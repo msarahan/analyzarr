@@ -1,0 +1,5 @@
+Analyzarr is the spare-time project of Michael Sarahan.  It draws some inspiration from the HyperSpy project (http://www.hyperspy.org), to which Michael contributed.
+
+Analyzarr is only developed when scientists bug Michael to add features.  Thus far, the fires under his ass are:
+
+- Quentin Ramasse
