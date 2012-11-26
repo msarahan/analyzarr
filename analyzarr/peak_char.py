@@ -16,8 +16,107 @@ import sys
 import numpy as np
 from scipy.signal import medfilt
 
-import pyximport; pyximport.install()
-from one_dim_findpeaks import one_dim_findpeaks
+#import pyximport; pyximport.install()
+try:
+    from one_dim_findpeaks import one_dim_findpeaks
+except:
+    def one_dim_findpeaks_naive(y, x=None, slope_thresh=0.5, amp_thresh=None,
+                                medfilt_radius=5, maxpeakn=30000, peakgroup=10, subchannel=True,
+                                peak_array=None):
+        """
+        Find peaks along a 1D line.
+        
+        Function to locate the positive peaks in a noisy x-y data set.
+
+        Detects peaks by looking for downward zero-crossings in the first
+        derivative that exceed 'slope_thresh'.
+    
+        Returns an array containing position, height, and width of each peak.
+    
+        'slope_thresh' and 'amp_thresh', control sensitivity: higher values will
+        neglect smaller features.
+    
+        Parameters
+        ---------
+        y : array
+            1D input array, e.g. a spectrum
+    
+        x : array (optional)
+            1D array describing the calibration of y (must have same shape as y)
+    
+        slope_thresh : float (optional)
+            1st derivative threshold to count the peak
+            default is set to 0.5
+            higher values will neglect smaller features.
+    
+        amp_thresh : float (optional)
+            intensity threshold above which   
+            default is set to 10% of max(y)
+            higher values will neglect smaller features.
+    
+        medfilt_radius : int (optional)
+            median filter window to apply to smooth the data
+            (see scipy.signal.medfilt)
+            if 0, no filter will be applied.
+            default is set to 5
+    
+        peakgroup : int (optional)
+            number of points around the "top part" of the peak
+            default is set to 10
+    
+        maxpeakn : int (optional)
+            number of maximum detectable peaks
+            default is set to 30000
+    
+        subchannel : bool (optional)
+            default is set to True
+    
+        peak_array : array of shape (n, 3) (optional)
+            A pre-allocated numpy array to fill with peaks.  Saves memory,
+            especially when using the 2D peakfinder.
+    
+        Returns
+        -------
+        P : array of shape (npeaks, 3)
+            contains position, height, and width of each peak
+    
+        """
+        # Changelog
+        # T. C. O'Haver, 1995.  Version 2  Last revised Oct 27, 2006
+        # Converted to Python by Michael Sarahan, Feb 2011.
+        # Revised to handle edges better.  MCS, Mar 2011
+        if x is None:
+            x = np.arange(len(y),dtype=np.int64)
+        if not amp_thresh:
+            amp_thresh = 0.1 * y.max()
+        d = np.gradient(y)
+        if peak_array is None:
+            # allocate a result array for 'maxpeakn' peaks
+            P = np.zeros(y.shape[0])
+            H = np.zeros(y.shape[0])
+        else:
+            maxpeakn=peak_array.shape[0]
+            P=peak_array
+        peak = 0
+        for j in xrange(len(y) - 4):
+            if np.sign(d[j]) > np.sign(d[j+1]): # Detects zero-crossing
+                if np.sign(d[j+1]) == 0: continue
+                # if slope of derivative is larger than slope_thresh
+                if d[j] - d[j+1] > slope_thresh:
+                    # if height of peak is larger than amp_thresh
+                    if y[j] > amp_thresh:  
+                        location = x[j]	
+                        height = y[j]
+                        # no way to know peak width without
+                        # the above measurements.
+                        if (location > 0 and not np.isnan(location)
+                            and location < x[-1]):
+                            P[peak] = location
+                            H[peak] = height
+                            peak = peak + 1
+        # return only the part of the array that contains peaks
+        # (not the whole maxpeakn x 3 array)
+        return P[:peak], H[:peak]
 
 def two_dim_findpeaks(arr,subpixel=False,peak_width=10,medfilt_radius=5,maxpeakn=10000):
     """
@@ -54,16 +153,15 @@ def two_dim_findpeaks(arr,subpixel=False,peak_width=10,medfilt_radius=5,maxpeakn
     #
     mapX=np.zeros_like(arr)
     mapY=np.zeros_like(arr)
-    peak_array=np.zeros((maxpeakn,3))
 
     # do a 2D median filter, not a 1D.
     if medfilt_radius > 0:
         arr = medfilt(arr,medfilt_radius)
-    xc = [(one_dim_findpeaks(arr[i]))[0] for i in xrange(arr.shape[0])]
+    xc = [(odfp.one_dim_findpeaks(arr[i].astype(np.float64)))[0] for i in xrange(arr.shape[0])]
     for row in xrange(len(xc)):
         for col in xrange(xc[row].shape[0]):
             mapX[row,int(xc[row][col])]=1
-    yc = [(one_dim_findpeaks(arr[:,i]))[0] for i in xrange(arr.shape[1])]
+    yc = [(odfp.one_dim_findpeaks(arr[:,i].astype(np.float64)))[0] for i in xrange(arr.shape[1])]
     for col in xrange(len(yc)):
         for row in xrange(yc[col].shape[0]):
             mapY[int(yc[col][row]),col]=1
