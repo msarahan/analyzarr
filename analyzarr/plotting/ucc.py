@@ -154,8 +154,8 @@ class TemplatePicker(ImagePlot):
         key_bindings = key_bindings,
         width=940, height=530,resizable=True)        
 
-    def __init__(self, signal_instance, *args, **kw):
-        super(TemplatePicker, self).__init__(signal_instance, *args, **kw)
+    def __init__(self, controller, *args, **kw):
+        super(TemplatePicker, self).__init__(controller, *args, **kw)
         try:
             import cv
         except:
@@ -165,7 +165,7 @@ class TemplatePicker(ImagePlot):
                 print "OpenCV unavailable.  Can't do cross correlation without it.  Aborting."
                 return None
         self.OK_custom=OK_custom_handler()
-        tmp_plot_data=ArrayPlotData(imagedata=self.sig.data[self.img_idx,self.top:self.top+self.tmp_size,self.left:self.left+self.tmp_size])
+        tmp_plot_data=ArrayPlotData(imagedata=controller.current_image[self.img_idx,self.top:self.top+self.tmp_size,self.left:self.left+self.tmp_size])
         tmp_plot=Plot(tmp_plot_data,default_origin="top left")
         tmp_plot.img_plot("imagedata", colormap=jet)
         tmp_plot.aspect_ratio=1.0

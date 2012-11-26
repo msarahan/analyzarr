@@ -68,23 +68,41 @@ class OriginalSpectrumData(tables.IsDescription):
 
 def get_image_h5file(filename):
     # split off any extension in the filename - we add our own.
-    h5file = tables.openFile('%s.h5'%filename,'w')
+    h5file = tables.openFile('%s.chest'%filename,'w')
+    
     # data outline keeps records of what data are available - the linkage 
     # between which cells came from which images, locations, etc.
     data_outline = h5file.createTable('/', 'data_outline', 
                                      OriginalImageData)
-    # image group has data files as CArrays, peaks as Tables, image MDA 
-    # results as CArrays, peak MDA results as Tables.  Can be multiple of each.
+    # image group has data files as CArrays.  There is one array for each file,
+    # accessed by the filename.
     imgGroup = h5file.createGroup('/', 'rawdata')
 
-    # image MDA results group
-    imgMdaGroup = h5file.createGroup(imgGroup, 'mda_image_results')
+    # image MDA results group.  Nested:
+    #   - MDA type
+    #     - which image they (the cells) originated from
+    #       - Factors
+    #       - Scores    
+    
+    # note that image MDA really only makes sense to do on a single image.  This is
+    # related to Masashi Watanabe's MSA plugin, marketed by HREM Research, which
+    # provides a facility for doing SVD on an image.
+    
+    # If you want to do it on more than one image, do either one at a time, or do
+    # cell cropping.
+    imgMdaGroup = h5file.createGroup('/', 'mda_image_results')
 
-    # cell group has data files as CArrays, peaks as Tables, image MDA results 
-    # as CArrays, peak MDA results as Tables.  Can be multiple of each.
-    cellsGroup = h5file.createGroup(imgGroup, 'cells')
+    # cell group has cell stacks as CArrays - one for each file from which cells came
+    # cell group also has template used for cropping
+    cellsGroup = h5file.createGroup('/', 'cells')
 
-    cellsImgMdaGroup = h5file.createGroup(cellsGroup, 'mda_cells_results')
+    # mda cell results has factors/score images for cell data.  These are nested: 
+    #   - MDA type
+    #     - which image they (the cells) originated from
+    #       - Factors
+    #       - Scores
+    #       - anything else of interest
+    cellsImgMdaGroup = h5file.createGroup('/', 'mda_cells_results')
     
     h5file.flush()
 
@@ -92,12 +110,12 @@ def get_image_h5file(filename):
 
 def get_spectrum_h5file(filename):
     # split off any extension in the filename - we add our own.
-    h5file = tables.openFile('%s.h5'%filename,'w')
+    h5file = tables.openFile('%s.chest'%filename,'w')
     data_outline = h5file.createTable('/', 'data_outline', 
                                      OriginalSpectrumData)
     imgGroup = h5file.createGroup('/', 'rawdata')
     # image MDA results group
-    mdaGroup = h5file.createGroup(imgGroup, 'mda_results')
+    mdaGroup = h5file.createGroup('/', 'mda_results')
 
     h5file.flush()
 
