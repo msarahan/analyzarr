@@ -37,14 +37,17 @@ from pyface.api import ProgressDialog
 
 from types import ListType, TupleType
 
-from analyzarr.learn import cv_funcs
 import numpy as np
 from collections import OrderedDict
 import os
 
-import ipdb
+import peak_char as pc
+import cv_funcs
 
-from analyzarr.drawing.image import ImagePlot, key_bindings
+
+#import ipdb
+
+from image import ImagePlot, key_bindings
 
 """
 try:
@@ -72,14 +75,14 @@ ipshell = IPShellEmbed(args,
                        exit_msg = 'Leaving Interpreter, back to program.')
 """
 class OK_custom_handler(Handler):
-    def close(self,info, is_ok):
+    def close(self, info, is_ok):
         if is_ok:
             info.object.crop_cells_stack()
         return True      
 
 #(value=[Array(dtype=np.float32,value=np.zeros((64,64)))])
 # (value=[Array(shape=(None,3), value=np.array(([[0,0,0]])))])
-class TemplatePicker(ImagePlot):
+class CellCropper(ImagePlot):
     template = Array
     CC = Array
     peaks = List
@@ -155,7 +158,7 @@ class TemplatePicker(ImagePlot):
         width=940, height=530,resizable=True)        
 
     def __init__(self, controller, *args, **kw):
-        super(TemplatePicker, self).__init__(controller, *args, **kw)
+        super(CellCropper, self).__init__(controller, *args, **kw)
         try:
             import cv
         except:
@@ -165,7 +168,8 @@ class TemplatePicker(ImagePlot):
                 print "OpenCV unavailable.  Can't do cross correlation without it.  Aborting."
                 return None
         self.OK_custom=OK_custom_handler()
-        tmp_plot_data=ArrayPlotData(imagedata=controller.current_image[self.img_idx,self.top:self.top+self.tmp_size,self.left:self.left+self.tmp_size])
+        self.template = self.data[self.top:self.top+self.tmp_size,self.left:self.left+self.tmp_size]
+        tmp_plot_data=ArrayPlotData(imagedata=self.template)
         tmp_plot=Plot(tmp_plot_data,default_origin="top left")
         tmp_plot.img_plot("imagedata", colormap=jet)
         tmp_plot.aspect_ratio=1.0
@@ -174,7 +178,7 @@ class TemplatePicker(ImagePlot):
         self.crop_sig=None
 
     def render_image(self):
-        plot = super(TemplatePicker,self).render_image()
+        plot = super(CellCropper,self).render_image()
         img=plot.img_plot("imagedata", colormap=gray)[0]
         csr = CursorTool(img, drag_button='left', color='white',
                          line_width=2.0)
@@ -270,7 +274,7 @@ class TemplatePicker(ImagePlot):
             grid_data_source.set_data(np.arange(self.CC.shape[1]), 
                                       np.arange(self.CC.shape[0]))
         else:
-            self.img_plotdata.set_data("imagedata",self.sig.data[self.img_idx,:,:])
+            self.img_plotdata.set_data("imagedata",self.data)
         self.redraw_plots()
 
     @on_trait_change("img_idx")
@@ -279,22 +283,20 @@ class TemplatePicker(ImagePlot):
         TODO: We look up the index in the model - first get a list of files, then get the name
         of the file at the given index.
         """
+        super(CellCropper, self).update_img_depth()
         if self.ShowCC:
             self.update_CC()
-        else:
-            self.img_plotdata.set_data("imagedata",self.data[self.img_idx,:,:])
-        self.img_plot.title="%s of %s: "%(self.img_idx+1,self.numfiles)+self.titles[self.img_idx]
         self.redraw_plots()        
 
     def _get_max_pos_x(self):
-        max_pos_x=self.sig.data.shape[-1]-self.tmp_size-1
+        max_pos_x=self.data.shape[-1]-self.tmp_size-1
         if max_pos_x>0:
             return max_pos_x
         else:
             return None
 
     def _get_max_pos_y(self):
-        max_pos_y=self.sig.data.shape[-2]-self.tmp_size-1
+        max_pos_y=self.data.shape[-2]-self.tmp_size-1
         if max_pos_y>0:
             return max_pos_y
         else:
@@ -320,22 +322,20 @@ class TemplatePicker(ImagePlot):
         
     @on_trait_change('left, top, tmp_size')
     def update_tmp_plot(self):
-        self.tmp_plotdata.set_data("imagedata", 
-                                   self.sig.data[self.img_idx,self.top:self.top+self.tmp_size,self.left:self.left+self.tmp_size])
+        self.template = self.data[self.top:self.top+self.tmp_size,self.left:self.left+self.tmp_size]
+        self.tmp_plotdata.set_data("imagedata", self.template)
         grid_data_source = self.tmp_plot.range2d.sources[0]
         grid_data_source.set_data(np.arange(self.tmp_size), np.arange(self.tmp_size))
         self.tmp_img_idx=self.img_idx
         if self.numpeaks_total>0:
             print "clearing peaks"
             self.peaks=[np.array([[0,0,-1]])]
+        self.update_CC()
         return
 
-    @on_trait_change('left, top, tmp_size')
     def update_CC(self):
         if self.ShowCC:
-            self.CC = cv_funcs.xcorr(self.sig.data[self.tmp_img_idx,self.top:self.top+self.tmp_size,
-                                                   self.left:self.left+self.tmp_size],
-                                     self.sig.data[self.img_idx,:,:])
+            self.CC = cv_funcs.xcorr(self.template, self.data)
             self.img_plotdata.set_data("imagedata",self.CC)
 
     @on_trait_change('cbar_selection:selection')
@@ -378,16 +378,14 @@ class TemplatePicker(ImagePlot):
 
     @on_trait_change('findpeaks')
     def locate_peaks(self):
-        from analyzarr import peak_char as pc
         peaks=[]
         progress = ProgressDialog(title="Peak finder progress", message="Finding peaks on %s images"%self.numfiles, max=self.numfiles, show_time=True, can_cancel=False)
         progress.open()
         for idx in xrange(self.numfiles):
             # TODO: use a dictionary of files, get rid of this indexing mess
-            self.CC = cv_funcs.xcorr(self.sig.data[self.tmp_img_idx,
-                                                   self.top:self.top+self.tmp_size,
-                                                   self.left:self.left+self.tmp_size],
-                                               self.sig.data[idx,:,:])
+            self.controller.set_active_index(idx)
+            self.data = self.controller.get_active_data()[:]
+            self.CC = cv_funcs.xcorr(self.template, self.data)
             # peak finder needs peaks greater than 1.  Multiply by 255 to scale them.
             pks=pc.two_dim_findpeaks(self.CC*255, peak_width=self.peak_width, medfilt_radius=None)
             pks[:,2]=pks[:,2]/255.

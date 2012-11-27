@@ -1,6 +1,7 @@
 
 import traits.api as t
 from plotting.image import ImagePlot
+from plotting.ucc import CellCropper
 
 # essential tasks:
 
@@ -38,6 +39,9 @@ class HighSeasAdventure(t.HasTraits):
     # run analyses
         
     ## fire up cell cropper
+    def cell_cropper(self):
+        ui = CellCropper(self)
+        ui.configure_traits()
 
     def _get_image_data(self, datatype, slab=[]):
         """

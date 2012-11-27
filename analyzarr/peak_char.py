@@ -16,11 +16,11 @@ import sys
 import numpy as np
 from scipy.signal import medfilt
 
-#import pyximport; pyximport.install()
+# try to use the faster Cython version.  If it's not available, fall back to the python definition below (~5x slower)
 try:
     from one_dim_findpeaks import one_dim_findpeaks
 except:
-    def one_dim_findpeaks_naive(y, x=None, slope_thresh=0.5, amp_thresh=None,
+    def one_dim_findpeaks(y, x=None, slope_thresh=0.5, amp_thresh=None,
                                 medfilt_radius=5, maxpeakn=30000, peakgroup=10, subchannel=True,
                                 peak_array=None):
         """
@@ -157,11 +157,11 @@ def two_dim_findpeaks(arr,subpixel=False,peak_width=10,medfilt_radius=5,maxpeakn
     # do a 2D median filter, not a 1D.
     if medfilt_radius > 0:
         arr = medfilt(arr,medfilt_radius)
-    xc = [(odfp.one_dim_findpeaks(arr[i].astype(np.float64)))[0] for i in xrange(arr.shape[0])]
+    xc = [(one_dim_findpeaks(arr[i].astype(np.float64)))[0] for i in xrange(arr.shape[0])]
     for row in xrange(len(xc)):
         for col in xrange(xc[row].shape[0]):
             mapX[row,int(xc[row][col])]=1
-    yc = [(odfp.one_dim_findpeaks(arr[:,i].astype(np.float64)))[0] for i in xrange(arr.shape[1])]
+    yc = [(one_dim_findpeaks(arr[:,i].astype(np.float64)))[0] for i in xrange(arr.shape[1])]
     for col in xrange(len(yc)):
         for row in xrange(yc[col].shape[0]):
             mapY[int(yc[col][row]),col]=1
