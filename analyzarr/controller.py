@@ -2,6 +2,8 @@
 import traits.api as t
 from plotting.image import ImagePlot
 from plotting.ucc import CellCropper
+from file_import import filters
+import tables as tb
 
 # essential tasks:
 
@@ -42,6 +44,30 @@ class HighSeasAdventure(t.HasTraits):
     def cell_cropper(self):
         ui = CellCropper(self)
         ui.configure_traits()
+
+    def add_cells(self, name, data, locations):
+        ds = self.chest.createCArray(self.chest.root.cells, 
+                                    name, 
+                                    tb.Atom.from_dtype(data.dtype),
+                                    data.shape,
+                                    filters=filters
+                                    )
+        ds = data[:]
+        self.chest.flush()
+        
+        loc = self.chest.root.cell_description.row
+        for idx in xrange(locations.shape[0]):
+            loc['idx'] = idx
+            # TODO: generalize so that data can come from anywhere
+            loc['input_data'] = '/root/rawdata'
+            loc['original_image'] = name
+            loc['x_coordinate'] = locations[idx, 0]
+            loc['y_coordinate'] = locations[idx, 1]
+            loc.append()
+        self.chest.root.cell_description.flush()
+        self.chest.flush()
+        #self.active_data_source = 'cells'
+        
 
     def _get_image_data(self, datatype, slab=[]):
         """

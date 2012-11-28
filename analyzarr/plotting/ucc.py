@@ -77,7 +77,7 @@ ipshell = IPShellEmbed(args,
 class OK_custom_handler(Handler):
     def close(self, info, is_ok):
         if is_ok:
-            info.object.crop_cells_stack()
+            info.object.crop_cells()
         return True      
 
 #(value=[Array(dtype=np.float32,value=np.zeros((64,64)))])
@@ -382,7 +382,6 @@ class CellCropper(ImagePlot):
         progress = ProgressDialog(title="Peak finder progress", message="Finding peaks on %s images"%self.numfiles, max=self.numfiles, show_time=True, can_cancel=False)
         progress.open()
         for idx in xrange(self.numfiles):
-            # TODO: use a dictionary of files, get rid of this indexing mess
             self.controller.set_active_index(idx)
             self.data = self.controller.get_active_data()[:]
             self.CC = cv_funcs.xcorr(self.template, self.data)
@@ -431,45 +430,22 @@ class CellCropper(ImagePlot):
         self.container.request_redraw()
         self.img_container.request_redraw()
 
-    def crop_cells_stack(self):
-        from analyzarr.signals.aggregate import AggregateCells
-        if self.numfiles==1:
-            self.crop_sig=self.crop_cells()
-            return
-        else:
-            crop_agg=[]
-            for idx in xrange(self.numfiles):
-                peaks=np.ma.compress_rows(self.mask_peaks(idx))
-                if peaks.any():
-                    crop_agg.append(self.crop_cells(idx))
-            self.crop_sig=AggregateCells(parent=self.sig, *crop_agg)
-            return
-
-    def crop_cells(self,idx=0):
+    def crop_cells(self):
         print "cropping cells..."
-        from analyzarr.signals.image import Image
-        # filter the peaks that are outside the selected threshold
-        peaks=np.ma.compress_rows(self.mask_peaks(idx))
-        tmp_sz=self.tmp_size
-        data=np.zeros((peaks.shape[0],tmp_sz,tmp_sz))
-        if not hasattr(self.sig.mapped_parameters,"original_files"):
-            parent=self.sig
-        else:
-            parent=self.sig.mapped_parameters.original_files[self.titles[idx]]
-        pmp=parent.mapped_parameters
-        positions=np.zeros((peaks.shape[0],1),dtype=[('filename','a256'),('id','i4'),('position','f4',(1,2))])
-        for i in xrange(peaks.shape[0]):
-            # crop the cells from the given locations
-            data[i,:,:]=self.sig.data[idx,peaks[i,1]:peaks[i,1]+tmp_sz,peaks[i,0]:peaks[i,0]+tmp_sz]
-            positions[i]=(self.titles[idx],i,peaks[i,:2])
-            crop_sig=Image({'data':data,
-                            'mapped_parameters':{
-                               'title':'Cropped cells from %s'%self.titles[idx],
-                               'record_by':'image',
-                               'locations':positions,
-                               'original_files':{pmp.title:parent},
-                               }
-                            })
-            
-        return crop_sig
+        for idx in xrange(self.numfiles):
+            # filter the peaks that are outside the selected threshold
+            self.controller.set_active_index(idx)
+            self.data = self.controller.get_active_data()[:]
+            self.name = self.controller.get_active_data().name
+            peaks=np.ma.compress_rows(self.mask_peaks(idx))
+            tmp_sz=self.tmp_size
+            data=np.zeros((peaks.shape[0],tmp_sz,tmp_sz))
+            for i in xrange(peaks.shape[0]):
+                # crop the cells from the given locations
+                data[i,:,:]=self.data[peaks[i,1]:peaks[i,1]+tmp_sz, 
+                                      peaks[i,0]:peaks[i,0]+tmp_sz]
+            # send the data to the controller for storage in the chest
+            self.controller.add_cells(name = self.name, data = data,
+                                      locations = peaks)
+        
 

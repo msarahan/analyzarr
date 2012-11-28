@@ -1,32 +1,35 @@
-
-
 import tables
 
 class MdaResults(tables.IsDescription):
     idx = tables.Int64Col(pos=0)
     # type of MDA
     mda_type = tables.StringCol(10)
-    # description of where data came from
+    # description of where data came from (as a path in the file, for example:
+    # '/root/rawdata'
     input_data = tables.StringCol(250)
     # was data filtered or reconstructed?
     treatments = tables.StringCol(250)
 
 class PeakData(tables.IsDescription):
     idx = tables.Int64Col(pos=0)
-    x = tables.Float32Col(pos=1)
-    y = tables.Float32Col(pos=2)
-    height = tables.Float32Col(pos=3)
-    orientation = tables.Float32Col(pos=4)
-    eccentricity = tables.Float32Col(pos=5)
-    # which file did it come from?  This might be a cell or a parent image.
+    # description of where data came from (as a path in the file, for example:
+    # '/root/rawdata'    
     input_data = tables.StringCol(250)
+    # filename that the data is from
+    original_image = tables.StringCol(250, pos = 1)
+    cell_id = tables.Int64Col(pos = 2)
+    x = tables.Float32Col(pos=3)
+    y = tables.Float32Col(pos=4)
+    height = tables.Float32Col(pos=5)
+    orientation = tables.Float32Col(pos=6)
+    eccentricity = tables.Float32Col(pos=7)
     # treatments - any prior processing (for example, reconstruction)    
     treatments = tables.StringCol(250)
 
     # Higher order moments - third: shift from center?
     # how to introduce Chebyshev polynomials?
 
-class OriginalImageData(tables.IsDescription):
+class ImageDataTable(tables.IsDescription):
     idx = tables.Int64Col(pos=0)
     # metadata = tables.
     # attributes - tags
@@ -34,37 +37,26 @@ class OriginalImageData(tables.IsDescription):
     filename = tables.StringCol(250)    
     # treatments - any prior processing (for example, reconstruction)
     treatments = tables.StringCol(250)
-    peaks = PeakData()
-    mda_image_results = MdaResults()
-    mda_peak_results = PeakData()
-    class Cells(tables.IsDescription):
-        idx = tables.Int64Col()
-        # the image from which this cell was cropped
-        parent = tables.StringCol(150)
-        # the upper left coordinate of the parent image where this
-        # cell was cropped from.
-        x_coordinate = tables.Float32Col()
-        y_coordinate = tables.Float32Col()
-        # peaks here can be mapped back to the original image by 
-        # some offset from the x and y coordinate.
-        peaks = PeakData()
-        peaks_avg = PeakData()
-        # MDA results tables specifc to cell stacks
-        mda_image_results = MdaResults()
-        mda_peak_results = PeakData()
+    
+class CellsTable(tables.IsDescription):
+    idx = tables.Int64Col(pos=0)
+    # description of where data came from (as a path in the file, for example:
+    # '/root/rawdata'    
+    input_data = tables.StringCol(250)
+    # filename that the data is from
+    original_image = tables.StringCol(250, pos = 1)
+    # the upper left coordinate of the parent image where this
+    # cell was cropped from.
+    x_coordinate = tables.Float32Col(pos=3)
+    y_coordinate = tables.Float32Col(pos=4)
+    
 
-class OriginalSpectrumData(tables.IsDescription):
+class SpectrumDataTable(tables.IsDescription):
     idx = tables.Int64Col(pos=0)
     # name of a file
     filename = tables.StringCol(250)  
-
-    # metadata = tables.
-  
     # treatments - any prior processing (for example, reconstruction)
     treatments = tables.StringCol(250)
-
-    # holds results from any number of MDA treatments
-    mda_results = MdaResults()
 
 def get_image_h5file(filename):
     # split off any extension in the filename - we add our own.
@@ -72,8 +64,13 @@ def get_image_h5file(filename):
     
     # data outline keeps records of what data are available - the linkage 
     # between which cells came from which images, locations, etc.
-    data_outline = h5file.createTable('/', 'data_outline', 
-                                     OriginalImageData)
+    image_table = h5file.createTable('/', 'image_description', 
+                                     ImageDataTable)
+    
+    cell_table = h5file.createTable('/', 'cell_description', 
+                                     CellsTable)
+    cell_peak_table = h5file.createTable('/', 'cell_peaks',
+                                         CellsTable)
     # image group has data files as CArrays.  There is one array for each file,
     # accessed by the filename.
     imgGroup = h5file.createGroup('/', 'rawdata')
@@ -111,8 +108,8 @@ def get_image_h5file(filename):
 def get_spectrum_h5file(filename):
     # split off any extension in the filename - we add our own.
     h5file = tables.openFile('%s.chest'%filename,'w')
-    data_outline = h5file.createTable('/', 'data_outline', 
-                                     OriginalSpectrumData)
+    data_outline = h5file.createTable('/', 'image_description', 
+                                     SpectrumDataTable)
     imgGroup = h5file.createGroup('/', 'rawdata')
     # image MDA results group
     mdaGroup = h5file.createGroup('/', 'mda_results')

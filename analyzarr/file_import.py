@@ -11,6 +11,8 @@ tiff_extensions = ['.tiff', '.tif',]
 
 dm_extensions = ['.dm3',]
 
+filters = tb.Filters(complib='blosc', complevel=8)
+
 # I don't give a rat's ass about FEI's MRC files or other spectral formats.  
 # Sorry.
 
@@ -43,11 +45,10 @@ def import_files(file_string, output_filename = None):
 
 def import_image(flist, output_filename=None):
     from scipy.misc import imread
-    filters = tb.Filters(complib='blosc', complevel=8)
     if output_filename is None:
         output_filename = "image_treasure_%s" % ""    
     h5file = get_image_h5file(output_filename)
-    data_record = h5file.root.data_outline.row
+    data_record = h5file.root.image_description.row
     # any kind of jpg, png can be lumped together
     for f in flist:
         # get data as numpy array
@@ -65,6 +66,8 @@ def import_image(flist, output_filename=None):
         data_record['filename'] = os.path.splitext(f)[0]
         data_record['idx'] = flist.index(f)
         data_record.append()
+    h5file.root.image_description.flush()
+    h5file.flush()
     return h5file
         
 
@@ -74,8 +77,7 @@ def import_tiff(flist, output_filename=None):
     if output_filename is None:
         output_filename = "image_treasure_%s" % ""    
     h5file = get_image_h5file(output_filename)
-    filters = tb.Filters(complib='blosc', complevel=8)
-    data_record = h5file.root.data_outline.row
+    data_record = h5file.root.image_description.row
     # any kind of jpg, png can be lumped together
     for f in flist:
         # get data as numpy array
@@ -94,12 +96,13 @@ def import_tiff(flist, output_filename=None):
         data_record['filename'] = os.path.splitext(f)[0]
         data_record['idx'] = flist.index(f)
         data_record.append()
+    h5file.root.image_description.flush()
+    h5file.flush()
     return h5file
         
 
 # DM3 files
 def import_dm(flist, output_filename=None):
-    filters = tb.Filters(complib='blosc', complevel=8)
     from lib.io.digital_micrograph import file_reader
     tmp_dm3, tmp_tags = file_reader(flist[0])
     
@@ -112,7 +115,7 @@ def import_dm(flist, output_filename=None):
             output_filename = "image_treasure_%s" % ""
         h5file = get_image_h5file(output_filename)
     
-    data_record = h5file.root.data_outline.row
+    data_record = h5file.root.image_description.row
     for f in flist:
         print "loading file: %s" %f
         # this is a little wasteful (re-reading the first file), 
@@ -134,6 +137,7 @@ def import_dm(flist, output_filename=None):
         data_record['filename'] = os.path.splitext(tmp_dm3.name)[0]
         data_record['idx'] = flist.index(f)
         data_record.append()
-
     # flush the data to commit our changes to the file.
+    h5file.root.image_description.flush()
+    h5file.flush()
     return h5file
