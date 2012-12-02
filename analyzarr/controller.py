@@ -52,7 +52,7 @@ class HighSeasAdventure(t.HasTraits):
                                     data.shape,
                                     filters=filters
                                     )
-        ds = data[:]
+        ds[:] = data
         self.chest.flush()
         
         loc = self.chest.root.cell_description.row
