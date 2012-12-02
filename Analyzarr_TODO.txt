@@ -1,0 +1,19 @@
+GOALS:
+Start to finish:
+- Load image data (done)
+- crop cells (done)
+- locate and characterize peaks on cells
+- present several analysis methods
+  - MDA
+  - peak char ratios
+- plot results
+  - overlay of factors (peak heights, shifts, etc.) on cells
+  - overlay of scores on original images
+  - overlay of peak ID #'s for identifying peaks to select peak chars from
+
+BONUS:
+- spectral MDA - provide base functionality, but defer to hyperspy
+- other machine learning methods - neural nets?
+
+STEPS TO ACHIEVE:
+- restore plotting of results from Hyperspy
