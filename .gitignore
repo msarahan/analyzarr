@@ -1,0 +1,10 @@
+syntax: glob
+*.pyd
+*.dm3
+*.pyc
+*.h5
+*.chest
+bin/*
+doc/.build/*
+doc/user_guide/_build/*
+doc/user_guide/.build/
