@@ -40,22 +40,7 @@ class HighSeasAdventure(t.HasTraits):
             self.selected_image = img_idx
             self.selected_cell = 0
         elif self.active_data_source is 'cells':
-            diff = img_idx - self.selected_image_cell
-            # select a different parent image if we go out of range of this one
-            if (self.selected_cell+diff) > len( [x['idx'] for x in self.chest.root.cell_description.where(
-                'original_image == "%s"' % nodes[self.selected_image])]):
-                if self.selected_image < len(nodes):
-                    self.selected_image += 1
-                    self.selected_image_cell = 0
-                else:
-                    self.selected_image = 0
-                    self.selected_image_cell = 0
-            else:
-                self.selected_cell = img_idx
-                if img_idx == 0:
-                    self.selected_image_cell = 0
-                else:
-                    self.selected_image_cell = self.selected_cell + diff
+            self.selected_cell = img_idx
 
     def set_active_data(self, active_data = 'rawdata'):
         self.active_data_source = active_data
@@ -66,16 +51,16 @@ class HighSeasAdventure(t.HasTraits):
             return nodes[self.selected_image][:]
         elif self.active_data_source is 'cells':
             # find the parent that this cell comes from
-            parent = self.chest.root.cell_description.read(start = self.selected_cell, 
-                                                           stop = self.selected_cell + 1,
-                                                           field = "original_image")
+            cell_record = self.chest.root.cell_description.read(start = self.selected_cell, 
+                                                           stop = self.selected_cell + 1)[0]
+            parent = cell_record['original_image']
             # select that parent as the selected image
             self.selected_image = int([x['idx'] for x in 
-                                   self.chest.root.image_description.iterrows()
-                                   if x['filename'] == parent][0])
+                                   self.chest.root.image_description.where(
+                                       'filename == "%s"' % parent)][0])
             
             # return the cell data
-            return nodes[self.selected_image][self.selected_image_cell,:,:]
+            return nodes[self.selected_image][cell_record['idx'],:,:]
 
     def get_active_name(self):
         nodes = self.chest.listNodes('/rawdata')
