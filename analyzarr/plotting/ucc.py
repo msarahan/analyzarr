@@ -435,17 +435,18 @@ class CellCropper(ImagePlot):
         for idx in xrange(self.numfiles):
             # filter the peaks that are outside the selected threshold
             self.controller.set_active_index(idx)
-            self.data = self.controller.get_active_data()[:]
-            self.name = self.controller.get_active_data().name
+            self.data = self.controller.get_active_data()
+            self.name = self.controller.get_active_name()
             peaks=np.ma.compress_rows(self.mask_peaks(idx))
             tmp_sz=self.tmp_size
             data=np.zeros((peaks.shape[0],tmp_sz,tmp_sz))
-            for i in xrange(peaks.shape[0]):
-                # crop the cells from the given locations
-                data[i,:,:]=self.data[peaks[i,1]:peaks[i,1]+tmp_sz, 
+            if data.shape[0] >0:
+                for i in xrange(peaks.shape[0]):
+                    # crop the cells from the given locations
+                    data[i,:,:]=self.data[peaks[i,1]:peaks[i,1]+tmp_sz, 
                                       peaks[i,0]:peaks[i,0]+tmp_sz]
-            # send the data to the controller for storage in the chest
-            self.controller.add_cells(name = self.name, data = data,
+                # send the data to the controller for storage in the chest
+                self.controller.add_cells(name = self.name, data = data,
                                       locations = peaks)
         
 

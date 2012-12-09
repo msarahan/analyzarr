@@ -1,3 +1,15 @@
+# -*- coding: utf-8 -*-
+"""
+Copyright (c) 2012, Michael Sarahan
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+
+    Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+    Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+"""
 
 import traits.api as t
 from plotting.image import ImagePlot
@@ -13,6 +25,7 @@ class HighSeasAdventure(t.HasTraits):
     selected_image = t.Int(0)
     # current cell index
     selected_cell = t.Int(0)
+    selected_image_cell = t.Int(0)
     # where plot data should come from
     active_data_source = t.Str("rawdata")
     # definition of any attribute or combination of attributes to be mapped
@@ -22,18 +35,60 @@ class HighSeasAdventure(t.HasTraits):
         self.chest = treasure_chest
 
     def set_active_index(self, img_idx):
+        nodes = self.chest.listNodes('/rawdata')
         if self.active_data_source is "rawdata":
             self.selected_image = img_idx
+            self.selected_cell = 0
         elif self.active_data_source is 'cells':
-            self.selected_cell = img_idx
+            diff = img_idx - self.selected_image_cell
+            # select a different parent image if we go out of range of this one
+            if (self.selected_cell+diff) > len( [x['idx'] for x in self.chest.root.cell_description.where(
+                'original_image == "%s"' % nodes[self.selected_image])]):
+                if self.selected_image < len(nodes):
+                    self.selected_image += 1
+                    self.selected_image_cell = 0
+                else:
+                    self.selected_image = 0
+                    self.selected_image_cell = 0
+            else:
+                self.selected_cell = img_idx
+                if img_idx == 0:
+                    self.selected_image_cell = 0
+                else:
+                    self.selected_image_cell = self.selected_cell + diff
+
+    def set_active_data(self, active_data = 'rawdata'):
+        self.active_data_source = active_data
             
     def get_active_data(self):
-        nodes = self.chest.listNodes('/%s' % self.active_data_source)
+        nodes = self.chest.listNodes('/%s'%self.active_data_source)
         if self.active_data_source is 'rawdata':
-            return nodes[self.selected_image]
+            return nodes[self.selected_image][:]
         elif self.active_data_source is 'cells':
-            return nodes[self.selected_cell]
+            # find the parent that this cell comes from
+            parent = self.chest.root.cell_description.read(start = self.selected_cell, 
+                                                           stop = self.selected_cell + 1,
+                                                           field = "original_image")
+            # select that parent as the selected image
+            self.selected_image = int([x['idx'] for x in 
+                                   self.chest.root.image_description.iterrows()
+                                   if x['filename'] == parent][0])
+            
+            # return the cell data
+            return nodes[self.selected_image][self.selected_image_cell,:,:]
 
+    def get_active_name(self):
+        nodes = self.chest.listNodes('/rawdata')
+        if self.active_data_source is 'rawdata':
+            return nodes[self.selected_image].name
+        elif self.active_data_source is 'cells':  
+            return '(from %s)' %nodes[self.selected_image].name
+
+    def get_num_files(self):
+        if self.active_data_source is 'rawdata':
+            return len(self.chest.listNodes('/rawdata'))
+        elif self.active_data_source is 'cells':          
+            return self.chest.root.cell_description.nrows
     # get plots
     def spyglass(self):
         chaco_plot = ImagePlot(self)
@@ -42,6 +97,7 @@ class HighSeasAdventure(t.HasTraits):
         
     ## fire up cell cropper
     def cell_cropper(self):
+        self.set_active_data('rawdata')
         ui = CellCropper(self)
         ui.configure_traits()
 
@@ -56,6 +112,7 @@ class HighSeasAdventure(t.HasTraits):
         self.chest.flush()
         
         loc = self.chest.root.cell_description.row
+        
         for idx in xrange(locations.shape[0]):
             loc['idx'] = idx
             # TODO: generalize so that data can come from anywhere
@@ -85,8 +142,17 @@ class HighSeasAdventure(t.HasTraits):
         """
         pass
     
-    def plot_images():
-        _img_plot(window = main_window, data = _get_image_data("rawdata"))
+    def plot_images(self):
+        main_window = None
+        self.set_active_data('rawdata')
+        self.spyglass()
 
-    def plot_cells():
-        _img_plot(window = main_window, data = _get_image_data("cells"))
+
+    def plot_cells(self):
+        main_window = None
+        self.set_active_data('cells')
+        #
+        self.spyglass()
+
+
+        

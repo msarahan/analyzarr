@@ -17,3 +17,8 @@ BONUS:
 
 STEPS TO ACHIEVE:
 - restore plotting of results from Hyperspy
+
+File structure:
+- group per experiment:
+   - group for each cropping experiment
+     - subgroup for analyses

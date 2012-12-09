@@ -67,9 +67,9 @@ class ImagePlot(HasTraits):
     def __init__(self, controller, *args, **kw):
         super(ImagePlot, self).__init__(*args,**kw)
         self.controller = controller
-        self.numfiles = len(controller.chest.listNodes("/%s"%controller.active_data_source))
-        self.data = controller.get_active_data()[:]
-        self.filename = controller.get_active_data().name
+        self.numfiles = controller.get_num_files()
+        self.data = controller.get_active_data()
+        self.filename = controller.get_active_name()
         self.img_plotdata=ArrayPlotData(imagedata = self.data)
         self.img_container=self._image_plot_container()
 
@@ -100,8 +100,8 @@ class ImagePlot(HasTraits):
     @on_trait_change("img_idx")
     def update_img_depth(self):
         self.controller.set_active_index(self.img_idx)
-        self.data = self.controller.get_active_data()[:]
-        self.name = self.controller.get_active_data().name
+        self.data = self.controller.get_active_data()
+        self.filename = self.controller.get_active_name()
         self.img_plotdata.set_data("imagedata",self.data)
         self.img_plot.title="%s of %s: "%(self.img_idx+1,self.numfiles)+self.filename
 
