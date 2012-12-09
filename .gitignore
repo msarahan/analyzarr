@@ -3,8 +3,13 @@ syntax: glob
 *.dm3
 *.pyc
 *.h5
+*.wpu
 *.chest
+
 bin/*
+
 doc/.build/*
+
 doc/user_guide/_build/*
+
 doc/user_guide/.build/
