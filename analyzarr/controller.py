@@ -16,7 +16,9 @@ from plotting.image import ImagePlot
 from plotting.ucc import CellCropper
 from file_import import filters
 import tables as tb
+import numpy as np
 
+import peak_char as pc
 # essential tasks:
 
 class HighSeasAdventure(t.HasTraits):
@@ -74,6 +76,19 @@ class HighSeasAdventure(t.HasTraits):
             return len(self.chest.listNodes('/rawdata'))
         elif self.active_data_source is 'cells':          
             return self.chest.root.cell_description.nrows
+        
+    def get_cell_set(self, names = None):
+        if names is None:
+            # query the raw data table for filenames
+            nodes = self.chest.listNodes('/cells')
+            celldata = nodes[0][:]
+            # collect all the cells
+            for node in nodes[1:]:
+                celldata = np.append(celldata, node[:], axis=0)
+        else:
+            celldata = None                
+        return celldata
+    
     # get plots
     def spyglass(self):
         chaco_plot = ImagePlot(self)
@@ -85,6 +100,28 @@ class HighSeasAdventure(t.HasTraits):
         self.set_active_data('rawdata')
         ui = CellCropper(self)
         ui.configure_traits()
+
+    def characterize_cells(self, peak_width, subpixel = False, target_locations = None,
+                           peak_locations = None, target_neighborhood = 20, 
+                           medfilt_radius = 5):
+        # get the peak attributes
+        attribs = pc.peak_attribs_stack(self.get_cell_set(), peak_width=peak_width, subpixel=subpixel, 
+                           target_locations=target_locations, peak_locations=peak_locations, 
+                           target_neighborhood=target_neighborhood, medfilt_radius=medfilt_radius)
+        # transpose the results - they come in the form of one column per image.  Should be one row per image.
+        attribs = attribs.T
+        # populate a table with the results
+        names = [('x%i, y%i, dx%i, dy%i, h%i, o%i, e%i'%((x,)*7)).split(', ') for x in xrange(attribs.shape[1]//7)]
+        names = [item for sublist in names for item in sublist]
+        dtypes = zip(names, ['f8',]*attribs.shape[1])
+        dtypes = [('idx', "i4"),]+dtypes
+        data = np.zeros((attribs.shape[0]), dtype = dtypes)
+        data['idx'] = np.arange(attribs.shape[0])
+        for name_idx in xrange(len(names)):
+            data[names[name_idx]] = attribs[:,name_idx]
+        self.chest.createTable(self.chest.root, 'cell_peaks', description = data)
+        #self.chest.root.cell_peaks.append([data[idx] for idx in xrange(1,attribs.shape[0])])
+        self.chest.root.cell_peaks.flush()
 
     def add_cells(self, name, data, locations):
         ds = self.chest.createCArray(self.chest.root.cells, 

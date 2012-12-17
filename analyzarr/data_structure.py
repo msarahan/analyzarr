@@ -82,8 +82,8 @@ def get_image_h5file(filename):
     
     cell_table = h5file.createTable('/', 'cell_description', 
                                      CellsTable)
-    cell_peak_table = h5file.createTable('/', 'cell_peaks',
-                                         CellsTable)
+    #cell_peak_table = h5file.createTable('/', 'cell_peaks',
+    #                                     CellsTable)
     # image group has data files as CArrays.  There is one array for each file,
     # accessed by the filename.
     imgGroup = h5file.createGroup('/', 'rawdata')
