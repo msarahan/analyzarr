@@ -1160,55 +1160,141 @@ Nothing to plot.  Try again.""")
                                      vector_scale=vector_scale,
                                      per_row=per_row)
 
-def kmeans_cluster_stack(self, clusters=None):
-    import mdp
-    if self._unfolded:
-        self.fold()
-    # if clusters not given, try to determine what it should be.
-    if clusters is None:
-        pass
-    d=self.data
-    kmeans=mdp.nodes.KMeansClassifier(clusters)
-    cluster_arrays=[]
-
-    avg_stack=np.zeros((clusters,d.shape[1],d.shape[2]))
-    kmeans.train(d.reshape((-1,d.shape[0])).T)
-    kmeans.stop_training()
-    groups=kmeans.label(d.reshape((-1,d.shape[0])).T)
-    try:
-        # test if location data is available
-        self.mapped_parameters.locations[0]
-    except:
-        messages.warning("No cell location information was available.")
-    for i in xrange(clusters):
-        # get number of members of this cluster
-        members=groups.count(i)
-        cluster_array=np.zeros((members,d.shape[1],d.shape[2]))
-        cluster_idx=0
-        positions=np.zeros((members,3))
-        for j in xrange(len(groups)):
-            if groups[j]==i:
-                cluster_array[cluster_idx,:,:]=d[j,:,:]
-                try:
-                    positions[cluster_idx]=self.mapped_parameters.locations[j]
-                except:
-                    pass
-                cluster_idx+=1
-        cluster_array_Image=Image({
-            'data':avg_stack,
-            'mapped_parameters':{
-                'title' : 'Cluster %s from %s'%(i,
-                    self.mapped_parameters.title),
-                'locations':positions,
-                'members':members,}
-        })
-        cluster_arrays.append(cluster_array_Image)
-        avg_stack[i,:,:]=np.sum(cluster_array,axis=0)
-    members_list=[groups.count(i) for i in xrange(clusters)]
-    avg_stack_Image=Image({'data':avg_stack,
+    def kmeans_cluster_stack(self, cells, clusters=None):
+        import mdp
+        if self._unfolded:
+            self.fold()
+        # if clusters not given, try to determine what it should be.
+        if clusters is None:
+            pass
+        d=cells
+        kmeans=mdp.nodes.KMeansClassifier(clusters)
+        cluster_arrays=[]
+    
+        avg_stack=np.zeros((clusters,d.shape[1],d.shape[2]))
+        kmeans.train(d.reshape((-1,d.shape[0])).T)
+        kmeans.stop_training()
+        groups=kmeans.label(d.reshape((-1,d.shape[0])).T)
+        try:
+            # test if location data is available
+            self.mapped_parameters.locations[0]
+        except:
+            messages.warning("No cell location information was available.")
+        for i in xrange(clusters):
+            # get number of members of this cluster
+            members=groups.count(i)
+            cluster_array=np.zeros((members,d.shape[1],d.shape[2]))
+            cluster_idx=0
+            positions=np.zeros((members,3))
+            for j in xrange(len(groups)):
+                if groups[j]==i:
+                    cluster_array[cluster_idx,:,:]=d[j,:,:]
+                    try:
+                        positions[cluster_idx]=self.mapped_parameters.locations[j]
+                    except:
+                        pass
+                    cluster_idx+=1
+            cluster_array_Image=Image({
+                'data':avg_stack,
                 'mapped_parameters':{
-                    'title':'Cluster averages from %s'%self.mapped_parameters.title,
-                    'member_counts':members_list,
-                    }
-                })
-    return avg_stack_Image, cluster_arrays
+                    'title' : 'Cluster %s from %s'%(i,
+                        self.mapped_parameters.title),
+                    'locations':positions,
+                    'members':members,}
+            })
+            cluster_arrays.append(cluster_array_Image)
+            avg_stack[i,:,:]=np.sum(cluster_array,axis=0)
+        members_list=[groups.count(i) for i in xrange(clusters)]
+        avg_stack_Image=Image({'data':avg_stack,
+                    'mapped_parameters':{
+                        'title':'Cluster averages from %s'%self.mapped_parameters.title,
+                        'member_counts':members_list,
+                        }
+                    })
+        return avg_stack_Image, cluster_arrays
+
+    def _plot_quiver_scatter_overlay(self, image, calibrate=True, shifts=None, 
+                                     char=None, ax=None, comp_label=None,
+                                     img_cmap=plt.cm.gray,
+                                     sc_cmap=plt.cm.jet,
+                                     quiver_color='white',
+                                     vector_scale=1,
+                                     cbar_label=None
+                                     ):
+        """quiver plot notes:
+           
+           The vector_scale parameter scales the quiver
+               plot arrows.  The vector is defined as
+               one data unit along the X axis.  If shifts
+               are small, set vector_scale so that when
+               they are multiplied by vector_scale, they
+               are on the scale of the image plot.
+        """
+        if ax==None:
+            ax=plt.gca()
+        extent=None
+        if shifts is not None:
+            slocs=shifts['location'].squeeze().copy()
+            shifts=shifts['shift'].squeeze().copy()
+        if char is not None:
+            clocs=char['location'].squeeze().copy()        
+        """
+        if calibrate:
+            extent=(axes[1].low_value,
+                    axes[1].high_value,
+                    axes[0].high_value,
+                    axes[0].low_value)
+            if shifts is not None:                
+                slocs[:,0]=slocs[:,0]*axes[0].scale+axes[0].offset
+                slocs[:,1]=slocs[:,1]*axes[1].scale+axes[1].offset
+                shifts[:,0]=shifts[:,0]*axes[0].scale+axes[0].offset
+                shifts[:,1]=shifts[:,1]*axes[1].scale+axes[1].offset
+            if char is not None:
+                clocs[:,0]=clocs[:,0]*axes[0].scale+axes[0].offset
+                clocs[:,1]=clocs[:,1]*axes[1].scale+axes[1].offset
+        """
+        ax.imshow(image,interpolation='nearest',
+                  cmap=img_cmap,extent=extent)
+        if comp_label:
+            plt.title(comp_label)
+        if shifts is not None:
+            ax.quiver(slocs[:,0],slocs[:,1],
+                      shifts[:,0], shifts[:,1],
+                      units='x',color=quiver_color,
+                      scale=vector_scale, scale_units='x')
+        if char is not None:
+            sc=ax.scatter(clocs[:,0],clocs[:,1],
+                       c=char['char'], cmap=sc_cmap)
+            div=make_axes_locatable(ax)
+            cax=div.append_axes('right',size="5%",pad=0.05)
+            cb=plt.colorbar(sc,cax=cax)
+            if cbar_label:
+                cb.set_label(cbar_label)
+        if extent:
+            ax.set_xlim(extent[:2])
+            ax.set_ylim(extent[2:])
+        else:
+            ax.set_xlim(0,image.shape[0])
+            ax.set_ylim(image.shape[1],0)
+        return ax
+    
+    def plot_image_peaks(img_data, locations, plot_ids=False, ax=None):
+        if ax is None:
+            ax=plt.gca()
+        ax.imshow(img_data,cmap=plt.gray(), 
+                interpolation = 'nearest')
+        if plot_ids:
+            for pk_id in xrange(locations.shape[0]):
+                plt.text(locations[pk_id,0], locations[pk_id,1], 
+                         "%s"%pk_id, size=10, rotation=0.,
+                         ha="center", va="center",
+                         bbox = dict(boxstyle="round",
+                                     ec=(1., 0.5, 0.5),
+                                     fc=(1., 0.8, 0.8),
+                                     )
+                         )
+        else:
+            ax.scatter(locations[:,0],locations[:,1])
+            ax.set_xlim(0,img_data.shape[0]-1)
+            ax.set_ylim(img_data.shape[1]-1,0)
+        return ax

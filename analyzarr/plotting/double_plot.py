@@ -21,6 +21,8 @@ import numpy as np
 from collections import OrderedDict
 import os
 
+from image import ImagePlot
+
 key_bindings = KeyBindings(
     KeyBinding( binding1    = 'Left',
                 description = 'Step left through images',
@@ -30,14 +32,12 @@ key_bindings = KeyBindings(
                 method_name = 'increase_img_idx' ),
 )
 
-class ImagePlot(HasTraits):
-
-    zero=Int(0)
-    img_plot = Instance(Plot)
-    next_img = Button
-    prev_img = Button
-    tab_selected = Event
-    img_container = Instance(Component)
+class DoubleImagePlot(ImagePlot):
+    left_plot = Instance(Plot)
+    right_plot = Instance(Plot)
+    total_container = Instance(Component)
+    left_container = Instance(Component)
+    right_container = Instance(Component)    
     colorbar= Instance(Component)
     cbar_selection = Instance(RangeSelection)
     cbar_selected = Event
@@ -47,7 +47,9 @@ class ImagePlot(HasTraits):
     traits_view = View(
         Group(
             Group(
-                Item("img_container",editor=ComponentEditor(), show_label=False),
+                HGroup(
+                    Item("total_container",editor=ComponentEditor(), show_label=False),
+                    ),
                 HGroup(
                     Spring(),
                     Item("prev_img",editor=ButtonEditor(label="<"),show_label=False, enabled_when='numfiles > 1'),
@@ -60,64 +62,44 @@ class ImagePlot(HasTraits):
             ),
         title="Image Viewer",
         key_bindings = key_bindings,
-        width=700, height=500,resizable=True
-    ) 
-
+        width=900, height=500,resizable=True
+    )
+    
     def __init__(self, controller, *args, **kw):
         super(ImagePlot, self).__init__(*args,**kw)
         self.controller = controller
         self.numfiles = controller.get_num_files()
-        #self.data_sources = controller.get_sources()
-        
+        # todo: must define two data sources
         self.data = controller.get_active_data()
-        self.img_data = ArrayPlotData(imagedata = self.data)
+        # todo: must base name on active data sources
         self.filename = controller.get_active_name()
-        self._create_image_plot_container()
-        self.plot = self.render_image(self.img_data)
-        self.img_container.add(self.plot)
+        # todo: we'll have two data sources
+        self.img_plotdata=ArrayPlotData(imagedata = self.data)
+        self._create_image_plot_containers()
 
     def _create_image_plot_container(self):
-        self.img_container=OverlayPlotContainer()
-        self.img_container.bgcolor = "white"
+        self.left_container=OverlayPlotContainer()
+        self.right_container=OverlayPlotContainer()
+        self.total_container = HPlotContainer(use_backbuffer = False)
+        self.total_container.add(self.left_container)
+        self.total_container.add(self.right_container)
+        self.total_container.bgcolor = "white"  
+    
+    # render_image is provided by the ImagePlot base class    
+    
+    def render_plot(self, data, data_str):
+        """
+        data is a numpy array to be plotted as a line plot.
+        The first column of the data is used as x, the second is used as y.
+        """
+        plotdata = ArrayPlotData(x = data[:,0], y = data[:,1])
+        plot = Plot(plotdata)
+        plot.plot(("x", "y"), type = 'line', color = 'blue')[0]
+        #plot.title="%s of %s: "%(self.img_idx+1,self.numfiles)+self.filename
+        #plot.aspect_ratio=float(data.shape[1])/float(data.shape[0])
 
-    def render_image(self, img_data):
-        plot = Plot(img_data,default_origin="top left")
-        img=plot.img_plot("imagedata", colormap=gray)[0]
-        # todo: generalize title and aspect ratio
-        plot.title="%s of %s: "%(self.img_idx+1,self.numfiles)+self.filename
-        plot.aspect_ratio=float(self.data.shape[1])/float(self.data.shape[0])
         # attach the rectangle tool
         plot.tools.append(PanTool(plot,drag_button="right"))
         zoom = ZoomTool(plot, tool_mode="box", always_on=False, aspect_ratio=plot.aspect_ratio)
         plot.overlays.append(zoom)
-        return plot
-
-    @on_trait_change("img_idx")
-    def update_img_depth(self):
-        self.controller.set_active_index(self.img_idx)
-        self.data = self.controller.get_active_data()
-        self.filename = self.controller.get_active_name()
-        self.img_data.set_data("imagedata",self.data)
-        self.plot.title="%s of %s: "%(self.img_idx+1,self.numfiles)+self.filename
-
-    @on_trait_change('next_img')
-    def increase_img_idx(self,info):
-        if self.img_idx==(self.numfiles-1):
-            self.img_idx=0
-        else:
-            self.img_idx+=1
-
-    @on_trait_change('prev_img')
-    def decrease_img_idx(self,info):
-        if self.img_idx==0:
-            self.img_idx=self.numfiles-1
-        else:
-            self.img_idx-=1
-
-# depth profile tools
-
-# line profile tools
-#   integration width
-#   for 2D SI's, limit line to full width of spectrum
-
-# area selector tools - lasso and square
+        return plot    
