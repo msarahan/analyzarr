@@ -17,6 +17,7 @@ from plotting.ucc import CellCropper
 from file_import import filters
 import tables as tb
 import numpy as np
+from mda import mda_sklearn as mda
 
 import peak_char as pc
 # essential tasks:
@@ -46,7 +47,8 @@ class HighSeasAdventure(t.HasTraits):
 
     def set_active_data(self, active_data = 'rawdata'):
         self.active_data_source = active_data
-            
+
+    # TODO: must generalize this more to deal with 3D info being passed around.
     def get_active_data(self):
         nodes = self.chest.listNodes('/%s'%self.active_data_source)
         if self.active_data_source is 'rawdata':
@@ -110,16 +112,25 @@ class HighSeasAdventure(t.HasTraits):
                            target_neighborhood=target_neighborhood, medfilt_radius=medfilt_radius)
         # transpose the results - they come in the form of one column per image.  Should be one row per image.
         attribs = attribs.T
-        # populate a table with the results
+        # generate a list of column names
         names = [('x%i, y%i, dx%i, dy%i, h%i, o%i, e%i'%((x,)*7)).split(', ') for x in xrange(attribs.shape[1]//7)]
+        # flatten that from a list of lists to a simple list
         names = [item for sublist in names for item in sublist]
+        # make tuples of each column name and 'f8' for the data type
         dtypes = zip(names, ['f8',]*attribs.shape[1])
+        # prepend the index column
         dtypes = [('idx', "i4"),]+dtypes
+        # make a blank recarray with our column names and dtypes
         data = np.zeros((attribs.shape[0]), dtype = dtypes)
+        # fill in the index column
         data['idx'] = np.arange(attribs.shape[0])
+        # for each column name, copy in the data
         for name_idx in xrange(len(names)):
             data[names[name_idx]] = attribs[:,name_idx]
+        # populate a table with the results
         self.chest.createTable(self.chest.root, 'cell_peaks', description = data)
+        # add an attribute for the total number of peaks recorded
+        self.chest.root.cell_peaks.number_of_peaks = attribs.shape[1]//7
         #self.chest.root.cell_peaks.append([data[idx] for idx in xrange(1,attribs.shape[0])])
         self.chest.root.cell_peaks.flush()
 
@@ -163,6 +174,95 @@ class HighSeasAdventure(t.HasTraits):
             slab = [(0,128,128), (10, 384, 384)] #will give you the central 256x256 area of the whole stack
         """
         pass
+    
+    def _get_ICA_data(self):
+        """
+        Pre-processes the data to be ready for ICA.  Namely:
+        - flattens data to 2D
+        - differentiates the data (integrated ICA)
+        """
+        # TODO: this is only a test - grabs all cell data.
+        # reshape the data: 
+        #   The goal is always to have the variables (pixels in an image,
+        #     energy channels in a spectrum) always as columns in a 2D array.
+        #     The rows are made up of observations.  For example, in 
+        #     images, the rows are individual cells.  In SIs, the rows
+        #     are pixels where spectra were gathered.
+        # for images, the cell idx is dim 0
+        data = self.get_cell_set().reshape((data.shape[0], -1))
+        # for spectra, the energy index is dim 0.
+        #data = spectrum_data.reshape((-1, data.shape[0]
+        diffdata=data.copy()
+        deriv_kernel=np.array([-1,0,0,0,0,0,1])
+        for i in xrange(data.shape[1]):
+            diffdata[:,i]=np.convolve(data[:,i],deriv_kernel)[3:-3]
+        return diffdata
+
+    #TODO: modify this to take advantage of PyTables queries
+    def get_peak_data(self, chars=[], indices = []):
+        """
+        Get peak data from the table of peak data.
+        
+        Input:
+        chars - a list of characteristic names (as string letters).
+            For example, ['dx', 'dy', 'h'] selects x and y deviation from 
+            average peak position and the peak height.
+            
+            Possible options include:
+            x - the x position of a peak in a cell
+            y - the y position of a peak in a cell
+            dx - the difference between the x position of the peak in this cell
+                 and the x position of the same peak in the average cell
+            dy - the difference between the y position of the peak in this cell
+                 and the y position of the same peak in the average cell
+            h - the height of the peak
+            o - if a peak is not perfectly symmetric, the orientation of the peak.
+            e - the eccentricity of a peak.  i.e. how egg-shaped is it?
+            
+        indices - peak indices (integers) to select from.  Use this if you want to compare
+            only a few peaks in the cell structure to compare.
+            None selects all peaks.
+        """
+        if len(chars) > 0:
+            if len(indices) is 0:
+                indices = range( self.chest.root.cell_peaks.number_of_peaks)
+            # the columns we get are the combination of the chars with the 
+            #   indices we want.
+            cols = [['%s%i' % (c, i) for i in indices] for c in chars]
+        else:
+            chars = ['x', 'y', 'dx', 'dy', 'h', 'o', 'e']
+            if len(indices) is 0:
+                indices = range( self.chest.root.cell_peaks.number_of_peaks)
+            # the columns we get are the combination of the chars with the 
+            #   indices we want.            
+            cols = [['%s%i' % (c, i) for c in chars] for i in indices]
+        # make the cols a simple list, rather than a list of lists
+        cols = [item for sublist in cols for item in sublist]
+        # get the data from the table
+        peak_data = self.chest.root.cell_peaks[:]
+        # return an ndarray with only the selected columns
+        return np.array(peak_data[cols]).view(float).reshape(len(cols),-1)
+
+    def PCA(self, n_components, whiten = False):
+        factors, scores = mda.PCA(self.get_MDA_data())
+        # stash the results under the group of MDA results
+        #   attribs:
+        #   - analysis type
+        #   - number of components
+        #   - whitening applied
+        # store the mean of each column - we use this for reconstruction later
+        
+        
+    def ICA(self, n_components, whiten = True, max_iter = 10):
+        factors, scores = mda.ICA(self.get_MDA_data())
+        # integration undoes the differentiation done in the ICA data prep.
+        factors = np.array([integrate.cumtrapz(factors[:,i]) for i in xrange(factors.shape[1])]).T
+        # we need to reshape the factors and scores to make sense.
+        # for images, the factors are themselves images, while the scores are line plots.
+        
+        # for SIs, the factors are spectra, while the scores are images.
+        
+        return factors, scores
     
     def plot_images(self):
         main_window = None
