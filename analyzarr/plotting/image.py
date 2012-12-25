@@ -73,18 +73,19 @@ class ImagePlot(HasTraits):
         self.img_data = ArrayPlotData(imagedata = self.data)
         self.filename = controller.get_active_name()
         self._create_image_plot_container()
-        self.plot = self.render_image(self.img_data)
+        self.plot = self.render_image(img_data = self.img_data, 
+                title = "%s of %s: "%(self.img_idx+1,self.numfiles)+self.filename)
         self.img_container.add(self.plot)
 
     def _create_image_plot_container(self):
         self.img_container=OverlayPlotContainer()
         self.img_container.bgcolor = "white"
 
-    def render_image(self, img_data):
+    def render_image(self, img_data, title=None):
         plot = Plot(img_data,default_origin="top left")
         img=plot.img_plot("imagedata", colormap=gray)[0]
         # todo: generalize title and aspect ratio
-        plot.title="%s of %s: "%(self.img_idx+1,self.numfiles)+self.filename
+        plot.title = title
         plot.aspect_ratio=float(self.data.shape[1])/float(self.data.shape[0])
         # attach the rectangle tool
         plot.tools.append(PanTool(plot,drag_button="right"))
