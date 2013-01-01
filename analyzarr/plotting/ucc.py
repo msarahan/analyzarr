@@ -383,7 +383,7 @@ class CellCropper(ImagePlot):
         progress.open()
         for idx in xrange(self.numfiles):
             self.controller.set_active_index(idx)
-            self.data = self.controller.get_active_data()[:]
+            self.data = self.controller.get_active_image()[:]
             self.CC = cv_funcs.xcorr(self.template, self.data)
             # peak finder needs peaks greater than 1.  Multiply by 255 to scale them.
             pks=pc.two_dim_findpeaks(self.CC*255, peak_width=self.peak_width, medfilt_radius=None)
@@ -435,7 +435,7 @@ class CellCropper(ImagePlot):
         for idx in xrange(self.numfiles):
             # filter the peaks that are outside the selected threshold
             self.controller.set_active_index(idx)
-            self.data = self.controller.get_active_data()
+            self.data = self.controller.get_active_image()
             self.name = self.controller.get_active_name()
             peaks=np.ma.compress_rows(self.mask_peaks(idx))
             tmp_sz=self.tmp_size

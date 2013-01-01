@@ -69,7 +69,7 @@ class ImagePlot(HasTraits):
         self.numfiles = controller.get_num_files()
         #self.data_sources = controller.get_sources()
         
-        self.data = controller.get_active_data()
+        self.data = controller.get_active_image()
         self.img_data = ArrayPlotData(imagedata = self.data)
         self.filename = controller.get_active_name()
         self._create_image_plot_container()
@@ -96,7 +96,7 @@ class ImagePlot(HasTraits):
     @on_trait_change("img_idx")
     def update_img_depth(self):
         self.controller.set_active_index(self.img_idx)
-        self.data = self.controller.get_active_data()
+        self.data = self.controller.get_active_image()
         self.filename = self.controller.get_active_name()
         self.img_data.set_data("imagedata",self.data)
         self.plot.title="%s of %s: "%(self.img_idx+1,self.numfiles)+self.filename

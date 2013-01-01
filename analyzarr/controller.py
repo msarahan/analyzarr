@@ -48,8 +48,7 @@ class HighSeasAdventure(t.HasTraits):
     def set_active_data(self, active_data = 'rawdata'):
         self.active_data_source = active_data
 
-    # TODO: must generalize this more to deal with 3D info being passed around.
-    def get_active_data(self):
+    def get_active_image(self):
         nodes = self.chest.listNodes('/%s'%self.active_data_source)
         if self.active_data_source is 'rawdata':
             return nodes[self.selected_image][:]
@@ -64,7 +63,11 @@ class HighSeasAdventure(t.HasTraits):
                                        'filename == "%s"' % parent)][0])
             
             # return the cell data
-            return nodes[self.selected_image][cell_record['idx'],:,:]
+            return nodes[self.selected_image][cell_record['idx'],:,:]        
+
+    def get_active_data_type(self):
+        # TODO: need to differentiate spectra from images somehow.
+        return 'image'
 
     def get_active_name(self):
         nodes = self.chest.listNodes('/rawdata')
@@ -79,17 +82,18 @@ class HighSeasAdventure(t.HasTraits):
         elif self.active_data_source is 'cells':          
             return self.chest.root.cell_description.nrows
         
-    def get_cell_set(self, names = None):
+    def get_active_image_set(self, names = None):
+        # TODO: this isn't rational for non-3D data yet.
         if names is None:
             # query the raw data table for filenames
-            nodes = self.chest.listNodes('/cells')
-            celldata = nodes[0][:]
+            nodes = self.chest.listNodes('/'+self.active_data_source)
+            data = nodes[0][:]
             # collect all the cells
             for node in nodes[1:]:
-                celldata = np.append(celldata, node[:], axis=0)
+                data = np.append(data, node[:], axis=0)
         else:
-            celldata = None                
-        return celldata
+            data = None          
+        return data
     
     # get plots
     def spyglass(self):
@@ -174,29 +178,6 @@ class HighSeasAdventure(t.HasTraits):
             slab = [(0,128,128), (10, 384, 384)] #will give you the central 256x256 area of the whole stack
         """
         pass
-    
-    def _get_ICA_data(self):
-        """
-        Pre-processes the data to be ready for ICA.  Namely:
-        - flattens data to 2D
-        - differentiates the data (integrated ICA)
-        """
-        # TODO: this is only a test - grabs all cell data.
-        # reshape the data: 
-        #   The goal is always to have the variables (pixels in an image,
-        #     energy channels in a spectrum) always as columns in a 2D array.
-        #     The rows are made up of observations.  For example, in 
-        #     images, the rows are individual cells.  In SIs, the rows
-        #     are pixels where spectra were gathered.
-        # for images, the cell idx is dim 0
-        data = self.get_cell_set().reshape((data.shape[0], -1))
-        # for spectra, the energy index is dim 0.
-        #data = spectrum_data.reshape((-1, data.shape[0]
-        diffdata=data.copy()
-        deriv_kernel=np.array([-1,0,0,0,0,0,1])
-        for i in xrange(data.shape[1]):
-            diffdata[:,i]=np.convolve(data[:,i],deriv_kernel)[3:-3]
-        return diffdata
 
     #TODO: modify this to take advantage of PyTables queries
     def get_peak_data(self, chars=[], indices = []):
@@ -243,8 +224,26 @@ class HighSeasAdventure(t.HasTraits):
         # return an ndarray with only the selected columns
         return np.array(peak_data[cols]).view(float).reshape(len(cols),-1)
 
-    def PCA(self, n_components, whiten = False):
-        factors, scores = mda.PCA(self.get_MDA_data())
+    def _reshape_MDA_results(self, data, factors, scores):
+        # we need to reshape the factors and scores to make sense.
+        # for images, the factors are themselves images, while the scores are line plots with one column per component.
+        if self.get_active_data_type() is "image":
+            factors = factors.reshape((-1, data.shape[-2], data.shape[-1]))
+            factors.squeeze()
+            scores.reshape((data.shape[0],-1))
+        # for SIs, the factors are spectra, while the scores are images.
+        elif self.get_active_data_type() is "spectrum" or self.get_active_data_type() is "peaks":
+            factors = factors.reshape((data.shape[0], -1))
+            scores = scores.reshape((-1, data.shape[-2],data.shape[-1]))
+            scores.squeeze()
+        return factors, scores
+
+    def PCA(self, n_components=None):
+        active_data = self.get_active_image_set()
+        data = active_data.reshape((active_data.shape[0], -1))        
+        factors, scores , eigenvalues = mda.PCA(data, n_components = n_components)
+        factors, scores = self._reshape_MDA_results(active_data, factors, scores)
+        return factors, scores, eigenvalues
         # stash the results under the group of MDA results
         #   attribs:
         #   - analysis type
@@ -254,14 +253,29 @@ class HighSeasAdventure(t.HasTraits):
         
         
     def ICA(self, n_components, whiten = True, max_iter = 10):
-        factors, scores = mda.ICA(self.get_MDA_data())
+        # reshape the data: 
+        #   The goal is always to have the variables (pixels in an image,
+        #     energy channels in a spectrum) always as columns in a 2D array.
+        #     The rows are made up of observations.  For example, in 
+        #     images, the rows are individual cells.  In SIs, the rows
+        #     are pixels where spectra were gathered.
+        # for images, the cell idx is dim 0        
+        data = active_data.reshape((active_data.shape[0], -1))
+        # for spectra, the energy index is dim 0.
+        #data = spectrum_data.reshape((-1, data.shape[0]
+        """
+        Pre-processes the data to be ready for ICA.  Namely:
+          differentiates the data (integrated ICA)
+        """        
+        diffdata=data.copy()
+        deriv_kernel=np.array([-1,0,0,0,0,0,1])
+        for i in xrange(data.shape[1]):
+            diffdata[:,i]=np.convolve(data[:,i],deriv_kernel)[3:-3]  
+        factors, scores = mda.ICA(diffdata, n_components = n_components)
+        
         # integration undoes the differentiation done in the ICA data prep.
         factors = np.array([integrate.cumtrapz(factors[:,i]) for i in xrange(factors.shape[1])]).T
-        # we need to reshape the factors and scores to make sense.
-        # for images, the factors are themselves images, while the scores are line plots.
-        
-        # for SIs, the factors are spectra, while the scores are images.
-        
+        factors, scores = self._reshape_MDA_results(active_data, factors, scores)
         return factors, scores
     
     def plot_images(self):
