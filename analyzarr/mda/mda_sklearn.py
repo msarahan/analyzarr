@@ -13,19 +13,21 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 from sklearn import decomposition
 
-def PCA(data, n_components, whiten=True):
-    estimator = decomposition.RandomizedPCA(n_components = n_components, 
+def PCA(data, n_components=None, whiten=False):
+    estimator = decomposition.PCA(n_components = n_components, 
                                             whiten = whiten)
     estimator.fit(data)
-    scores = est.fit_transform(data)
-    return factors, scores
+    factors = estimator.components_
+    scores = estimator.transform(data)
+    return factors, scores, estimator.explained_variance_ratio_
 
-def ICA(data, n_components, whiten = True, max_iter = 10):
+def ICA(data, n_components, whiten = False, max_iter = 10):
     estimator = decomposition.FastICA(n_components = n_components, 
-                                            whiten = whiten)
+                                            whiten = whiten, 
+                                            max_iter = max_iter)
     estimator.fit(data)
-    factors = est.components_
-    scores = est.fit_transform(data)
+    factors = est.transform(data)
+    scores = estimator.get_mixing_matrix()
     return factors, scores
 
 def NMF(data, n_components, beta = 5.0, tol = 5e-3, sparseness = 'components'):
