@@ -21,7 +21,7 @@ import numpy as np
 from collections import OrderedDict
 import os
 
-from image import ImagePlot
+from renderers import HasRenderer
 
 key_bindings = KeyBindings(
     KeyBinding( binding1    = 'Left',
@@ -32,7 +32,7 @@ key_bindings = KeyBindings(
                 method_name = 'increase_img_idx' ),
 )
 
-class DoubleImagePlot(ImagePlot):
+class DoubleImagePlot(HasRenderer):
     left_plot = Instance(Plot)
     right_plot = Instance(Plot)
     total_container = Instance(Component)
@@ -41,8 +41,10 @@ class DoubleImagePlot(ImagePlot):
     colorbar= Instance(Component)
     cbar_selection = Instance(RangeSelection)
     cbar_selected = Event
-    numfiles=Int(1)
-    img_idx=Int(0)
+    left_numfiles = Int(1)
+    right_numfiles = Int(1)
+    left_img_idx = Int(0)
+    right_img_idx = Int(0)
 
     traits_view = View(
         Group(
@@ -70,7 +72,8 @@ class DoubleImagePlot(ImagePlot):
         self.controller = controller
         self.numfiles = controller.get_num_files()
         # todo: must define two data sources
-        self.data = controller.get_active_data()
+        self.data_left = controller.get_active_data()
+        self.data_right = controller.get_active_data()
         # todo: must base name on active data sources
         self.filename = controller.get_active_name()
         # todo: we'll have two data sources
@@ -83,23 +86,5 @@ class DoubleImagePlot(ImagePlot):
         self.total_container = HPlotContainer(use_backbuffer = False)
         self.total_container.add(self.left_container)
         self.total_container.add(self.right_container)
-        self.total_container.bgcolor = "white"  
+        self.total_container.bgcolor = "white"   
     
-    # render_image is provided by the ImagePlot base class    
-    
-    def render_plot(self, data, data_str):
-        """
-        data is a numpy array to be plotted as a line plot.
-        The first column of the data is used as x, the second is used as y.
-        """
-        plotdata = ArrayPlotData(x = data[:,0], y = data[:,1])
-        plot = Plot(plotdata)
-        plot.plot(("x", "y"), type = 'line', color = 'blue')[0]
-        #plot.title="%s of %s: "%(self.img_idx+1,self.numfiles)+self.filename
-        #plot.aspect_ratio=float(data.shape[1])/float(data.shape[0])
-
-        # attach the rectangle tool
-        plot.tools.append(PanTool(plot,drag_button="right"))
-        zoom = ZoomTool(plot, tool_mode="box", always_on=False, aspect_ratio=plot.aspect_ratio)
-        plot.overlays.append(zoom)
-        return plot    

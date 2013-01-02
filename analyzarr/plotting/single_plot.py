@@ -21,6 +21,8 @@ import numpy as np
 from collections import OrderedDict
 import os
 
+from renderers import HasRenderer
+
 key_bindings = KeyBindings(
     KeyBinding( binding1    = 'Left',
                 description = 'Step left through images',
@@ -30,7 +32,7 @@ key_bindings = KeyBindings(
                 method_name = 'increase_img_idx' ),
 )
 
-class ImagePlot(HasTraits):
+class SinglePlot(HasRenderer):
 
     zero=Int(0)
     img_plot = Instance(Plot)
@@ -64,7 +66,7 @@ class ImagePlot(HasTraits):
     ) 
 
     def __init__(self, controller, *args, **kw):
-        super(ImagePlot, self).__init__(*args,**kw)
+        super(SinglePlot, self).__init__(controller, *args,**kw)
         self.controller = controller
         self.numfiles = controller.get_num_files()
         #self.data_sources = controller.get_sources()
@@ -74,24 +76,13 @@ class ImagePlot(HasTraits):
         self.filename = controller.get_active_name()
         self._create_image_plot_container()
         self.plot = self.render_image(img_data = self.img_data, 
-                title = "%s of %s: "%(self.img_idx+1,self.numfiles)+self.filename)
+                title = "%s of %s: "%(self.img_idx+1, 
+                                      self.numfiles) + self.filename)
         self.img_container.add(self.plot)
 
     def _create_image_plot_container(self):
         self.img_container=OverlayPlotContainer()
         self.img_container.bgcolor = "white"
-
-    def render_image(self, img_data, title=None):
-        plot = Plot(img_data,default_origin="top left")
-        img=plot.img_plot("imagedata", colormap=gray)[0]
-        # todo: generalize title and aspect ratio
-        plot.title = title
-        plot.aspect_ratio=float(self.data.shape[1])/float(self.data.shape[0])
-        # attach the rectangle tool
-        plot.tools.append(PanTool(plot,drag_button="right"))
-        zoom = ZoomTool(plot, tool_mode="box", always_on=False, aspect_ratio=plot.aspect_ratio)
-        plot.overlays.append(zoom)
-        return plot
 
     @on_trait_change("img_idx")
     def update_img_depth(self):

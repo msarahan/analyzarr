@@ -12,7 +12,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 """
 
 import traits.api as t
-from plotting.image import ImagePlot
+from plotting.viewers import StackViewer
 from plotting.ucc import CellCropper
 from file_import import filters
 import tables as tb
@@ -97,7 +97,7 @@ class HighSeasAdventure(t.HasTraits):
     
     # get plots
     def spyglass(self):
-        chaco_plot = ImagePlot(self)
+        chaco_plot = StackViewer(self)
         chaco_plot.configure_traits()
     # run analyses
         
@@ -282,7 +282,6 @@ class HighSeasAdventure(t.HasTraits):
         main_window = None
         self.set_active_data('rawdata')
         self.spyglass()
-
 
     def plot_cells(self):
         main_window = None

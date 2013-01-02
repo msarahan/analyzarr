@@ -47,7 +47,8 @@ import cv_funcs
 
 #import ipdb
 
-from image import ImagePlot, key_bindings
+from viewers import StackViewer
+from single_plot import key_bindings
 
 """
 try:
@@ -82,7 +83,8 @@ class OK_custom_handler(Handler):
 
 #(value=[Array(dtype=np.float32,value=np.zeros((64,64)))])
 # (value=[Array(shape=(None,3), value=np.array(([[0,0,0]])))])
-class CellCropper(ImagePlot):
+# TODO: this should be either a single plot or a dual plot?
+class CellCropper(StackViewer):
     template = Array
     CC = Array
     peaks = List
@@ -188,6 +190,7 @@ class CellCropper(ImagePlot):
         self.img_plot=plot
         return plot
 
+    # TODO: use base class render_scatter_overlay method
     def render_scatplot(self):
         peakdata=ArrayPlotData()
         peakdata.set_data("index",self.peaks[self.img_idx][:,0])
