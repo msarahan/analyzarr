@@ -11,16 +11,16 @@ a=file_import.open_treasure_chest('wing_test.chest')
 adv = controller.HighSeasAdventure(a)
 
 # test plotting images
-#adv.plot_images()
+adv.plot_images()
 # test cell cropper
 #adv.cell_cropper()
 # test plotting of cropped cells
 #adv.plot_cells()
 
-adv.set_active_data('cells')
-factors, scores = adv.PCA()
+adv.plot_cells()
+#factors, scores = adv.PCA()
 
-plt.imshow(factors[0])
+#plt.imshow(factors[0])
 
 #adv.characterize_cells(10)
 

@@ -37,3 +37,55 @@ def NMF(data, n_components, beta = 5.0, tol = 5e-3, sparseness = 'components'):
     scores = est.fit_transform(data)
     return factors, scores
     
+def kmeans_cluster_stack(self, cells, clusters=None):
+    import mdp
+    if self._unfolded:
+        self.fold()
+    # if clusters not given, try to determine what it should be.
+    if clusters is None:
+        pass
+    d=cells
+    kmeans=mdp.nodes.KMeansClassifier(clusters)
+    cluster_arrays=[]
+
+    avg_stack=np.zeros((clusters,d.shape[1],d.shape[2]))
+    kmeans.train(d.reshape((-1,d.shape[0])).T)
+    kmeans.stop_training()
+    groups=kmeans.label(d.reshape((-1,d.shape[0])).T)
+    try:
+        # test if location data is available
+        self.mapped_parameters.locations[0]
+    except:
+        messages.warning("No cell location information was available.")
+    for i in xrange(clusters):
+        # get number of members of this cluster
+        members=groups.count(i)
+        cluster_array=np.zeros((members,d.shape[1],d.shape[2]))
+        cluster_idx=0
+        positions=np.zeros((members,3))
+        for j in xrange(len(groups)):
+            if groups[j]==i:
+                cluster_array[cluster_idx,:,:]=d[j,:,:]
+                try:
+                    positions[cluster_idx]=self.mapped_parameters.locations[j]
+                except:
+                    pass
+                cluster_idx+=1
+        cluster_array_Image=Image({
+            'data':avg_stack,
+            'mapped_parameters':{
+                'title' : 'Cluster %s from %s'%(i,
+                    self.mapped_parameters.title),
+                'locations':positions,
+                'members':members,}
+        })
+        cluster_arrays.append(cluster_array_Image)
+        avg_stack[i,:,:]=np.sum(cluster_array,axis=0)
+    members_list=[groups.count(i) for i in xrange(clusters)]
+    avg_stack_Image=Image({'data':avg_stack,
+                'mapped_parameters':{
+                    'title':'Cluster averages from %s'%self.mapped_parameters.title,
+                    'member_counts':members_list,
+                    }
+                })
+    return avg_stack_Image, cluster_arrays
