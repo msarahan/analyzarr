@@ -12,8 +12,8 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 """
 
 import traits.api as t
-from plotting.viewers import StackViewer
-from plotting.ucc import CellCropper
+#from plotting.viewers import StackViewer
+#from ui.ucc import CellCropper
 from file_import import filters
 import tables as tb
 import numpy as np
@@ -21,6 +21,16 @@ from mda import mda_sklearn as mda
 
 import peak_char as pc
 # essential tasks:
+
+# our plots
+from ui.single_plot import SinglePlot, StackPlot
+
+# our enaml views of the plots - the actual UIs
+import enaml
+from enaml.stdlib.sessions import simple_session
+from enaml.qt.qt_application import QtApplication
+with enaml.imports():
+    from ui.single_plot_view import SinglePlotView, StackPlotView
 
 class HighSeasAdventure(t.HasTraits):
     # traits of importance:
@@ -95,10 +105,6 @@ class HighSeasAdventure(t.HasTraits):
             data = None          
         return data
     
-    # get plots
-    def spyglass(self):
-        chaco_plot = StackViewer(self)
-        chaco_plot.configure_traits()
     # run analyses
         
     ## fire up cell cropper
@@ -281,13 +287,26 @@ class HighSeasAdventure(t.HasTraits):
     def plot_images(self):
         main_window = None
         self.set_active_data('rawdata')
-        self.spyglass()
+        plot = StackPlot(self)
+        # TODO: name the session according to the data it is plotting
+        session = simple_session(
+             'stack', 'A view of plot', StackPlotView, model=plot
+             )
+        self.qtapp.add_factories([session])
+        self.qtapp.start_session('stack')
+        self.qtapp.start()
 
     def plot_cells(self):
         main_window = None
         self.set_active_data('cells')
-        #
-        self.spyglass()
+        plot = StackPlot(self)
+        # TODO: name the session according to the data it is plotting
+        session = simple_session(
+             'stack1', 'A view of plot', StackPlotView, model=plot
+             )
+        self.qtapp.add_factories([session])
+        self.qtapp.start_session('stack1')
+        self.qtapp.start()
 
 
         

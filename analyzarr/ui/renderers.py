@@ -21,7 +21,7 @@ class HasRenderer(HasTraits):
         """
         plotdata = ArrayPlotData(x = data[:,0], y = data[:,1])
         plot = Plot(plotdata)
-        plot.plot(("x", "y"), type = 'line', color = 'blue')[0]
+        
         #plot.title="%s of %s: "%(self.img_idx+1,self.numfiles)+self.filename
         #plot.aspect_ratio=float(data.shape[1])/float(data.shape[0])
     
@@ -29,11 +29,13 @@ class HasRenderer(HasTraits):
         plot.tools.append(PanTool(plot,drag_button="right"))
         zoom = ZoomTool(plot, tool_mode="box", always_on=False, aspect_ratio=plot.aspect_ratio)
         plot.overlays.append(zoom)
-        return plot    
+        return plot
+        # the thing that gets the Plot object should do something like this:
+        #plot.plot(("x", "y"), type = 'line', color = 'blue')[0]
 
     def render_image(self, img_data, title=None):
         plot = Plot(img_data,default_origin="top left")
-        img = plot.img_plot("imagedata", colormap=gray)[0]
+        
         # todo: generalize title and aspect ratio
         plot.title = title
         data_array = img_data.arrays['imagedata']
@@ -43,6 +45,8 @@ class HasRenderer(HasTraits):
         zoom = ZoomTool(plot, tool_mode="box", always_on=False, aspect_ratio=plot.aspect_ratio)
         plot.overlays.append(zoom)
         return plot
+        # the thing that gets the Plot object should do something like this:
+        #img = plot.img_plot("imagedata", colormap=gray)[0]
 
     def render_scatter_overlay(self, base_plot, location_data = None, color_data = None):
         if location_data is None:
@@ -75,6 +79,8 @@ class HasRenderer(HasTraits):
         scatplot.y_grid.visible = False
         scatplot.range2d = base_plot.range2d
         return scatplot
+        # usage: should create container (overlayplotcontainer); add both 
+        #   base_plot and this returned plot to it.
 
     def render_quiver_overlay(self, location_data=None, vector_data=None, 
                               color = 'white', scale=1):

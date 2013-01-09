@@ -1,0 +1,52 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sat Jan 05 12:52:37 2013
+
+@author: Mike
+"""
+
+from enaml.widgets.api import Window, Container, EnableCanvas, PushButton, \
+    GroupBox
+from single_plot import SinglePlot
+
+enamldef SinglePlotView(Window):
+    attr model
+    initial_size = (500,550)
+    Container:
+        EnableCanvas:
+            component = model.plot
+
+
+"""
+#: old traits view for single_plot
+    traits_view = View(
+        Group(
+            Group(
+                Item("img_container",editor=ComponentEditor(), show_label=False),
+                HGroup(
+                    Spring(),
+                    Item("prev_img",editor=ButtonEditor(label="<"),show_label=False, enabled_when='numfiles > 1'),
+                    Item("next_img",editor=ButtonEditor(label=">"),show_label=False, enabled_when='numfiles > 1'),
+                    ),
+                label="Image", show_border=True, trait_modified="tab_selected",
+                orientation='vertical',
+                ),
+            orientation='horizontal'
+            ),
+        title="Image Viewer",
+        key_bindings = key_bindings,
+        width=700, height=500,resizable=True
+    ) 
+"""
+
+enamldef StackPlotView(SinglePlotView):
+    Container:
+        EnableCanvas:
+            component = model.plot
+        GroupBox:
+            PushButton:
+                text = ">"
+                clicked :: model.increase_img_idx()
+            PushButton:
+                text = "<"
+                clicked :: model.decrease_img_idx()
