@@ -5,11 +5,8 @@ syntax: glob
 *.h5
 *.wpu
 *.chest
-
+*.enamlc
 bin/*
-
 doc/.build/*
-
 doc/user_guide/_build/*
-
 doc/user_guide/.build/
