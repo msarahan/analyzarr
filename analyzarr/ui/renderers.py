@@ -10,10 +10,6 @@ from chaco.tools.cursor_tool import CursorTool, BaseCursorTool
 from chaco.data_range_1d import DataRange1D
 
 class HasRenderer(HasTraits):
-    def __init__(self, controller, *args, **kw):
-        super(HasRenderer, self).__init__(*args,**kw)
-        self.controller = controller
-
     def render_plot(self, data, data_str):
         """
         data is a numpy array to be plotted as a line plot.

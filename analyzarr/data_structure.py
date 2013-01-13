@@ -13,8 +13,9 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 import tables
 
-class MdaResults(tables.IsDescription):
+class MdaResultsTable(tables.IsDescription):
     idx = tables.Int64Col(pos=0)
+    #date = 
     # type of MDA
     mda_type = tables.StringCol(10)
     # description of where data came from (as a path in the file, for example:
@@ -23,6 +24,8 @@ class MdaResults(tables.IsDescription):
     # was data filtered or reconstructed?
     treatments = tables.StringCol(250)
 
+# TODO: this table is not used - we instead dynamically create a table for 
+#   having several columns for each peak.
 class PeakData(tables.IsDescription):
     idx = tables.Int64Col(pos=0)
     # description of where data came from (as a path in the file, for example:
@@ -71,40 +74,29 @@ class SpectrumDataTable(tables.IsDescription):
     # treatments - any prior processing (for example, reconstruction)
     treatments = tables.StringCol(250)
 
+
 def get_image_h5file(filename):
     # split off any extension in the filename - we add our own.
-    h5file = tables.openFile('%s.chest'%filename,'w')
-    
+    h5file = tables.openFile('%s.chest' % filename, 'w')
+
     # data outline keeps records of what data are available - the linkage 
     # between which cells came from which images, locations, etc.
-    image_table = h5file.createTable('/', 'image_description', 
-                                     ImageDataTable)
-    
-    cell_table = h5file.createTable('/', 'cell_description', 
-                                     CellsTable)
+    h5file.createTable('/', 'image_description',
+                        ImageDataTable)
+
+    h5file.createTable('/', 'cell_description',
+                        CellsTable)
+                        
+    h5file.createTable('/', 'mda_description', )
     #cell_peak_table = h5file.createTable('/', 'cell_peaks',
     #                                     CellsTable)
     # image group has data files as CArrays.  There is one array for each file,
     # accessed by the filename.
-    imgGroup = h5file.createGroup('/', 'rawdata')
-
-    # image MDA results group.  Nested:
-    #   - MDA type
-    #     - which image they (the cells) originated from
-    #       - Factors
-    #       - Scores    
-    
-    # note that image MDA really only makes sense to do on a single image.  This is
-    # related to Masashi Watanabe's MSA plugin, marketed by HREM Research, which
-    # provides a facility for doing SVD on an image.
-    
-    # If you want to do it on more than one image, do either one at a time, or do
-    # cell cropping.
-    imgMdaGroup = h5file.createGroup('/', 'mda_image_results')
+    h5file.createGroup('/', 'rawdata')
 
     # cell group has cell stacks as CArrays - one for each file from which cells came
     # cell group also has template used for cropping
-    cellsGroup = h5file.createGroup('/', 'cells')
+    h5file.createGroup('/', 'cells')
 
     # mda cell results has factors/score images for cell data.  These are nested: 
     #   - MDA type
@@ -112,11 +104,25 @@ def get_image_h5file(filename):
     #       - Factors
     #       - Scores
     #       - anything else of interest
-    cellsImgMdaGroup = h5file.createGroup('/', 'mda_cells_results')
     
+    # note that image MDA really only makes sense to do on a single image.  This is
+    # related to Masashi Watanabe's MSA plugin, marketed by HREM Research, which
+    # provides a facility for doing SVD on an image.
+    
+    # If you want to do it on more than one image, do either one at a time, or do
+    # cell cropping.
+    
+    # image MDA results group.  Nested:
+    #   - MDA type
+    #     - which image they (the cells) originated from
+    #       - Factors
+    #       - Scores
+    h5file.createGroup('/', 'mda_results')
+
     h5file.flush()
 
     return h5file
+
 
 def get_spectrum_h5file(filename):
     # split off any extension in the filename - we add our own.

@@ -66,27 +66,7 @@ class StackPlot(SinglePlot):
         self.plot.title = "%s of %s: " % (self.img_idx + 1,
                                           self.numfiles) + self.filename
 
-    def increase_img_idx(self):
-        if self.img_idx == (self.numfiles - 1):
-            self.img_idx = 0
-        else:
-            self.img_idx += 1
 
-    def decrease_img_idx(self):
-        if self.img_idx == 0:
-            self.img_idx = self.numfiles - 1
-        else:
-            self.img_idx -= 1
-
-    @on_trait_change("img_idx")
-    def update_img_depth(self):
-        self.controller.set_active_index(self.img_idx)
-        self.data = self.controller.get_active_image()
-        self.filename = self.controller.get_active_name()
-        self.plotdata.set_data("imagedata", self.data)
-        # TODO: rewrite to use "format" method
-        self.plot.title = "%s of %s: " % (self.img_idx + 1,
-                                          self.numfiles) + self.filename
 
 
 class OverlayPlot(HasRenderer):

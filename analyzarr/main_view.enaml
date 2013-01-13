@@ -31,11 +31,7 @@ from chaco import default_colormaps as dc
 from scipy.misc import lena
 from traits.api import HasTraits, Instance, Array, Bool
 
-class Controller(HasTraits):
-    show_image_view = Bool(True)
-    show_cell_view = Bool(False)
-    show_score_view = Bool(False)
-    show_factor_view = Bool(False)
+from controllers import HighSeasAdventure
 
 class ImageModel(HasTraits):
     """ Create a Chaco Plot object with the data to analyze.
@@ -68,6 +64,7 @@ class ImageModel(HasTraits):
         plot_data.set_data('imagedata', image_source._data)
         self.plot = Plot(plot_data, default_origin='top left', padding=30)
         self.plot.img_plot('imagedata', colormap=dc.gray)
+        self.plot.aspect_ratio=float(image_source._data.shape[1]) / float(image_source._data.shape[0])
 
 enamldef MyMenuBar(MenuBar):
     Menu:
@@ -131,9 +128,18 @@ enamldef MyMenuBar(MenuBar):
 
 
 enamldef ImagePlotToolBar(ToolBar):
+    attr controller
     Action:
         text = "Save"
         tool_tip = "Save current plot"
+    Action:
+        text = "<"
+        tool_tip = "View previous image in stack"
+        triggered :: controller.decrease_selected_index()
+    Action:
+        text = ">"
+        tool_tip = "View next image in stack"
+        triggered :: controller.increase_selected_index()
         
                 
 enamldef MyToolBar(ToolBar):
@@ -189,6 +195,7 @@ enamldef ViewToolBar(ToolBar):
         checkable = True
         checked := controller.show_factor_view
         toggled :: print "toggled factor view"
+    
         
 enamldef MyDockPane(DockPane):
     title << 'Dock Area %s | %s' % (dock_area, 'floating' if floating else 'docked')
@@ -200,16 +207,20 @@ enamldef MyDockPane(DockPane):
         PushButton:
             text = 'Baz'
 
-enamldef ImageViewDockPane(DockPane):
-    attr model = ImageModel()
+enamldef ImageViewDockPane(DockPane): imgdockpane:
+    attr controller
     Container:
-        EnableCanvas:
-            component = model.plot
-        ImagePlotToolBar:
+        constraints = [
+            vbox(canvas, toolbar)
+        ]
+        EnableCanvas: canvas:
+            component = controller.plot
+        ImagePlotToolBar: toolbar:
             movable = False
+            controller = imgdockpane.controller
 
 enamldef Main(MainWindow): main:
-    attr controller = Controller()
+    attr controller = HighSeasAdventure()
     initial_size = (600, 600)
     MyMenuBar:
         pass
@@ -219,23 +230,28 @@ enamldef Main(MainWindow): main:
         controller = main.controller
         dock_area = 'left'
     ImageViewDockPane: image_view:
+        controller = main.controller.image_controller
         title << "Image view"
         dock_area = 'left'
-        visible := controller.show_image_view
+        visible := main.controller.show_image_view
     ImageViewDockPane: cell_view:
+        controller = main.controller.cell_controller
         title << "Cell view"
         dock_area = 'right'
         #: floating = True
-        visible := controller.show_cell_view
+        visible := main.controller.show_cell_view
+
+"""
     ImageViewDockPane: score_view:
         title << "Score view"
         dock_area = 'left'
         #: allowed_dock_areas = ['left', 'right']
-        visible := controller.show_score_view
+        visible := main.controller.show_score_view
     ImageViewDockPane: factor_view:
         title << "Factor view"
         dock_area = 'right'
-        visible := controller.show_factor_view
+        visible := main.controller.show_factor_view
+"""
 
 """
     Container:
