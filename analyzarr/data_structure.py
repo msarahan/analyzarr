@@ -13,9 +13,12 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 import tables
 
+filters = tables.Filters(complib='blosc', complevel=8)
+
 class MdaResultsTable(tables.IsDescription):
     idx = tables.Int64Col(pos=0)
-    #date = 
+    # YYYY-MM-DD HH:MM
+    date = tables.StringCol(16)
     # type of MDA
     mda_type = tables.StringCol(10)
     # description of where data came from (as a path in the file, for example:
@@ -24,53 +27,56 @@ class MdaResultsTable(tables.IsDescription):
     # was data filtered or reconstructed?
     treatments = tables.StringCol(250)
 
-# TODO: this table is not used - we instead dynamically create a table for 
+
+# TODO: this table is not used - we instead dynamically create a table for
 #   having several columns for each peak.
 class PeakData(tables.IsDescription):
     idx = tables.Int64Col(pos=0)
     # description of where data came from (as a path in the file, for example:
-    # '/root/rawdata'    
+    # '/root/rawdata'
     input_data = tables.StringCol(250)
     # filename that the data is from
-    original_image = tables.StringCol(250, pos = 1)
-    cell_id = tables.Int64Col(pos = 2)
+    original_image = tables.StringCol(250, pos=1)
+    cell_id = tables.Int64Col(pos=2)
     x = tables.Float32Col(pos=3)
     y = tables.Float32Col(pos=4)
     height = tables.Float32Col(pos=5)
     orientation = tables.Float32Col(pos=6)
     eccentricity = tables.Float32Col(pos=7)
-    # treatments - any prior processing (for example, reconstruction)    
+    # treatments - any prior processing (for example, reconstruction)
     treatments = tables.StringCol(250)
 
     # Higher order moments - third: shift from center?
     # how to introduce Chebyshev polynomials?
+
 
 class ImageDataTable(tables.IsDescription):
     idx = tables.Int64Col(pos=0)
     # metadata = tables.
     # attributes - tags
     # name of a file
-    filename = tables.StringCol(250)    
+    filename = tables.StringCol(250)
     # treatments - any prior processing (for example, reconstruction)
     treatments = tables.StringCol(250)
-    
+
+
 class CellsTable(tables.IsDescription):
     idx = tables.Int64Col(pos=0)
     # description of where data came from (as a path in the file, for example:
-    # '/root/rawdata'    
+    # '/root/rawdata'
     input_data = tables.StringCol(250)
     # filename that the data is from
-    original_image = tables.StringCol(250, pos = 1)
+    original_image = tables.StringCol(250, pos=1)
     # the upper left coordinate of the parent image where this
     # cell was cropped from.
     x_coordinate = tables.Float32Col(pos=3)
     y_coordinate = tables.Float32Col(pos=4)
-    
+
 
 class SpectrumDataTable(tables.IsDescription):
     idx = tables.Int64Col(pos=0)
     # name of a file
-    filename = tables.StringCol(250)  
+    filename = tables.StringCol(250)
     # treatments - any prior processing (for example, reconstruction)
     treatments = tables.StringCol(250)
 
@@ -79,26 +85,26 @@ def get_image_h5file(filename):
     # split off any extension in the filename - we add our own.
     h5file = tables.openFile('%s.chest' % filename, 'w')
 
-    # data outline keeps records of what data are available - the linkage 
+    # data outline keeps records of what data are available - the linkage
     # between which cells came from which images, locations, etc.
-    h5file.createTable('/', 'image_description',
-                        ImageDataTable)
+    h5file.createTable('/', 'image_description', ImageDataTable)
 
-    h5file.createTable('/', 'cell_description',
-                        CellsTable)
-                        
-    h5file.createTable('/', 'mda_description', )
+    h5file.createTable('/', 'cell_description', CellsTable)
+
+    h5file.createTable('/', 'mda_description', MdaResultsTable)
     #cell_peak_table = h5file.createTable('/', 'cell_peaks',
     #                                     CellsTable)
     # image group has data files as CArrays.  There is one array for each file,
     # accessed by the filename.
     h5file.createGroup('/', 'rawdata')
 
-    # cell group has cell stacks as CArrays - one for each file from which cells came
+    # cell group has cell stacks as CArrays - one for each file from which
+    #    cells came
     # cell group also has template used for cropping
     h5file.createGroup('/', 'cells')
 
-    # mda cell results has factors/score images for cell data.  These are nested: 
+    # mda cell results has factors/score images for cell data.  These are
+    #  nested:
     #   - MDA type
     #     - which image they (the cells) originated from
     #       - Factors

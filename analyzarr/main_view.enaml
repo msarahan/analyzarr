@@ -23,7 +23,7 @@ Implementation Notes:
 from enaml.layout.api import vbox
 from enaml.widgets.api import (
     MainWindow, ToolBar, DockPane, MenuBar, Menu, Action, ActionGroup,
-    Container, Html, PushButton, EnableCanvas, CheckBox
+    Container, Html, PushButton, EnableCanvas, CheckBox, FileDialog
 )
 
 from chaco.api import ArrayPlotData, Plot, ImageData
@@ -66,18 +66,35 @@ class ImageModel(HasTraits):
         self.plot.img_plot('imagedata', colormap=dc.gray)
         self.plot.aspect_ratio=float(image_source._data.shape[1]) / float(image_source._data.shape[0])
 
-enamldef MyMenuBar(MenuBar):
+enamldef OpenChestDialog(FileDialog):
+    attr controller
+    title = "WHARR BE YE TREASURE?"
+    mode = "open_file"
+    closed :: controller.open_treasure_chest(self.path)
+
+enamldef ImportFilesDialog(FileDialog):
+    attr controller
+    title = "Choose the files to plunder:"
+    mode = "open_files"
+    closed :: controller.import_files(self.paths)
+
+enamldef MyMenuBar(MenuBar): menu:
+    attr controller
+    OpenChestDialog: chest_dialog:
+        controller = menu.controller
+    ImportFilesDialog: import_dialog:
+        controller = menu.controller
     Menu:
         title = '&File'
         Action:
             text = 'New File\tCtrl+N'
             triggered :: print 'New File triggered'
         Action:
-            text = 'Open File\tCtrl+O'
-            triggered :: print 'Open File triggered'
+            text = 'Open Chest\tCtrl+O'
+            triggered :: chest_dialog.open()
         Action:
-            text = 'Open Folder...'
-            triggered :: print 'Open Folder triggered'
+            text = 'Import Files'
+            triggered :: import_dialog.open()
     Menu:
         title = '&Edit'
         Action:
@@ -214,28 +231,28 @@ enamldef ImageViewDockPane(DockPane): imgdockpane:
             vbox(canvas, toolbar)
         ]
         EnableCanvas: canvas:
-            component = controller.plot
+            component << controller.plot
         ImagePlotToolBar: toolbar:
             movable = False
-            controller = imgdockpane.controller
+            controller << imgdockpane.controller
 
 enamldef Main(MainWindow): main:
     attr controller = HighSeasAdventure()
     initial_size = (600, 600)
     MyMenuBar:
-        pass
+        controller << main.controller
     MyToolBar:
         pass
     ViewToolBar: view_buttons:
-        controller = main.controller
+        controller << main.controller
         dock_area = 'left'
     ImageViewDockPane: image_view:
-        controller = main.controller.image_controller
+        controller << main.controller.image_controller
         title << "Image view"
         dock_area = 'left'
         visible := main.controller.show_image_view
     ImageViewDockPane: cell_view:
-        controller = main.controller.cell_controller
+        controller << main.controller.cell_controller
         title << "Cell view"
         dock_area = 'right'
         #: floating = True

@@ -2,8 +2,9 @@
 
 import tables as tb
 import os
+import time
 
-from data_structure import get_image_h5file, get_spectrum_h5file
+from data_structure import get_image_h5file, get_spectrum_h5file, filters
 
 img_extensions = ['.png', '.bmp', '.dib', '.gif', '.jpeg', '.jpe', '.jpg', '.msp', '.pcx', '.ppm', ".pbm", ".pgm", '.xbm', '.spi',]
 
@@ -11,7 +12,6 @@ tiff_extensions = ['.tiff', '.tif',]
 
 dm_extensions = ['.dm3',]
 
-filters = tb.Filters(complib='blosc', complevel=8)
 
 # I don't give a rat's ass about FEI's MRC files or other spectral formats.  
 # Sorry.
@@ -25,13 +25,15 @@ def import_files(file_string, output_filename = None):
     # match supported file input types - check extension
     if '*' in file_string:
         from glob import glob
-        flist=glob(file_string)
+        flist = glob(file_string)
         flist.sort()
+    elif isinstance(file_string, list):
+        flist = file_string
     else:
         flist = [file_string]
 
     if os.path.splitext(flist[0])[1] in img_extensions:
-        h5file = import_images(flist, output_filename)
+        h5file = import_image(flist, output_filename)
     elif os.path.splitext(flist[0])[1] in tiff_extensions:
         h5file = import_tiff(flist, output_filename)
     elif os.path.splitext(flist[0])[1] in dm_extensions:
@@ -46,7 +48,8 @@ def import_files(file_string, output_filename = None):
 def import_image(flist, output_filename=None):
     from scipy.misc import imread
     if output_filename is None:
-        output_filename = "image_treasure_%s" % ""    
+        output_filename = "image_treasure_%s" % time.strftime("%Y%m%d_%H%M", 
+                                                             time.localtime())
     h5file = get_image_h5file(output_filename)
     data_record = h5file.root.image_description.row
     # any kind of jpg, png can be lumped together
@@ -55,7 +58,7 @@ def import_image(flist, output_filename=None):
         d = imread(f)
         # add a CArray for this data in the h5file
         ds = h5file.createCArray(h5file.root.rawdata, 
-                            os.path.splitext(f)[0], 
+                            os.path.splitext(os.path.split(f)[1])[0],
                             tb.Atom.from_dtype(d.dtype),
                             d.shape,
                             filters=filters
@@ -63,7 +66,7 @@ def import_image(flist, output_filename=None):
         # assigns the data to the array
         ds[:] = d
         # add the record for this image to the table in the h5file
-        data_record['filename'] = os.path.splitext(f)[0]
+        data_record['filename'] = os.path.splitext(os.path.split(f)[1])[0]
         data_record['idx'] = flist.index(f)
         data_record.append()
     h5file.root.image_description.flush()
@@ -75,7 +78,8 @@ def import_tiff(flist, output_filename=None):
     # for tiff, we use Christoph Gohlke's reader
     from lib.io.tifffile import imread
     if output_filename is None:
-        output_filename = "image_treasure_%s" % ""    
+        output_filename = "image_treasure_%s" % time.strftime("%Y%m%d_%H%M", 
+                                                             time.localtime())   
     h5file = get_image_h5file(output_filename)
     data_record = h5file.root.image_description.row
     # any kind of jpg, png can be lumped together
@@ -84,7 +88,7 @@ def import_tiff(flist, output_filename=None):
         d = imread(f)
         # add a CArray for this data in the h5file
         ds = h5file.createCArray(h5file.root.rawdata, 
-                            os.path.splitext(f)[0], 
+                            os.path.splitext(os.path.split(f)[1])[0], 
                             tb.Atom.from_dtype(d.dtype),
                             d.shape,
                             filters=filters
@@ -93,7 +97,7 @@ def import_tiff(flist, output_filename=None):
         ds[:] = d
 
         # add the record for this image to the table in the h5file
-        data_record['filename'] = os.path.splitext(f)[0]
+        data_record['filename'] = os.path.splitext(os.path.split(f)[1])[0]
         data_record['idx'] = flist.index(f)
         data_record.append()
     h5file.root.image_description.flush()
@@ -108,11 +112,15 @@ def import_dm(flist, output_filename=None):
     
     if tmp_dm3.record_by is 'spectrum':
         if output_filename is None:
-            output_filename = "spectrum_treasure_%s" % ""
+            output_filename = "spectrum_treasure_%s" % time.strftime(
+                                                        "%Y%m%d_%H%M", 
+                                                        time.localtime())
         h5file = get_spectrum_h5file(output_filename)
     elif tmp_dm3.record_by is 'image':
         if output_filename is None:
-            output_filename = "image_treasure_%s" % ""
+            output_filename = "image_treasure_%s" % time.strftime(
+                                                        "%Y%m%d_%H%M", 
+                                                        time.localtime())
         h5file = get_image_h5file(output_filename)
     
     data_record = h5file.root.image_description.row
@@ -123,7 +131,7 @@ def import_dm(flist, output_filename=None):
         tmp_dm3, tmp_tags = file_reader(f)
         # add a CArray for this data in the h5file
         ds = h5file.createCArray(h5file.root.rawdata, 
-                            os.path.splitext(tmp_dm3.name)[0], 
+                            os.path.splitext(os.path.split(f)[1])[0], 
                             tb.Atom.from_dtype(tmp_dm3.data.dtype),
                             tmp_dm3.data.shape,
                             filters=filters
@@ -134,7 +142,7 @@ def import_dm(flist, output_filename=None):
         # TODO: add the tags as metadata for the CArray
         
         # add the record for this image to the table in the h5file
-        data_record['filename'] = os.path.splitext(tmp_dm3.name)[0]
+        data_record['filename'] = os.path.splitext(os.path.split(f)[1])[0]
         data_record['idx'] = flist.index(f)
         data_record.append()
     # flush the data to commit our changes to the file.

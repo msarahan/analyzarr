@@ -14,10 +14,10 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 import traits.api as t
 #from plotting.viewers import StackViewer
 #from ui.ucc import CellCropper
-from file_import import filters
+from data_structure import filters
 import tables as tb
 import numpy as np
-from mda import mda_sklearn as mda
+from lib.mda import mda_sklearn as mda
 
 import peak_char as pc
 
@@ -26,7 +26,6 @@ from chaco.api import Plot, ArrayPlotData, OverlayPlotContainer
 
 from ui.renderers import HasRenderer
 import file_import
-
 
 class ControllerBase(HasRenderer):
     # current image index
@@ -39,13 +38,12 @@ class ControllerBase(HasRenderer):
         self.plotdata = ArrayPlotData()
         self.plot = Plot()
         self.chest = None
+        self.numfiles = 0
         if treasure_chest is not None:
             self.chest = treasure_chest
             self.data_path = data_path
             self.nodes = self.chest.listNodes(data_path)
             self.numfiles = len(self.nodes)
-            self.init_plot()
-            print "initialized plot for data in %s" % data_path
         
     def set_active_index(self, img_idx):
         self.selected_index = img_idx
@@ -124,18 +122,21 @@ class ControllerBase(HasRenderer):
         """
         pass
 
-
 class ImageController(ControllerBase):
     def __init__(self, treasure_chest=None, data_path='/rawdata', *args, **kw):
         super(ImageController, self).__init__(treasure_chest, data_path,
                                               *args, **kw)
+        if self.numfiles > 0:
+            self.init_plot()
+            print "initialized plot for data in %s" % data_path
 
     ## fire up cell cropper
     def cell_cropper(self):
-        pass
+        #pass
         #self.set_active_data('rawdata')
-        #ui = CellCropper(self)
-        #ui.configure_traits()
+        ui = CellCropper(self)
+        ui.configure_traits()
+
 
 
 class CellController(ControllerBase):
@@ -144,7 +145,9 @@ class CellController(ControllerBase):
                 *args, **kw)
         if self.chest is not None:
             self.numfiles = self.chest.root.cell_description.nrows
-            self.init_plot()
+            if self.numfiles > 0:
+                self.init_plot()
+                print "initialized plot for data in %s" % data_path
 
     def get_active_image(self):
         # Find this cell in the cell description table.  We use this to look
@@ -257,11 +260,36 @@ class CellController(ControllerBase):
 
 
 class MDAController(ControllerBase):
+    ######
+    #  Analysis methods each create their own member under the group of MDA
+    #  results in the chest.
+    ######    
     def PCA(self, n_components=None):
+        self._create_new_context("PCA")
+        
         active_data = self.get_active_image_set()
         data = active_data.reshape((active_data.shape[0], -1))
         factors, scores , eigenvalues = mda.PCA(data, n_components=n_components)
         factors, scores = self._reshape_MDA_results(active_data, factors, scores)
+        fs = self.chest.createCArray(self.context, 'Factors',
+                                     tb.Atom.from_dtype(factors.dtype),
+                                     factors.shape,
+                                     filters=filters
+                                     )
+        ss = self.chest.createCArray(self.context, 'Scores',
+                                     tb.Atom.from_dtype(scores.dtype),
+                                     scores.shape,
+                                     filters=filters
+                                     )
+        ev = self.chest.createCArray(self.context, 'Eigenvalues',
+                                     tb.Atom.from_dtype(eigenvalues.dtype),
+                                     eigenvalues.shape,
+                                     filters=filters
+                                     )
+        fs[:] = factors
+        ss[:] = scores
+        ev[:] = eigenvalues
+        self.chest.flush()
         return factors, scores, eigenvalues
         # stash the results under the group of MDA results
         #   attribs:
@@ -271,14 +299,17 @@ class MDAController(ControllerBase):
         # store the mean of each column - we use this for reconstruction later
 
     def ICA(self, n_components, whiten=False, max_iter=10):
-        # reshape the data: 
+        from scipy import integrate
+        self._create_new_context("ICA")
+        # reshape the data:
         #   The goal is always to have the variables (pixels in an image,
         #     energy channels in a spectrum) always as columns in a 2D array.
-        #     The rows are made up of observations.  For example, in 
+        #     The rows are made up of observations.  For example, in
         #     images, the rows are individual cells.  In SIs, the rows
         #     are pixels where spectra were gathered.
-        # for images, the cell idx is dim 0        
-        data = self.active_data.reshape((self.active_data.shape[0], -1))
+        # for images, the cell idx is dim 0
+        data = self.data_controller.active_data_cube.reshape(
+            (self.active_data.shape[0], -1))
         # for spectra, the energy index is dim 0.
         #data = spectrum_data.reshape((-1, data.shape[0]
         """
@@ -292,23 +323,61 @@ class MDAController(ControllerBase):
         factors, scores = mda.ICA(diffdata, n_components=n_components)
 
         # integration undoes the differentiation done in the ICA data prep.
-        factors = np.array([integrate.cumtrapz(factors[:,i]) for i in xrange(factors.shape[1])]).T
-        factors, scores = self._reshape_MDA_results(active_data, factors, scores)
+        factors = np.array([integrate.cumtrapz(factors[:, i])
+                            for i in xrange(factors.shape[1])]).T
+        factors, scores = self._reshape_MDA_results(
+                            self.data_controller.active_data_cube,
+                            factors, scores)
+        fs = self.chest.createCArray(self.context, 'Factors',
+                                     tb.Atom.from_dtype(factors.dtype),
+                                     factors.shape,
+                                     filters=filters
+                                     )
+        ss = self.chest.createCArray(self.context, 'Scores',
+                                     tb.Atom.from_dtype(scores.dtype),
+                                     scores.shape,
+                                     filters=filters
+                                     )
+        fs[:] = factors
+        ss[:] = scores
+        self.chest.flush()
         return factors, scores
 
     def _reshape_MDA_results(self, data, factors, scores):
         # we need to reshape the factors and scores to make sense.
-        # for images, the factors are themselves images, while the scores are line plots with one column per component.
+        # for images, the factors are themselves images, while the scores are
+        # line plots with one column per component.
         if self.get_active_data_type() is "image":
             factors = factors.reshape((-1, data.shape[-2], data.shape[-1]))
             factors.squeeze()
             scores.reshape((data.shape[0], -1))
         # for SIs, the factors are spectra, while the scores are images.
-        elif self.get_active_data_type() is "spectrum" or self.get_active_data_type() is "peaks":
+        elif ((self.get_active_data_type() is "spectrum") or
+                (self.get_active_data_type() is "peaks")):
             factors = factors.reshape((data.shape[0], -1))
             scores = scores.reshape((-1, data.shape[-2], data.shape[-1]))
             scores.squeeze()
         return factors, scores
+
+    def _create_new_context(self, MDA_type):
+        import time
+        # first add an entry to our table of analyses performed
+        datestr = time.strftime("%Y-%m-%d %H:%M", time.localtime())
+        data_record = self.chest.root.mda_description.row
+        data_record['date'] = datestr
+        data_record['mda_type'] = MDA_type
+        data_record['input_data'] = self.data_controller.summarize_data()
+        #data_record['treatments'] = self.data_controller.summarize
+        data_record.append()
+        # If this MDA type hasn't been done yet, add a member of the MDA group
+        #   for this type.
+        self.chest.createGroup
+        # Set this instance's data as members of a group for the time right now
+        # this is where the factors and scores result arrays will be stored.
+        self.chest.flush()
+        # context is a pytables group.  It has attributes for informational
+        #   data, as well as being the container for any outputs.
+        self.context = "/mda_results/%s/%s" % (MDA_type, datestr)
 
 
 # the UI controller
@@ -317,7 +386,7 @@ class HighSeasAdventure(t.HasTraits):
     show_cell_view = t.Bool(False)
     show_score_view = t.Bool(False)
     show_factor_view = t.Bool(False)
-    
+
     image_controller = t.Instance(ImageController)
     cell_controller = t.Instance(CellController)
 
@@ -327,12 +396,26 @@ class HighSeasAdventure(t.HasTraits):
         super(HighSeasAdventure, self).__init__(*args, **kw)
         self.image_controller = ImageController()
         self.cell_controller = CellController()
-        self.open_treasure_chest("wing_test.chest")
+        self.chest = None
 
     def open_treasure_chest(self, filename):
+        if self.chest is not None:
+            self.chest.close()
         chest = file_import.open_treasure_chest(filename)
         self.image_controller = ImageController(chest)
         self.cell_controller = CellController(chest)
+
+    def import_files(self, file_list):
+        chest = file_import.import_files(file_list)
+        self.image_controller = ImageController(chest)
+        self.cell_controller = CellController()
+
+    def import_image(self):
+        pass
+
+    def new_project(self):
+        #new_file =
+        self.image_controller = ImageController()
 
     def add_cells(self, name, data, locations):
         ds = self.chest.createCArray(self.chest.root.cells,
