@@ -27,16 +27,13 @@ from chaco.api import Plot, ArrayPlotData, OverlayPlotContainer
 from ui.renderers import HasRenderer
 import file_import
 
+
 class ControllerBase(HasRenderer):
     # current image index
     selected_index = t.Int(0)
-    plot = t.Instance(Plot)
-    plotdata = t.Instance(ArrayPlotData)
 
     def __init__(self, treasure_chest=None, data_path='/rawdata', *args, **kw):
         super(ControllerBase, self).__init__(*args, **kw)
-        self.plotdata = ArrayPlotData()
-        self.plot = Plot()
         self.chest = None
         self.numfiles = 0
         if treasure_chest is not None:
@@ -44,9 +41,6 @@ class ControllerBase(HasRenderer):
             self.data_path = data_path
             self.nodes = self.chest.listNodes(data_path)
             self.numfiles = len(self.nodes)
-        
-    def set_active_index(self, img_idx):
-        self.selected_index = img_idx
 
     def increase_selected_index(self):
         if self.selected_index == (self.numfiles - 1):
@@ -64,6 +58,61 @@ class ControllerBase(HasRenderer):
     def update_img_depth(self):
         self.data = self.get_active_image()
         self.filename = self.get_active_name()
+        self.update_plots()
+
+    # TODO: this is for defining MDA's kind of data it's handling.  It might
+    #   eventually be used for spectroscopy data.
+    def get_active_data_type(self):
+        return "image"
+
+    def _get_image_data(self, datatype, slab=[]):
+        """
+        Gets some slab of data from the HDF5 file
+        @param rawdata: string; one of:
+            'rawdata' - the collection of raw images
+            'cells' - the cells cropped from the raw images
+            'mda_image_results' - mda results (eigenimages and scores) from the raw images
+            'mda_cells_results' - mda results (eigenimages and scores) from the cell stacks
+        @param slab: list of tuples; the first is the origin to start slicing from; the second 
+            is the coordinate to slice to.
+            for example, given a 3D stack, dimensions (10, 512, 512), which would be a stack of 512x512 images, 10 deep:
+            slab = [(0,0,0), (5,512,512)]  # will give you the first five images
+            slab = [(0,128,128), (10, 384, 384)] #will give you the central 256x256 area of the whole stack
+        """
+        pass
+
+
+class ImageController(ControllerBase):
+    plot = t.Instance(Plot)
+    plotdata = t.Instance(ArrayPlotData)
+
+    def __init__(self, treasure_chest=None, data_path='/rawdata', *args, **kw):
+        super(ImageController, self).__init__(treasure_chest, data_path,
+                                              *args, **kw)
+        self.plotdata = ArrayPlotData()
+        self.plot = Plot()
+        if self.numfiles > 0:
+            self.init_plot()
+            print "initialized plot for data in %s" % data_path
+
+    ## fire up cell cropper
+    def cell_cropper(self):
+        #pass
+        #self.set_active_data('rawdata')
+        ui = CellCropper(self)
+        ui.configure_traits()
+
+    def init_plot(self):
+        self.plotdata.set_data('imagedata', self.get_active_image())
+        self.plot = self.render_image(img_data=self.plotdata,
+                title="%s of %s: " % (self.selected_index + 1,
+                                      self.numfiles) + self.get_active_name()
+                    )
+        #self.plot = Plot(plot_data, default_origin='top left', padding=30)
+        #self.plot.img_plot('imagedata', colormap=dc.gray)
+        self.plot.img_plot("imagedata", colormap=gray)
+
+    def update_plots(self):
         self.plotdata.set_data("imagedata", self.data)
         # TODO: rewrite to use "format" method
         self.plot.title = "%s of %s: " % (self.selected_index + 1,
@@ -92,54 +141,8 @@ class ControllerBase(HasRenderer):
     def get_active_name(self):
         return self.nodes[self.selected_index].name
 
-    # TODO: this is for defining MDA's kind of data it's handling.
-    def get_active_data_type(self):
-        return "image"
 
-    def init_plot(self):
-        self.plotdata.set_data('imagedata', self.get_active_image())
-        self.plot = self.render_image(img_data=self.plotdata,
-                title="%s of %s: " % (self.selected_index + 1,
-                                      self.numfiles) + self.get_active_name()
-                    )
-        #self.plot = Plot(plot_data, default_origin='top left', padding=30)
-        #self.plot.img_plot('imagedata', colormap=dc.gray)
-        self.plot.img_plot("imagedata", colormap=gray)
-
-    def _get_image_data(self, datatype, slab=[]):
-        """
-        Gets some slab of data from the HDF5 file
-        @param rawdata: string; one of:
-            'rawdata' - the collection of raw images
-            'cells' - the cells cropped from the raw images
-            'mda_image_results' - mda results (eigenimages and scores) from the raw images
-            'mda_cells_results' - mda results (eigenimages and scores) from the cell stacks
-        @param slab: list of tuples; the first is the origin to start slicing from; the second 
-            is the coordinate to slice to.
-            for example, given a 3D stack, dimensions (10, 512, 512), which would be a stack of 512x512 images, 10 deep:
-            slab = [(0,0,0), (5,512,512)]  # will give you the first five images
-            slab = [(0,128,128), (10, 384, 384)] #will give you the central 256x256 area of the whole stack
-        """
-        pass
-
-class ImageController(ControllerBase):
-    def __init__(self, treasure_chest=None, data_path='/rawdata', *args, **kw):
-        super(ImageController, self).__init__(treasure_chest, data_path,
-                                              *args, **kw)
-        if self.numfiles > 0:
-            self.init_plot()
-            print "initialized plot for data in %s" % data_path
-
-    ## fire up cell cropper
-    def cell_cropper(self):
-        #pass
-        #self.set_active_data('rawdata')
-        ui = CellCropper(self)
-        ui.configure_traits()
-
-
-
-class CellController(ControllerBase):
+class CellController(ImageController):
     def __init__(self, treasure_chest=None, data_path='/cells', *args, **kw):
         super(CellController, self).__init__(treasure_chest, data_path,
                 *args, **kw)
@@ -260,13 +263,76 @@ class CellController(ControllerBase):
 
 
 class MDAController(ControllerBase):
+    # TODO: should we have so many ArrayPlotData instances, or just one with 
+    #    appropriate naming?    
+    
+    # the image data for the factor plot
+    factor_plotdata = t.Instance(ArrayPlotData)
+    # any scatter plot data to be overlayed on the factor image data
+    factor_scatterdata = t.Instance(ArrayPlotData)
+    # any quiver plot data to be overlayed on the factor image data
+    factor_arrowdata = t.Instance(ArrayPlotData)
+    # the actual plot object
+    factor_plot = Plot()
+    # the image data for the score plot (may be a parent image)
+    score_plotdata = t.Instance(ArrayPlotData)
+    # any scatter plot data to be overlayed on the score image data
+    #   these data may be the actual score data, which is presented as a
+    #   scatter plot overlaid on a parent image
+    score_scatterdata = t.Instance(ArrayPlotData)
+
+    def __init__(self, treasure_chest=None, data_path='/mda_results',
+                 *args, **kw):
+        super(ControllerBase, self).__init__(*args, **kw)
+        self.factor_plotdata = ArrayPlotData()
+        self.factor_scatterdata = ArrayPlotData()
+        self.factor_arrowdata = ArrayPlotData()
+        self.factor_plot = Plot()
+        self.score_plotdata = ArrayPlotData()
+        self.score_scatterdata = ArrayPlotData()
+        self.score_plot = Plot()
+        if treasure_chest is not None:
+            self.chest = treasure_chest
+            self.data_path = data_path
+            # TODO: this is not a good way to do things.  MDA is split with
+            #   two descriptors - the type of mda, then the date it was done.
+            #   perhaps only do by date it was done?
+            self.nodes = self.chest.listNodes(data_path)
+            self.numfiles = self.chest.root.mda_description.nrows
+            if self.numfiles > 0:
+                self.init_plots()
+
+    # TODO: need to rethink how to set_data for these things, since we have so
+    #    many different places to put data.
+    def init_plots(self):
+        self.factor_plotdata.set_data('imagedata',
+                                      self.get_active_factor_image())
+        self.factor_plotdata.set_data('imagedata',
+                                      self.get_active_score_image())
+        self.factor_plot = self.render_factor_plot(
+                img_data=self.factor_plotdata,
+                title="%s of %s: " % (self.selected_index + 1,
+                                      self.numfiles) + self.get_active_name()
+                )
+        self.score_plot = self.render_score_plot(
+                img_data=self.score_plotdata, scatter_data=self.score_plotdata,
+                title="%s of %s: " % (self.selected_index + 1,
+                                      self.numfiles) + self.get_active_name()
+                )
+
+    def update_plots(self):
+        self.factor_plotdata.set_data("imagedata", self.data)
+        # TODO: rewrite to use "format" method
+        self.plot.title = "%s of %s: " % (self.selected_index + 1,
+                                          self.numfiles) + self.filename
+
     ######
     #  Analysis methods each create their own member under the group of MDA
     #  results in the chest.
-    ######    
+    ######
     def PCA(self, n_components=None):
         self._create_new_context("PCA")
-        
+
         active_data = self.get_active_image_set()
         data = active_data.reshape((active_data.shape[0], -1))
         factors, scores , eigenvalues = mda.PCA(data, n_components=n_components)
