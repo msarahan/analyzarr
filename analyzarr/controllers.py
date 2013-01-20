@@ -27,6 +27,7 @@ from chaco.api import Plot, ArrayPlotData, OverlayPlotContainer
 from ui.renderers import HasRenderer
 import file_import
 
+#from ui.ucc import CellCropper
 
 class ControllerBase(HasRenderer):
     # current image index
@@ -41,6 +42,11 @@ class ControllerBase(HasRenderer):
             self.data_path = data_path
             self.nodes = self.chest.listNodes(data_path)
             self.numfiles = len(self.nodes)
+
+    # TODO: add bounds checking
+    # used by the cell cropper
+    def set_active_index(self, idx):
+        self.selected_index = idx
 
     def increase_selected_index(self):
         if self.selected_index == (self.numfiles - 1):
@@ -104,13 +110,14 @@ class ImageController(ControllerBase):
 
     def init_plot(self):
         self.plotdata.set_data('imagedata', self.get_active_image())
-        self.plot = self.render_image(img_data=self.plotdata,
+        self.plot = self.get_simple_image_plot(array_plot_data = self.plotdata,
                 title="%s of %s: " % (self.selected_index + 1,
                                       self.numfiles) + self.get_active_name()
-                    )
+                )
+        #self.plot.showplot("image_plot")
         #self.plot = Plot(plot_data, default_origin='top left', padding=30)
         #self.plot.img_plot('imagedata', colormap=dc.gray)
-        self.plot.img_plot("imagedata", colormap=gray)
+        #self.plot.img_plot("imagedata", colormap=gray)
 
     def update_plots(self):
         self.plotdata.set_data("imagedata", self.data)
@@ -428,7 +435,7 @@ class MDAController(ControllerBase):
     def _create_new_context(self, MDA_type):
         import time
         # first add an entry to our table of analyses performed
-        datestr = time.strftime("%Y-%m-%d %H:%M", time.localtime())
+        datestr = MDA_type + time.strftime("_%Y-%m-%d %H:%M", time.localtime())
         data_record = self.chest.root.mda_description.row
         data_record['date'] = datestr
         data_record['mda_type'] = MDA_type
@@ -445,6 +452,177 @@ class MDAController(ControllerBase):
         #   data, as well as being the container for any outputs.
         self.context = "/mda_results/%s/%s" % (MDA_type, datestr)
 
+class CellCropController(ImageController):
+    zero=t.Int(0)
+    template_plot = t.Instance(Plot)
+    template_data = t.Instance(ArrayPlotData)
+    template_size = t.Range(low=2, high=512, value=64, cols=4)
+    template_top = t.Range(low='zero',high='max_pos_y', value=20, cols=4)
+    template_left = t.Range(low='zero',high='max_pos_x', value=20, cols=4)
+    peaks = t.List
+    ShowCC = t.Bool(False)
+    max_pos_x = t.Property(depends_on=['tmp_size'])
+    max_pos_y = t.Property(depends_on=['tmp_size'])
+    is_square = t.Bool
+    peak_width = t.Range(low=2, high=200, value=10)
+    numpeaks_total = t.Int(0,cols=5)
+    numpeaks_img = t.Int(0,cols=5)
+    thresh = t.Trait(None,None,t.List,t.Tuple,t.Array)
+    thresh_upper = t.Float(1.0)
+    thresh_lower = t.Float(-1.0)
+
+    def __init__(self, treasure_chest=None, data_path='/rawdata', *args, **kw):
+        super(CellCropController, self).__init__(treasure_chest, data_path,
+                                              *args, **kw)
+        self.plotdata = ArrayPlotData()
+        self.plot = Plot()
+        if self.numfiles > 0:
+            self.init_plot()
+            print "initialized plot for data in %s" % data_path
+    
+    def init_plot(self):
+        self.plotdata.set_data('imagedata', self.get_active_image())
+        self.plot = self.render_image(img_data=self.plotdata,
+                title="%s of %s: " % (self.selected_index + 1,
+                                      self.numfiles) + self.get_active_name()
+                    )
+        self.plot.img_plot("imagedata", colormap=gray)
+        # pick an initial template with default parameters
+        self.update_template_data()
+        self.template_plot.img_plot("imagedata", colormap=gray)
+
+    def update_template_data(self):
+        self.template_data.set_data('imagedata',
+                    self.get_active_image()[
+                        template_top:template_top + template_size,
+                        template_left:template_left + template_size]
+                    )
+
+    def update_plots(self):
+        self.plotdata.set_data("imagedata", self.data)
+        # TODO: rewrite to use "format" method
+        self.plot.title = "%s of %s: " % (self.selected_index + 1,
+                                          self.numfiles) + self.filename
+        
+    def update_CC(self):
+        if self.ShowCC:
+            self.CC = cv_funcs.xcorr(self.template, self.data)
+            self.img_plotdata.set_data("imagedata",self.CC)
+
+    #@on_trait_change('cbar_selection:selection')
+    def update_thresh(self):
+        try:
+            thresh=self.cbar_selection.selection
+            self.thresh=thresh
+            self.cmap_renderer.color_data.metadata['selections']=thresh
+            self.thresh_lower=thresh[0]
+            self.thresh_upper=thresh[1]
+            #cmap_renderer.color_data.metadata['selection_masks']=self.thresh
+            self.cmap_renderer.color_data.metadata_changed={'selections':thresh}
+            self.container.request_redraw()
+            self.img_container.request_redraw()
+        except:
+            pass
+
+    #@on_trait_change('thresh_upper,thresh_lower')
+    def manual_thresh_update(self):
+        self.thresh=[self.thresh_lower,self.thresh_upper]
+        self.cmap_renderer.color_data.metadata['selections']=self.thresh
+        self.cmap_renderer.color_data.metadata_changed={'selections':self.thresh}
+        self.container.request_redraw()
+        self.img_container.request_redraw()
+
+    #@on_trait_change('peaks,cbar_selection:selection,img_idx')
+    def calc_numpeaks(self):
+        try:
+            thresh=self.cbar_selection.selection
+            self.thresh=thresh
+        except:
+            thresh=[]
+        if thresh==[] or thresh==() or thresh==None:
+            thresh=(-1,1)
+        self.numpeaks_total=int(np.sum([np.sum(np.ma.masked_inside(self.peaks[i][:,2],thresh[0],thresh[1]).mask) for i in xrange(len(self.peaks))]))
+        try:
+            self.numpeaks_img=int(np.sum(np.ma.masked_inside(self.peaks[self.img_idx][:,2],thresh[0],thresh[1]).mask))
+        except:
+            self.numpeaks_img=0
+
+            
+    # TODO: this is the old way of doing things, with peaks in one giant array.
+    #   We need to re-do this with the new pytables way, simpler addressing.
+    def locate_peaks(self):
+        peaks=[]
+        progress = ProgressDialog(title="Peak finder progress", message="Finding peaks on %s images"%self.numfiles, max=self.numfiles, show_time=True, can_cancel=False)
+        progress.open()
+        for idx in xrange(self.numfiles):
+            self.controller.set_active_index(idx)
+            data = self.controller.get_active_image()
+            CC = cv_funcs.xcorr(self.template_data.get_data("imagedata"),
+                                    self.controller.get_active_image())
+            # peak finder needs peaks greater than 1.  Multiply by 255 to scale them.
+            pks=pc.two_dim_findpeaks(CC*255, peak_width=self.peak_width, medfilt_radius=None)
+            pks[:,2]=pks[:,2]/255.
+            peaks.append(pks)
+            progress.update(idx+1)
+        #ipdb.set_trace()
+        self.peaks=peaks
+        self.redraw_plots()
+        
+    def mask_peaks(self,idx):
+        thresh=self.cbar_selection.selection
+        if thresh==[]:
+            thresh=(-1,1)
+        mpeaks=np.ma.asarray(self.peaks[idx])
+        mpeaks[:,2]=np.ma.masked_outside(mpeaks[:,2],thresh[0],thresh[1])
+        return mpeaks
+
+    #@on_trait_change("peaks")
+    def redraw_plots(self):
+        oldplot=self.img_plot
+        self.container.remove(oldplot)
+        newplot=self.render_image()
+        self.container.add(newplot)
+        self.img_plot=newplot
+
+        try:
+            # if these haven't been created before, this will fail.  wrap in try to prevent that.
+            oldscat=self.scatplot
+            self.container.remove(oldscat)
+            oldcolorbar = self.colorbar
+            self.img_container.remove(oldcolorbar)
+        except:
+            pass
+
+        if self.numpeaks_img>0:
+            newscat=self.render_scatplot()
+            self.container.add(newscat)
+            self.scatplot=newscat
+            colorbar = self.draw_colorbar()
+            self.img_container.add(colorbar)
+            self.colorbar=colorbar
+
+        self.container.request_redraw()
+        self.img_container.request_redraw()
+
+    def crop_cells(self):
+        print "cropping cells..."
+        for idx in xrange(self.numfiles):
+            # filter the peaks that are outside the selected threshold
+            self.controller.set_active_index(idx)
+            self.data = self.controller.get_active_image()
+            self.name = self.controller.get_active_name()
+            peaks=np.ma.compress_rows(self.mask_peaks(idx))
+            tmp_sz=self.tmp_size
+            data=np.zeros((peaks.shape[0],tmp_sz,tmp_sz))
+            if data.shape[0] >0:
+                for i in xrange(peaks.shape[0]):
+                    # crop the cells from the given locations
+                    data[i,:,:]=self.data[peaks[i,1]:peaks[i,1]+tmp_sz, 
+                                      peaks[i,0]:peaks[i,0]+tmp_sz]
+                # send the data to the controller for storage in the chest
+                self.controller.add_cells(name = self.name, data = data,
+                                      locations = peaks)    
+    
 
 # the UI controller
 class HighSeasAdventure(t.HasTraits):
