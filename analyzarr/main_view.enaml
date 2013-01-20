@@ -26,45 +26,7 @@ from enaml.widgets.api import (
     Container, Html, PushButton, EnableCanvas, CheckBox, FileDialog
 )
 
-from chaco.api import ArrayPlotData, Plot, ImageData
-from chaco import default_colormaps as dc
-from scipy.misc import lena
-from traits.api import HasTraits, Instance, Array, Bool
-
 from controllers import HighSeasAdventure
-
-class ImageModel(HasTraits):
-    """ Create a Chaco Plot object with the data to analyze.
-
-    """
-    #: The plot which will draw the image data.
-    plot = Instance(Plot)
-
-    #: The array data for the plot.
-    data = Array
-
-    def __init__(self, **kwargs):
-        """ Initialize an ImageModel.
-
-        Parameters
-        ----------
-        filename : str, optional
-            If provided, then ImageData is loaded with the .fromfile class
-            method, otherwise, a sample image is loaded.
-
-        """
-        super(ImageModel, self).__init__()
-        if 'filename' in kwargs:
-            image_source = ImageData.fromfile(kwargs[filename])
-            self.data = image_source._data
-        else:
-            self.data = lena()
-            image_source = ImageData(data=self.data, value_depth=1)
-        plot_data = ArrayPlotData()
-        plot_data.set_data('imagedata', image_source._data)
-        self.plot = Plot(plot_data, default_origin='top left', padding=30)
-        self.plot.img_plot('imagedata', colormap=dc.gray)
-        self.plot.aspect_ratio=float(image_source._data.shape[1]) / float(image_source._data.shape[0])
 
 enamldef OpenChestDialog(FileDialog):
     attr controller
