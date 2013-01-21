@@ -1,73 +1,78 @@
-from enaml.layout.api import vbox
+from enaml.layout.api import vbox, hbox
 from enaml.widgets.api import (
     Window, ToolBar, DockPane, MenuBar, Menu, Action, ActionGroup,
-    Container, Html, PushButton, EnableCanvas, CheckBox, FileDialog
+    Container, Html, PushButton, EnableCanvas, CheckBox, FileDialog,
+    SpinBox, Label
 )
+from enaml.stdlib.fields import FloatField
 
+# TODO: need to import controller
 
-
-enamldef CellCropperInterface(Window):
-    #: this is a HighSeasAdventure object.  It has the image and cell
-    #:   controllers that we will need
+enamldef CellCropperInterface(DockPane):
     attr controller
+    floating=True
+    title = "Cell Cropper"
     Container:
+        constraints = [hbox(image_container, template_container)]
         #: First, the left view with the parent image
-        Container:
-            
+        Container: image_container:
+            constraints = [ vbox(imageCanvas, hbox(prev_img, next_img, showCC))]
             #: the image (Chaco/Enable canvas)
             EnableCanvas: imageCanvas:
-                component << controller.image_controller.plot
+                component << controller.plot
             #: the checkbox to show cross correlation view
             CheckBox: showCC:
                 text = "Show cross-correlation"
-                
+                checked << controller.ShowCC
             #: the buttons to go between images
-    traits_view = View(
-        Group(
-            Group(
-                Item("img_container",editor=ComponentEditor(), show_label=False),
-                HGroup(
-                    Item("ShowCC", editor=BooleanEditor(), label="Show cross correlation image"),
-                    Spring(),
-                    Item("prev_img",editor=ButtonEditor(label="<"),show_label=False, enabled_when='numfiles > 1'),
-                    Item("next_img",editor=ButtonEditor(label=">"),show_label=False, enabled_when='numfiles > 1'),
-                    ),
-                label="Original image", show_border=True, trait_modified="tab_selected",
-                orientation='vertical',),
-            VGroup(
-                Group(
-                    HGroup(
-                        Item("left", label="Left coordinate", style="custom"),
-                        Spring(),
-                        Item("top", label="Top coordinate", style="custom"),
-                        ),
-                    Item("tmp_size", label="Template size", style="custom"),
-                    Item("tmp_plot",editor=ComponentEditor(height=256, width=256), show_label=False, resizable=True),
-                    label="Template", show_border=True),
-                Group(
-                    HGroup(
-                        Item("peak_width", label="Peak width", style="custom"),
-                        Spring(),
-                        Item("findpeaks",editor=ButtonEditor(label="Find Peaks"),show_label=False),
-                        ),
-                    HGroup(
-                        Item("thresh_lower",label="Threshold Lower Value", editor=TextEditor(evaluate=float,
-                                                                                             format_str='%1.4f')),
-                        Spring(),
-                        Item("thresh_upper",label="Threshold Upper Value", editor=TextEditor(evaluate=float,
-                                                                                             format_str='%1.4f')),
-                    ),
-                    HGroup(
-                        Item("numpeaks_img",label="Number of Cells selected (this image)",style='readonly'),
-                        Spring(),
-                        Item("numpeaks_total",label="Total",style='readonly'),                          
-                        ),
-                    label="Peak parameters", show_border=True),
-                ),
-            orientation='horizontal'),
-        buttons = [ Action(name='OK', enabled_when = 'numpeaks_total > 0' ),
-            CancelButton ],
-        title="Template Picker",
-        handler=OK_custom, kind='livemodal',
-        key_bindings = key_bindings,
-        width=940, height=530,resizable=True) 
+            PushButton: prev_img:
+                text = '<'
+                clicked :: controller.decrease_selected_index()
+            PushButton: next_img:
+                text = '>'
+                clicked :: controller.increase_selected_index()
+                
+        #: now the right view the template, controls, and info
+        Container: template_container:
+            constraints = [
+                vbox(
+                    hbox(l_left_coord, left_coord, 
+                        l_top_coord, top_coord, 
+                        l_size, size),
+                    templateCanvas, 
+                    hbox(l_peak_width,peak_width),
+                    hbox(l_thresh_lower, thresh_lower, 
+                        l_thresh_upper, thresh_upper),
+                    )
+                    ]
+                                
+            EnableCanvas: templateCanvas:
+                component << controller.template_plot
+            Label: l_left_coord:
+                text = "Left coordinate"
+            SpinBox: left_coord:
+                value := controller.template_left
+                maximum << controller.max_pos_x
+            Label: l_top_coord:
+                text = "Top coordinate"
+            SpinBox: top_coord:
+                value := controller.template_top
+                maximum << controller.max_pos_y
+            Label: l_size:
+                text = "Size"
+            SpinBox: size:
+                value := controller.template_size
+                maximum = 1024
+            Label: l_peak_width:
+                text = 'Peak Width'
+            SpinBox: peak_width:
+                value := controller.peak_width
+            Label: l_thresh_upper:
+                text = 'Upper Threshold'
+            FloatField: thresh_upper:
+                value := controller.thresh_upper
+            Label: l_thresh_lower:
+                text = 'Lower Threshold'
+            FloatField: thresh_lower:
+                value := controller.thresh_lower
+            

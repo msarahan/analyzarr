@@ -12,6 +12,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 """
 
 import traits.api as t
+from traits.api import on_trait_change
 #from plotting.viewers import StackViewer
 #from ui.ucc import CellCropper
 from data_structure import filters
@@ -22,12 +23,10 @@ from lib.mda import mda_sklearn as mda
 import peak_char as pc
 
 from chaco.default_colormaps import gray
-from chaco.api import Plot, ArrayPlotData, OverlayPlotContainer
+from chaco.api import ArrayPlotData, BasePlotContainer, Plot
 
 from ui.renderers import HasRenderer
 import file_import
-
-#from ui.ucc import CellCropper
 
 class ControllerBase(HasRenderer):
     # current image index
@@ -37,9 +36,9 @@ class ControllerBase(HasRenderer):
         super(ControllerBase, self).__init__(*args, **kw)
         self.chest = None
         self.numfiles = 0
+        self.data_path = data_path
         if treasure_chest is not None:
             self.chest = treasure_chest
-            self.data_path = data_path
             self.nodes = self.chest.listNodes(data_path)
             self.numfiles = len(self.nodes)
 
@@ -59,12 +58,6 @@ class ControllerBase(HasRenderer):
             self.selected_index = self.numfiles - 1
         else:
             self.selected_index -= 1
-
-    @t.on_trait_change("selected_index")
-    def update_img_depth(self):
-        self.data = self.get_active_image()
-        self.filename = self.get_active_name()
-        self.update_plots()
 
     # TODO: this is for defining MDA's kind of data it's handling.  It might
     #   eventually be used for spectroscopy data.
@@ -88,25 +81,18 @@ class ControllerBase(HasRenderer):
         pass
 
 
-class ImageController(ControllerBase):
-    plot = t.Instance(Plot)
+class BaseImageController(ControllerBase):
+    plot = t.Instance(BasePlotContainer)
     plotdata = t.Instance(ArrayPlotData)
+    show_crop_ui = t.Bool(False)
 
     def __init__(self, treasure_chest=None, data_path='/rawdata', *args, **kw):
-        super(ImageController, self).__init__(treasure_chest, data_path,
+        super(BaseImageController, self).__init__(treasure_chest, data_path,
                                               *args, **kw)
         self.plotdata = ArrayPlotData()
-        self.plot = Plot()
         if self.numfiles > 0:
             self.init_plot()
             print "initialized plot for data in %s" % data_path
-
-    ## fire up cell cropper
-    def cell_cropper(self):
-        #pass
-        #self.set_active_data('rawdata')
-        ui = CellCropper(self)
-        ui.configure_traits()
 
     def init_plot(self):
         self.plotdata.set_data('imagedata', self.get_active_image())
@@ -118,12 +104,6 @@ class ImageController(ControllerBase):
         #self.plot = Plot(plot_data, default_origin='top left', padding=30)
         #self.plot.img_plot('imagedata', colormap=dc.gray)
         #self.plot.img_plot("imagedata", colormap=gray)
-
-    def update_plots(self):
-        self.plotdata.set_data("imagedata", self.data)
-        # TODO: rewrite to use "format" method
-        self.plot.title = "%s of %s: " % (self.selected_index + 1,
-                                          self.numfiles) + self.filename
 
     # this is a 2D image for plotting purposes
     def get_active_image(self):
@@ -147,9 +127,14 @@ class ImageController(ControllerBase):
 
     def get_active_name(self):
         return self.nodes[self.selected_index].name
-
-
-class CellController(ImageController):
+    
+    @t.on_trait_change("selected_index")
+    def update_img_depth(self):
+        self.plotdata.set_data("imagedata", self.get_active_image())
+        self.set_plot_title("%s of %s: " % (self.selected_index + 1,
+                                          self.numfiles) + self.get_active_name())
+        
+class CellController(BaseImageController):
     def __init__(self, treasure_chest=None, data_path='/cells', *args, **kw):
         super(CellController, self).__init__(treasure_chest, data_path,
                 *args, **kw)
@@ -270,34 +255,20 @@ class CellController(ImageController):
 
 
 class MDAController(ControllerBase):
-    # TODO: should we have so many ArrayPlotData instances, or just one with 
-    #    appropriate naming?    
-    
-    # the image data for the factor plot
-    factor_plotdata = t.Instance(ArrayPlotData)
-    # any scatter plot data to be overlayed on the factor image data
-    factor_scatterdata = t.Instance(ArrayPlotData)
-    # any quiver plot data to be overlayed on the factor image data
-    factor_arrowdata = t.Instance(ArrayPlotData)
+    # the image data for the factor plot (including any scatter data and
+    #    quiver data
+    factor_plotdata = ArrayPlotData
     # the actual plot object
-    factor_plot = Plot()
+    factor_plot = t.Instance(BasePlotContainer)
     # the image data for the score plot (may be a parent image)
-    score_plotdata = t.Instance(ArrayPlotData)
-    # any scatter plot data to be overlayed on the score image data
-    #   these data may be the actual score data, which is presented as a
-    #   scatter plot overlaid on a parent image
-    score_scatterdata = t.Instance(ArrayPlotData)
+    score_plotdata = ArrayPlotData
+    score_plot = t.Instance(BasePlotContainer)
 
     def __init__(self, treasure_chest=None, data_path='/mda_results',
                  *args, **kw):
         super(ControllerBase, self).__init__(*args, **kw)
         self.factor_plotdata = ArrayPlotData()
-        self.factor_scatterdata = ArrayPlotData()
-        self.factor_arrowdata = ArrayPlotData()
-        self.factor_plot = Plot()
         self.score_plotdata = ArrayPlotData()
-        self.score_scatterdata = ArrayPlotData()
-        self.score_plot = Plot()
         if treasure_chest is not None:
             self.chest = treasure_chest
             self.data_path = data_path
@@ -327,11 +298,12 @@ class MDAController(ControllerBase):
                                       self.numfiles) + self.get_active_name()
                 )
 
-    def update_plots(self):
-        self.factor_plotdata.set_data("imagedata", self.data)
-        # TODO: rewrite to use "format" method
-        self.plot.title = "%s of %s: " % (self.selected_index + 1,
-                                          self.numfiles) + self.filename
+    @t.on_trait_change("selected_index")
+    def update_img_depth(self):
+        # TODO: customize this to change the factor data and plot data
+        self.plotdata.set_data("imagedata", self.get_active_image())
+        self.set_plot_title("%s of %s: " % (self.selected_index + 1,
+                                          self.numfiles) + self.get_active_name())
 
     ######
     #  Analysis methods each create their own member under the group of MDA
@@ -452,98 +424,162 @@ class MDAController(ControllerBase):
         #   data, as well as being the container for any outputs.
         self.context = "/mda_results/%s/%s" % (MDA_type, datestr)
 
-class CellCropController(ImageController):
+class CellCropController(BaseImageController):
     zero=t.Int(0)
-    template_plot = t.Instance(Plot)
+    template_plot = t.Instance(BasePlotContainer)
     template_data = t.Instance(ArrayPlotData)
     template_size = t.Range(low=2, high=512, value=64, cols=4)
     template_top = t.Range(low='zero',high='max_pos_y', value=20, cols=4)
     template_left = t.Range(low='zero',high='max_pos_x', value=20, cols=4)
-    peaks = t.List
+    peaks = t.Dict({})
     ShowCC = t.Bool(False)
-    max_pos_x = t.Property(depends_on=['tmp_size'])
-    max_pos_y = t.Property(depends_on=['tmp_size'])
-    is_square = t.Bool
+    max_pos_x = t.Int(256)
+    max_pos_y = t.Int(256)
+    is_square = t.Bool(True)
     peak_width = t.Range(low=2, high=200, value=10)
     numpeaks_total = t.Int(0,cols=5)
     numpeaks_img = t.Int(0,cols=5)
     thresh = t.Trait(None,None,t.List,t.Tuple,t.Array)
-    thresh_upper = t.Float(1.0)
-    thresh_lower = t.Float(-1.0)
+    thresh_upper = t.Range(-1.0, 1.0, 1.0)
+    thresh_lower = t.Range(-1.0, 1.0, -1.0)
+    
+    # todo - we'll probably need to define this
+    #csr=t.Instance(BaseCursorTool)
 
     def __init__(self, treasure_chest=None, data_path='/rawdata', *args, **kw):
         super(CellCropController, self).__init__(treasure_chest, data_path,
                                               *args, **kw)
-        self.plotdata = ArrayPlotData()
-        self.plot = Plot()
         if self.numfiles > 0:
             self.init_plot()
             print "initialized plot for data in %s" % data_path
     
     def init_plot(self):
         self.plotdata.set_data('imagedata', self.get_active_image())
-        self.plot = self.render_image(img_data=self.plotdata,
+        self.plot = self.get_simple_image_plot(array_plot_data=self.plotdata,
                 title="%s of %s: " % (self.selected_index + 1,
                                       self.numfiles) + self.get_active_name()
                     )
-        self.plot.img_plot("imagedata", colormap=gray)
         # pick an initial template with default parameters
-        self.update_template_data()
-        self.template_plot.img_plot("imagedata", colormap=gray)
+        self.template_data = ArrayPlotData()
+        self.template_plot = Plot(self.template_data)        
+        self.template_data.set_data('imagedata',
+                    self.get_active_image()[
+                        self.template_top:self.template_top + self.template_size,
+                        self.template_left:self.template_left + self.template_size
+                    ]
+                    )
+        self.template_plot.img_plot('imagedata', title = "Template")
+        self.template_plot.aspect_ratio=1 #square templates
 
+    @t.on_trait_change("selected_index")
+    def update_img_depth(self):
+        if self.ShowCC:
+            self.CC = cv_funcs.xcorr(self.template, self.data)
+            self.plotdata.set_data("imagedata",self.CC)
+            self.set_plot_title("Cross correlation of " + self.get_active_name())            
+        else:
+            self.plotdata.set_data("imagedata", self.get_active_image())
+            self.set_plot_title("%s of %s: " % (self.selected_index + 1,
+                                          self.numfiles) + self.get_active_name())
+
+    @on_trait_change('template_left, template_top, template_size')
     def update_template_data(self):
         self.template_data.set_data('imagedata',
                     self.get_active_image()[
-                        template_top:template_top + template_size,
-                        template_left:template_left + template_size]
+                        self.template_top:self.template_top + self.template_size,
+                        self.template_left:self.template_left + self.template_size
+                    ]
                     )
+        if self.numpeaks_total>0:
+            print "clearing peaks"
+            self.peaks=[np.array([[0,0,-1]])]
+        self.update_CC()        
 
-    def update_plots(self):
-        self.plotdata.set_data("imagedata", self.data)
-        # TODO: rewrite to use "format" method
-        self.plot.title = "%s of %s: " % (self.selected_index + 1,
-                                          self.numfiles) + self.filename
-        
+    def add_cursor_tool(self):    
+        self.csr = CursorTool(self._base_plot, drag_button='left', color='white',
+                                 line_width=2.0)
+        self._base_plot.overlays.append(self.csr)
+    
+    @t.on_trait_change('selected_index, template_size')
+    def _get_max_pos_x(self):
+        max_pos_x=self.get_active_image().shape[-1]-self.template_size-1
+        if max_pos_x>0:
+            return max_pos_x
+        else:
+            return None
+
+    @t.on_trait_change('selected_index, template_size')
+    def _get_max_pos_y(self):
+        max_pos_y=self.get_active_image().shape[-2]-self.template_size-1
+        if max_pos_y>0:
+            return max_pos_y
+        else:
+            return None
+
+    @t.on_trait_change('template_left, template_top')
+    def update_csr_position(self):
+        #if self.template_left>0:        
+            #self.csr.current_position=self.template_left,self.template_top
+        pass
+
+    @t.on_trait_change('csr:current_position')
+    def update_top_left(self):
+        if self.csr.current_position[0]>0 or self.csr.current_position[1]>0:
+            if self.csr.current_position[0]>self.max_pos_x:
+                if self.csr.current_position[1]<self.max_pos_y:
+                    self.template_top=self.csr.current_position[1]
+                else:
+                    self.csr.current_position=self.max_pos_x, self.max_pos_y
+            elif self.csr.current_position[1]>self.max_pos_y:
+                self.template_left,self.template_top=self.csr.current_position[0],self.max_pos_y
+            else:
+                self.template_left,self.template_top=self.csr.current_position
+                
     def update_CC(self):
         if self.ShowCC:
             self.CC = cv_funcs.xcorr(self.template, self.data)
-            self.img_plotdata.set_data("imagedata",self.CC)
+            self.plotdata.set_data("imagedata",self.CC)
 
-    #@on_trait_change('cbar_selection:selection')
+    @t.on_trait_change('colorbar_selection:selection')
     def update_thresh(self):
         try:
-            thresh=self.cbar_selection.selection
-            self.thresh=thresh
-            self.cmap_renderer.color_data.metadata['selections']=thresh
+            thresh=self.colorbar_selection.selection
+            self.scatter_threshold=thresh
+            self.scatter_plot.color_data.metadata['selections']=thresh
             self.thresh_lower=thresh[0]
             self.thresh_upper=thresh[1]
             #cmap_renderer.color_data.metadata['selection_masks']=self.thresh
-            self.cmap_renderer.color_data.metadata_changed={'selections':thresh}
-            self.container.request_redraw()
-            self.img_container.request_redraw()
+            self.scatter_plot.color_data.metadata_changed={'selections':thresh}
+            self.plot.request_redraw()
         except:
             pass
 
-    #@on_trait_change('thresh_upper,thresh_lower')
+    @t.on_trait_change('thresh_upper,thresh_lower')
     def manual_thresh_update(self):
-        self.thresh=[self.thresh_lower,self.thresh_upper]
-        self.cmap_renderer.color_data.metadata['selections']=self.thresh
-        self.cmap_renderer.color_data.metadata_changed={'selections':self.thresh}
-        self.container.request_redraw()
-        self.img_container.request_redraw()
+        self.scatter_threshold=[self.thresh_lower,self.thresh_upper]
+        self.scatter_plot.color_data.metadata['selections']=self.scatter_threshold
+        self.scatter_plot.color_data.metadata_changed={'selections':self.scatter_threshold}
+        self.plot.request_redraw()
 
-    #@on_trait_change('peaks,cbar_selection:selection,img_idx')
+    @on_trait_change('peaks, colorbar_selection:selection, selected_index')
     def calc_numpeaks(self):
         try:
             thresh=self.cbar_selection.selection
-            self.thresh=thresh
+            self.scatter_threshold=thresh
         except:
             thresh=[]
         if thresh==[] or thresh==() or thresh==None:
             thresh=(-1,1)
-        self.numpeaks_total=int(np.sum([np.sum(np.ma.masked_inside(self.peaks[i][:,2],thresh[0],thresh[1]).mask) for i in xrange(len(self.peaks))]))
+        self.numpeaks_total=int(np.sum([np.sum(np.ma.masked_inside(
+            self.peaks[image_id][:,2], thresh[0], thresh[1]).mask) 
+                                        for image_id in self.peaks.keys()
+                                        ]
+                                       )
+                                )
         try:
-            self.numpeaks_img=int(np.sum(np.ma.masked_inside(self.peaks[self.img_idx][:,2],thresh[0],thresh[1]).mask))
+            self.numpeaks_img=int(np.sum(np.ma.masked_inside(
+                self.peaks[self.get_active_name()][:,2],
+                thresh[0],thresh[1]).mask))
         except:
             self.numpeaks_img=0
 
@@ -551,28 +587,29 @@ class CellCropController(ImageController):
     # TODO: this is the old way of doing things, with peaks in one giant array.
     #   We need to re-do this with the new pytables way, simpler addressing.
     def locate_peaks(self):
-        peaks=[]
-        progress = ProgressDialog(title="Peak finder progress", message="Finding peaks on %s images"%self.numfiles, max=self.numfiles, show_time=True, can_cancel=False)
+        peaks={}
+        progress = ProgressDialog(title="Peak finder progress", 
+                       message="Finding peaks on %s images" % self.numfiles,
+                       max=self.numfiles, show_time=True, can_cancel=False)
         progress.open()
         for idx in xrange(self.numfiles):
-            self.controller.set_active_index(idx)
-            data = self.controller.get_active_image()
+            self.set_active_index(idx)
             CC = cv_funcs.xcorr(self.template_data.get_data("imagedata"),
-                                    self.controller.get_active_image())
+                                    self.get_active_image())
             # peak finder needs peaks greater than 1.  Multiply by 255 to scale them.
             pks=pc.two_dim_findpeaks(CC*255, peak_width=self.peak_width, medfilt_radius=None)
             pks[:,2]=pks[:,2]/255.
-            peaks.append(pks)
+            peaks[self.get_active_name()]=pks
             progress.update(idx+1)
         #ipdb.set_trace()
         self.peaks=peaks
         self.redraw_plots()
         
-    def mask_peaks(self,idx):
-        thresh=self.cbar_selection.selection
+    def mask_peaks(self,image_id):
+        thresh=self.colorbar_selection.selection
         if thresh==[]:
             thresh=(-1,1)
-        mpeaks=np.ma.asarray(self.peaks[idx])
+        mpeaks=np.ma.asarray(self.peaks[image_id])
         mpeaks[:,2]=np.ma.masked_outside(mpeaks[:,2],thresh[0],thresh[1])
         return mpeaks
 
@@ -609,19 +646,18 @@ class CellCropController(ImageController):
         for idx in xrange(self.numfiles):
             # filter the peaks that are outside the selected threshold
             self.controller.set_active_index(idx)
-            self.data = self.controller.get_active_image()
-            self.name = self.controller.get_active_name()
-            peaks=np.ma.compress_rows(self.mask_peaks(idx))
-            tmp_sz=self.tmp_size
+            active_image = self.controller.get_active_image()
+            name = self.controller.get_active_name()
+            peaks=np.ma.compress_rows(self.mask_peaks(self.get_active_name()))
+            tmp_sz=self.template_size
             data=np.zeros((peaks.shape[0],tmp_sz,tmp_sz))
             if data.shape[0] >0:
                 for i in xrange(peaks.shape[0]):
                     # crop the cells from the given locations
-                    data[i,:,:]=self.data[peaks[i,1]:peaks[i,1]+tmp_sz, 
-                                      peaks[i,0]:peaks[i,0]+tmp_sz]
+                    data[i,:,:]=active_image[peaks[i, 1]:peaks[i, 1] + tmp_sz,
+                                      peaks[i, 0]:peaks[i, 0] + tmp_sz]
                 # send the data to the controller for storage in the chest
-                self.controller.add_cells(name = self.name, data = data,
-                                      locations = peaks)    
+                self.controller.add_cells(name=name, data=data, locations=peaks)
     
 
 # the UI controller
@@ -631,28 +667,32 @@ class HighSeasAdventure(t.HasTraits):
     show_score_view = t.Bool(False)
     show_factor_view = t.Bool(False)
 
-    image_controller = t.Instance(ImageController)
+    image_controller = t.Instance(BaseImageController)
     cell_controller = t.Instance(CellController)
+    crop_controller = t.Instance(CellCropController)
 
     # TODO: need method for opening files
 
     def __init__(self, *args, **kw):
         super(HighSeasAdventure, self).__init__(*args, **kw)
-        self.image_controller = ImageController()
+        self.image_controller = BaseImageController()
         self.cell_controller = CellController()
+        self.crop_controller = CellCropController()
         self.chest = None
 
     def open_treasure_chest(self, filename):
         if self.chest is not None:
             self.chest.close()
         chest = file_import.open_treasure_chest(filename)
-        self.image_controller = ImageController(chest)
+        self.image_controller = BaseImageController(chest)
         self.cell_controller = CellController(chest)
+        self.crop_controller = CellCropController(chest)
 
     def import_files(self, file_list):
         chest = file_import.import_files(file_list)
-        self.image_controller = ImageController(chest)
-        self.cell_controller = CellController()
+        self.image_controller = BaseImageController(chest)
+        self.cell_controller = CellController(chest)
+        self.crop_controller = CellCropController(chest)
 
     def import_image(self):
         pass

@@ -5,23 +5,34 @@ from traits.api import HasTraits
 from chaco.tools.api import PanTool, ZoomTool, RangeSelection, \
      RangeSelectionOverlay
 from chaco.api import Plot, ArrayPlotData, jet, gray, \
-     ColorBar, ColormappedSelectionOverlay, LinearMapper
+     ColorBar, ColormappedSelectionOverlay, LinearMapper, \
+     HPlotContainer, OverlayPlotContainer, BasePlotContainer
 from chaco.tools.cursor_tool import CursorTool, BaseCursorTool
 
 from chaco.data_range_1d import DataRange1D
 
 class HasRenderer(HasTraits):
-    quiver_scale = Float(1.0)
-    scatter_threshold = Trait(None,None,List,Tuple,Array)
-    colorbar_selection = Instance(RangeSelection)
-    # TODO: do we need the scatter plot renderer for the transparency manipulation?
+    _quiver_scale = Float(1.0)
+    _scatter_threshold = Trait(None,None,List,Tuple,Array)
+    _colorbar_selection = Instance(RangeSelection)
+    _base_plot = Instance(Plot)
+    _scatter_plot = Instance(Plot)
+    _quiver_plot = Instance(Plot)
     
     def get_line_plot(self, array_plot_data, title=None):
-        return self._render_line_plot(array_plot_data)
+        plot = self._render_line_plot(array_plot_data)
+        # container isn't necessary here, but we do it to keep it consistent
+        #   with how the other plot types return data.        
+        plot_container = OverlayPlotContainer(plot)
+        return plot_container
 
     def get_simple_image_plot(self, array_plot_data, title=None):
-        plot = self._render_image(array_plot_data, title)
-        return plot
+        image_plot = self._render_image(array_plot_data=array_plot_data, 
+                                        title=title)
+        # container isn't necessary here, but we do it to keep it consistent
+        #   with how the other plot types return data.
+        image_container = OverlayPlotContainer(image_plot)
+        return image_container
 
     # TODO - add optional appearance tweaks
     def get_scatter_overlay_plot(self, array_plot_data, title=None):
@@ -45,35 +56,39 @@ class HasRenderer(HasTraits):
             image_container = HPlotContainer(image_container, colorbar)
         return image_container
     
-    def _render_plot(self, data):
+    def set_plot_title(self, title):
+        self._base_plot.title=title
+    
+    def _render_plot(self, array_plot_data):
         """
         data is a numpy array to be plotted as a line plot.
         The first column of the data is used as x, the second is used as y.
         """
-        plotdata = ArrayPlotData(x = data[:,0], y = data[:,1])
-        plot = Plot(plotdata)
-        colorbar = None
+        plot = Plot(array_plot_data)
+        plot.plot(("x","y"), type="line", name="base_plot")[0]
     
         # attach the pan and zoom tools
         plot.tools.append(PanTool(plot,drag_button="right"))
         zoom = ZoomTool(plot, tool_mode="box", always_on=False, aspect_ratio=plot.aspect_ratio)
         plot.overlays.append(zoom)
-        return plot, colorbar
+        #self._base_plot = plot.plots['base_plot'][0]
+        self._base_plot = plot
+        return plot
 
-    def _render_image(self, image_data, title=None):
-        plot = Plot(image_data,default_origin="top left")        
-        plot.img_plot("imagedata", colormap=gray, name="image_plot")
+    def _render_image(self, array_plot_data, title=None):
+        plot = Plot(array_plot_data,default_origin="top left")        
+        plot.img_plot("imagedata", colormap=gray, name="base_plot")
         # todo: generalize title and aspect ratio
         plot.title = title
-        data_array = image_data.arrays['imagedata']
+        data_array = array_plot_data.arrays['imagedata']
         plot.aspect_ratio=float(data_array.shape[1]) / float(data_array.shape[0])
         # attach the rectangle tool
         plot.tools.append(PanTool(plot,drag_button="right"))
         zoom = ZoomTool(plot, tool_mode="box", always_on=False, aspect_ratio=plot.aspect_ratio)
         plot.overlays.append(zoom)
+        self._base_plot = plot
+        #self._base_plot = plot.plots['base_plot'][0]
         return plot
-        # the thing that gets the Plot object should do something like this:
-        #img = plot.img_plot("imagedata", colormap=gray)[0]
 
     def _render_scatter_overlay(self, base_plot, array_plot_data,
                                 marker="circle", fill_alpha="0.5",
@@ -138,18 +153,23 @@ class HasRenderer(HasTraits):
                                      ) 
             colorbar.padding_top = scatter_renderer.padding_top
             colorbar.padding_bottom = scatter_renderer.padding_bottom
+            self._colorbar_selection = colorbar_selection
         scatter_plot.x_grid.visible = False
         scatter_plot.y_grid.visible = False
         scatter_plot.range2d = base_plot.range2d
+        self._scatter_plot = scatter_plot
         return scatter_plot, colorbar
 
-    def _render_quiver_overlay(self, base_plot, array_plot_data, line_color="white", 
-                               line_width=1.0, arrow_size=5):
+    def _render_quiver_overlay(self, base_plot, array_plot_data, 
+                               line_color="white", line_width=1.0, 
+                               arrow_size=5):
         plot = Plot(image_data, aspect_ratio = base_plot.aspect_ratio, 
                     default_origin="top left")
-        plot.quiverplot(("index", "value", "vectors"), line_color=line_color,
-                        line_width=line_width, arrow_size=arrow_size)
+        plot.quiverplot(("index", "value", "vectors"), name="quiver_plot",
+                        line_color=line_color, line_width=line_width, 
+                        arrow_size=arrow_size)
         quiverplot.x_grid.visible = False
         quiverplot.y_grid.visible = False
         quiverplot.range2d = base_plot.range2d
+        self._quiver_plot = quiverplot
         return quiverplot

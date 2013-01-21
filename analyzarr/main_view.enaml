@@ -26,19 +26,25 @@ from enaml.widgets.api import (
     Container, Html, PushButton, EnableCanvas, CheckBox, FileDialog
 )
 
-from controllers import HighSeasAdventure
+from controllers import HighSeasAdventure, CellCropController
+
+import enaml
+with enaml.imports():
+    from ui.ucc import CellCropperInterface
 
 enamldef OpenChestDialog(FileDialog):
     attr controller
     title = "WHARR BE YE TREASURE?"
     mode = "open_file"
     closed :: controller.open_treasure_chest(self.path)
+    destroy_on_close=False
 
 enamldef ImportFilesDialog(FileDialog):
     attr controller
     title = "Choose the files to plunder:"
     mode = "open_files"
     closed :: controller.import_files(self.paths)
+    destroy_on_close=False
 
 enamldef MyMenuBar(MenuBar): menu:
     attr controller
@@ -105,12 +111,13 @@ enamldef MyMenuBar(MenuBar): menu:
                 text = 'Justify'
                 toggled :: print '%s toggled %s' % (text, 'on' if checked else 'off')
 
-
-enamldef ImagePlotToolBar(ToolBar):
+enamldef BasePlotToolbar(ToolBar):
     attr controller
     Action:
         text = "Save"
         tool_tip = "Save current plot"
+    
+enamldef BaseImagePlotToolbar(BasePlotToolbar):
     Action:
         text = "<"
         tool_tip = "View previous image in stack"
@@ -119,38 +126,12 @@ enamldef ImagePlotToolBar(ToolBar):
         text = ">"
         tool_tip = "View next image in stack"
         triggered :: controller.increase_selected_index()
-        
-                
-enamldef MyToolBar(ToolBar):
-    Action:
-        text = 'Button'
-        tool_tip = text
-    ActionGroup:
-        Action:
-            separator = True
-        Action:
-            checkable = True
-            text = 'Exclusive'
-            triggered :: print 'triggered'
-            toggled :: print 'toggled' 
-        Action:
-            checkable = True
-            text = 'ToolBar'
-        Action:
-            checkable = True
-            text = 'Buttons'
-        Action:
-            separator = True
-    Action:
-        checkable = True
-        text = 'Checkable'
-    Action:
-        checkable = True
-        text = 'ToolBar'
-    Action:
-        checkable = True
-        text = 'Buttons'
 
+enamldef ImagePlotToolBar(BaseImagePlotToolbar):
+    Action:
+        text = "Crop cells"
+        tool_tip = "Open the cell cropping interface"
+        triggered :: controller.show_crop_ui=True
 
 enamldef ViewToolBar(ToolBar):
     attr controller
@@ -175,18 +156,19 @@ enamldef ViewToolBar(ToolBar):
         checked := controller.show_factor_view
         toggled :: print "toggled factor view"
     
-        
-enamldef MyDockPane(DockPane):
-    title << 'Dock Area %s | %s' % (dock_area, 'floating' if floating else 'docked')
+enamldef CellViewDockPane(DockPane): celldockpane:
+    attr controller
     Container:
-        PushButton:
-            text = 'Foo'
-        PushButton:
-            text = 'Bar'
-        PushButton:
-            text = 'Baz'
+        constraints = [
+            vbox(canvas, toolbar)
+        ]
+        EnableCanvas: canvas:
+            component << celldockpane.controller.plot
+        BaseImagePlotToolbar: toolbar:
+            movable = False
+            controller << celldockpane.controller
 
-enamldef ImageViewDockPane(DockPane): imgdockpane:
+enamldef ImageViewDockPane(DockPane): imagedockpane:
     attr controller
     Container:
         constraints = [
@@ -196,15 +178,13 @@ enamldef ImageViewDockPane(DockPane): imgdockpane:
             component << controller.plot
         ImagePlotToolBar: toolbar:
             movable = False
-            controller << imgdockpane.controller
+            controller << imagedockpane.controller
 
 enamldef Main(MainWindow): main:
     attr controller = HighSeasAdventure()
     initial_size = (600, 600)
     MyMenuBar:
         controller << main.controller
-    MyToolBar:
-        pass
     ViewToolBar: view_buttons:
         controller << main.controller
         dock_area = 'left'
@@ -213,12 +193,16 @@ enamldef Main(MainWindow): main:
         title << "Image view"
         dock_area = 'left'
         visible := main.controller.show_image_view
-    ImageViewDockPane: cell_view:
+    CellViewDockPane: cell_view:
         controller << main.controller.cell_controller
         title << "Cell view"
         dock_area = 'right'
         #: floating = True
         visible := main.controller.show_cell_view
+    CellCropperInterface: crop_ui:
+        controller << main.controller.crop_controller
+        visible := main.controller.image_controller.show_crop_ui
+        
 
 """
     ImageViewDockPane: score_view:
