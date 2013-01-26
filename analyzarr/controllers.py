@@ -13,8 +13,6 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 import traits.api as t
 from traits.api import on_trait_change
-#from plotting.viewers import StackViewer
-#from ui.ucc import CellCropper
 from data_structure import filters
 import tables as tb
 import numpy as np
@@ -43,7 +41,6 @@ class ControllerBase(HasRenderer):
             self.nodes = self.chest.listNodes(data_path)
             self.numfiles = len(self.nodes)
 
-    # TODO: add bounds checking
     # used by the cell cropper
     def set_active_index(self, idx):
         self.selected_index = idx
@@ -56,7 +53,7 @@ class ControllerBase(HasRenderer):
 
     def decrease_selected_index(self):
         if self.selected_index == 0:
-            self.selected_index = self.numfiles - 1
+            self.selected_index = int(self.numfiles - 1)
         else:
             self.selected_index -= 1
 
@@ -101,10 +98,6 @@ class BaseImageController(ControllerBase):
                 title="%s of %s: " % (self.selected_index + 1,
                                       self.numfiles) + self.get_active_name()
                 )
-        #self.plot.showplot("image_plot")
-        #self.plot = Plot(plot_data, default_origin='top left', padding=30)
-        #self.plot.img_plot('imagedata', colormap=dc.gray)
-        #self.plot.img_plot("imagedata", colormap=gray)
 
     # this is a 2D image for plotting purposes
     def get_active_image(self):
@@ -130,7 +123,7 @@ class BaseImageController(ControllerBase):
         return self.nodes[self.selected_index].name
     
     @t.on_trait_change("selected_index")
-    def update_img_depth(self):
+    def update_image(self):
         self.plotdata.set_data("imagedata", self.get_active_image())
         self.set_plot_title("%s of %s: " % (self.selected_index + 1,
                                           self.numfiles) + self.get_active_name())
@@ -257,11 +250,11 @@ class CellController(BaseImageController):
 
 class MDAController(ControllerBase):
     # the image data for the factor plot (including any scatter data and
-    #    quiver data
+    #    quiver data)
     factor_plotdata = ArrayPlotData
     # the actual plot object
     factor_plot = t.Instance(BasePlotContainer)
-    # the image data for the score plot (may be a parent image)
+    # the image data for the score plot (may be a parent image for scatter overlays)
     score_plotdata = ArrayPlotData
     score_plot = t.Instance(BasePlotContainer)
 
@@ -300,7 +293,7 @@ class MDAController(ControllerBase):
                 )
 
     @t.on_trait_change("selected_index")
-    def update_img_depth(self):
+    def update_image(self):
         # TODO: customize this to change the factor data and plot data
         self.plotdata.set_data("imagedata", self.get_active_image())
         self.set_plot_title("%s of %s: " % (self.selected_index + 1,
@@ -440,9 +433,6 @@ class CellCropController(BaseImageController):
     peak_width = t.Range(low=2, high=200, value=10)
     numpeaks_total = t.Int(0,cols=5)
     numpeaks_img = t.Int(0,cols=5)
-    thresh = t.Trait([0,1],None,t.List,t.Tuple,t.Array)
-    thresh_upper = t.Range(-1.0, 1.0, 1.0)
-    thresh_lower = t.Range(-1.0, 1.0, -1.0)
     
     # todo - we'll probably need to define this
     #csr=t.Instance(BaseCursorTool)
@@ -475,7 +465,7 @@ class CellCropController(BaseImageController):
         self.template_plot.aspect_ratio=1 #square templates
 
     @t.on_trait_change("selected_index, ShowCC")
-    def update_img(self):
+    def update_image(self):
         if self.ShowCC:
             CC = cv_funcs.xcorr(self.template_data.get_data('imagedata'),
                                      self.get_active_image())
@@ -484,13 +474,24 @@ class CellCropController(BaseImageController):
             grid_data_source = self._base_plot.range2d.sources[0]
             grid_data_source.set_data(np.arange(CC.shape[1]), 
                                       np.arange(CC.shape[0]))
-        else:
+        else:            
             self.plotdata.set_data("imagedata", self.get_active_image())
             self.set_plot_title("%s of %s: " % (self.selected_index + 1,
                                           self.numfiles) + self.get_active_name())
             grid_data_source = self._base_plot.range2d.sources[0]
             grid_data_source.set_data(np.arange(self.get_active_image().shape[1]), 
                                       np.arange(self.get_active_image().shape[0]))
+        if self.peaks.has_key(self.get_active_name()):
+            self.plotdata.set_data("index",self.peaks[self.get_active_name()][:,0])
+            self.plotdata.set_data("value",self.peaks[self.get_active_name()][:,1])
+            self.plotdata.set_data("color",self.peaks[self.get_active_name()][:,2])
+        else:
+            if 'index' in self.plotdata.arrays:
+                self.plotdata.del_data('index')
+                # value will implicitly exist if value exists.
+                self.plotdata.del_data('value')
+            if 'color' in self.plotdata.arrays:
+                self.plotdata.del_data('color')
 
     @on_trait_change('template_left, template_top, template_size')
     def update_template_data(self):
@@ -545,32 +546,33 @@ class CellCropController(BaseImageController):
             else:
                 self.template_left,self.template_top=self.csr.current_position
 
-    @t.on_trait_change('colorbar_selection:selection')
+    @t.on_trait_change('_colorbar_selection:selection')
     def update_thresh(self):
         try:
-            thresh=self.colorbar_selection.selection
-            self.scatter_threshold=thresh
-            self.scatter_plot.color_data.metadata['selections']=thresh
+            thresh=self._colorbar_selection.selection
+            self.thresh=thresh
+            scatter_renderer=self._scatter_plot.plots['scatter_plot'][0]
+            scatter_renderer.color_data.metadata['selections']=thresh
             self.thresh_lower=thresh[0]
             self.thresh_upper=thresh[1]
-            #cmap_renderer.color_data.metadata['selection_masks']=self.thresh
-            self._scatter_plot.color_data.metadata_changed={'selections':thresh}
-            self._scatter_plot.request_redraw()
+            scatter_renderer.color_data.metadata_changed={'selections':thresh}
+            self.plot.request_redraw()
         except:
             pass
 
     @t.on_trait_change('thresh_upper,thresh_lower')
     def manual_thresh_update(self):
-        self.scatter_threshold=[self.thresh_lower,self.thresh_upper]
-        self.scatter_plot.color_data.metadata['selections']=self.scatter_threshold
-        self.scatter_plot.color_data.metadata_changed={'selections':self.scatter_threshold}
+        self.thresh=[self.thresh_lower,self.thresh_upper]
+        scatter_renderer=self._scatter_plot.plots['scatter_plot'][0]
+        scatter_renderer.color_data.metadata['selections']=self.thresh
+        scatter_renderer.color_data.metadata_changed={'selections':self.thresh}
         self.plot.request_redraw()
 
-    @on_trait_change('peaks, colorbar_selection:selection, selected_index')
+    @on_trait_change('peaks, _colorbar_selection:selection, selected_index')
     def calc_numpeaks(self):
         try:
             thresh=self.cbar_selection.selection
-            self.scatter_threshold=thresh
+            self.thresh=thresh
         except:
             thresh=[]
         if thresh==[] or thresh==() or thresh==None:
@@ -597,7 +599,10 @@ class CellCropController(BaseImageController):
                 title="%s of %s: " % (self.selected_index + 1,
                                       self.numfiles) + self.get_active_name()
                     )
-        self.update_img()
+        scatter_renderer = self._scatter_plot.plots['scatter_plot'][0]
+        scatter_renderer.color_data.metadata['selections']=self.thresh
+        scatter_renderer.color_data.metadata_changed={'selections':self.thresh}
+        self.update_image()
     
 
     def locate_peaks(self):
