@@ -20,6 +20,7 @@ import tables as tb
 import numpy as np
 from lib.mda import mda_sklearn as mda
 
+import cv_funcs
 import peak_char as pc
 
 from chaco.default_colormaps import gray
@@ -439,7 +440,7 @@ class CellCropController(BaseImageController):
     peak_width = t.Range(low=2, high=200, value=10)
     numpeaks_total = t.Int(0,cols=5)
     numpeaks_img = t.Int(0,cols=5)
-    thresh = t.Trait(None,None,t.List,t.Tuple,t.Array)
+    thresh = t.Trait([0,1],None,t.List,t.Tuple,t.Array)
     thresh_upper = t.Range(-1.0, 1.0, 1.0)
     thresh_lower = t.Range(-1.0, 1.0, -1.0)
     
@@ -449,13 +450,15 @@ class CellCropController(BaseImageController):
     def __init__(self, treasure_chest=None, data_path='/rawdata', *args, **kw):
         super(CellCropController, self).__init__(treasure_chest, data_path,
                                               *args, **kw)
+        #self.chest = treasure_chest
+        #self.data_path = data_path
         if self.numfiles > 0:
             self.init_plot()
             print "initialized plot for data in %s" % data_path
     
     def init_plot(self):
         self.plotdata.set_data('imagedata', self.get_active_image())
-        self.plot = self.get_simple_image_plot(array_plot_data=self.plotdata,
+        self.plot = self.get_scatter_overlay_plot(array_plot_data=self.plotdata,
                 title="%s of %s: " % (self.selected_index + 1,
                                       self.numfiles) + self.get_active_name()
                     )
@@ -471,16 +474,23 @@ class CellCropController(BaseImageController):
         self.template_plot.img_plot('imagedata', title = "Template")
         self.template_plot.aspect_ratio=1 #square templates
 
-    @t.on_trait_change("selected_index")
-    def update_img_depth(self):
+    @t.on_trait_change("selected_index, ShowCC")
+    def update_img(self):
         if self.ShowCC:
-            self.CC = cv_funcs.xcorr(self.template, self.data)
-            self.plotdata.set_data("imagedata",self.CC)
-            self.set_plot_title("Cross correlation of " + self.get_active_name())            
+            CC = cv_funcs.xcorr(self.template_data.get_data('imagedata'),
+                                     self.get_active_image())
+            self.plotdata.set_data("imagedata",CC)
+            self.set_plot_title("Cross correlation of " + self.get_active_name())
+            grid_data_source = self._base_plot.range2d.sources[0]
+            grid_data_source.set_data(np.arange(CC.shape[1]), 
+                                      np.arange(CC.shape[0]))
         else:
             self.plotdata.set_data("imagedata", self.get_active_image())
             self.set_plot_title("%s of %s: " % (self.selected_index + 1,
                                           self.numfiles) + self.get_active_name())
+            grid_data_source = self._base_plot.range2d.sources[0]
+            grid_data_source.set_data(np.arange(self.get_active_image().shape[1]), 
+                                      np.arange(self.get_active_image().shape[0]))
 
     @on_trait_change('template_left, template_top, template_size')
     def update_template_data(self):
@@ -534,11 +544,6 @@ class CellCropController(BaseImageController):
                 self.template_left,self.template_top=self.csr.current_position[0],self.max_pos_y
             else:
                 self.template_left,self.template_top=self.csr.current_position
-                
-    def update_CC(self):
-        if self.ShowCC:
-            self.CC = cv_funcs.xcorr(self.template, self.data)
-            self.plotdata.set_data("imagedata",self.CC)
 
     @t.on_trait_change('colorbar_selection:selection')
     def update_thresh(self):
@@ -549,8 +554,8 @@ class CellCropController(BaseImageController):
             self.thresh_lower=thresh[0]
             self.thresh_upper=thresh[1]
             #cmap_renderer.color_data.metadata['selection_masks']=self.thresh
-            self.scatter_plot.color_data.metadata_changed={'selections':thresh}
-            self.plot.request_redraw()
+            self._scatter_plot.color_data.metadata_changed={'selections':thresh}
+            self._scatter_plot.request_redraw()
         except:
             pass
 
@@ -583,15 +588,24 @@ class CellCropController(BaseImageController):
         except:
             self.numpeaks_img=0
 
-            
-    # TODO: this is the old way of doing things, with peaks in one giant array.
-    #   We need to re-do this with the new pytables way, simpler addressing.
+    @on_trait_change('peaks')
+    def update_scatter_plot(self):
+        self.plotdata.set_data("index",self.peaks[self.get_active_name()][:,0])
+        self.plotdata.set_data("value",self.peaks[self.get_active_name()][:,1])
+        self.plotdata.set_data("color",self.peaks[self.get_active_name()][:,2])
+        self.plot = self.get_scatter_overlay_plot(array_plot_data=self.plotdata,
+                title="%s of %s: " % (self.selected_index + 1,
+                                      self.numfiles) + self.get_active_name()
+                    )
+        self.update_img()
+    
+
     def locate_peaks(self):
         peaks={}
-        progress = ProgressDialog(title="Peak finder progress", 
-                       message="Finding peaks on %s images" % self.numfiles,
-                       max=self.numfiles, show_time=True, can_cancel=False)
-        progress.open()
+        #progress = ProgressDialog(title="Peak finder progress", 
+        #               message="Finding peaks on %s images" % self.numfiles,
+        #               max=self.numfiles, show_time=True, can_cancel=False)
+        #progress.open()
         for idx in xrange(self.numfiles):
             self.set_active_index(idx)
             CC = cv_funcs.xcorr(self.template_data.get_data("imagedata"),
@@ -600,64 +614,64 @@ class CellCropController(BaseImageController):
             pks=pc.two_dim_findpeaks(CC*255, peak_width=self.peak_width, medfilt_radius=None)
             pks[:,2]=pks[:,2]/255.
             peaks[self.get_active_name()]=pks
-            progress.update(idx+1)
+            #progress.update(idx+1)
         #ipdb.set_trace()
         self.peaks=peaks
-        self.redraw_plots()
         
     def mask_peaks(self,image_id):
-        thresh=self.colorbar_selection.selection
-        if thresh==[]:
-            thresh=(-1,1)
+        #thresh=self.colorbar_selection.selection
+        #if thresh==[]:
+        #    thresh=(-1,1)
         mpeaks=np.ma.asarray(self.peaks[image_id])
-        mpeaks[:,2]=np.ma.masked_outside(mpeaks[:,2],thresh[0],thresh[1])
+        mpeaks[:,2]=np.ma.masked_outside(mpeaks[:,2],self.thresh[0],self.thresh[1])
         return mpeaks
 
-    #@on_trait_change("peaks")
-    def redraw_plots(self):
-        oldplot=self.img_plot
-        self.container.remove(oldplot)
-        newplot=self.render_image()
-        self.container.add(newplot)
-        self.img_plot=newplot
-
-        try:
-            # if these haven't been created before, this will fail.  wrap in try to prevent that.
-            oldscat=self.scatplot
-            self.container.remove(oldscat)
-            oldcolorbar = self.colorbar
-            self.img_container.remove(oldcolorbar)
-        except:
-            pass
-
-        if self.numpeaks_img>0:
-            newscat=self.render_scatplot()
-            self.container.add(newscat)
-            self.scatplot=newscat
-            colorbar = self.draw_colorbar()
-            self.img_container.add(colorbar)
-            self.colorbar=colorbar
-
-        self.container.request_redraw()
-        self.img_container.request_redraw()
-
     def crop_cells(self):
-        print "cropping cells..."
+        # clear the table of peaks
+        self.chest.root.cell_description.removeRows(0,-1)
+        # remove all existing entries in the data group
+        for node in self.chest.listNodes('/cells'):
+            self.chest.removeNode('/cells/' + node.name)
+        # store the template
+        template_data = self.template_data.get_data('imagedata')
+        template_array = self.chest.createCArray(self.chest.root.cells,
+                                             'template',
+                                             tb.Atom.from_dtype(template_data.dtype),
+                                             template_data.shape,
+                                             filters = filters,
+                                             )
+        template_array[:] = template_data
+        # TODO: set attribute that tells where the template came from
+        row = self.chest.root.cell_description.row
         for idx in xrange(self.numfiles):
             # filter the peaks that are outside the selected threshold
-            self.controller.set_active_index(idx)
-            active_image = self.controller.get_active_image()
-            name = self.controller.get_active_name()
+            self.set_active_index(idx)
+            active_image = self.get_active_image()
             peaks=np.ma.compress_rows(self.mask_peaks(self.get_active_name()))
             tmp_sz=self.template_size
             data=np.zeros((peaks.shape[0],tmp_sz,tmp_sz))
             if data.shape[0] >0:
                 for i in xrange(peaks.shape[0]):
+                    # store the peak in the table
+                    row['input_data'] = self.data_path
+                    row['original_image'] = self.get_active_name()
+                    row['x_coordinate'] = peaks[i, 1]
+                    row['y_coordinate'] = peaks[i, 0]
+                    row.append()
                     # crop the cells from the given locations
                     data[i,:,:]=active_image[peaks[i, 1]:peaks[i, 1] + tmp_sz,
                                       peaks[i, 0]:peaks[i, 0] + tmp_sz]
-                # send the data to the controller for storage in the chest
-                self.controller.add_cells(name=name, data=data, locations=peaks)
+                # insert the data (one 3d array per file)
+                cell_array = self.chest.createCArray(self.chest.root.cells,
+                                        self.get_active_name(),
+                                        tb.Atom.from_dtype(data.dtype),
+                                        data.shape,
+                                        filters = filters,
+                                        )
+                cell_array[:] = data
+        self.chest.flush()
+                
+
     
 
 # the UI controller

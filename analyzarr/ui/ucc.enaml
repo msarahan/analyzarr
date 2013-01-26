@@ -23,7 +23,7 @@ enamldef CellCropperInterface(DockPane):
             #: the checkbox to show cross correlation view
             CheckBox: showCC:
                 text = "Show cross-correlation"
-                checked << controller.ShowCC
+                checked := controller.ShowCC
             #: the buttons to go between images
             PushButton: prev_img:
                 text = '<'
@@ -42,8 +42,10 @@ enamldef CellCropperInterface(DockPane):
                     templateCanvas, 
                     hbox(l_peak_width,peak_width),
                     hbox(l_thresh_lower, thresh_lower, 
-                        l_thresh_upper, thresh_upper),
-                    )
+                        l_thresh_upper, thresh_upper
+                        ),
+                    hbox(find_peaks, crop),
+                    ),
                     ]
                                 
             EnableCanvas: templateCanvas:
@@ -75,4 +77,9 @@ enamldef CellCropperInterface(DockPane):
                 text = 'Lower Threshold'
             FloatField: thresh_lower:
                 value := controller.thresh_lower
-            
+            PushButton: find_peaks:
+                text = 'Find peaks!'
+                clicked :: controller.locate_peaks()
+            PushButton: crop:
+                text = 'Crop!'
+                clicked :: controller.crop_cells()
