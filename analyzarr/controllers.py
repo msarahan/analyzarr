@@ -31,11 +31,12 @@ class ControllerBase(HasRenderer):
     # current image index
     selected_index = t.Int(0)
 
-    def __init__(self, treasure_chest=None, data_path='/rawdata', *args, **kw):
+    def __init__(self, parent, treasure_chest=None, data_path='/rawdata', *args, **kw):
         super(ControllerBase, self).__init__(*args, **kw)
         self.chest = None
         self.numfiles = 0
         self.data_path = data_path
+        self.parent = parent
         if treasure_chest is not None:
             self.chest = treasure_chest
             self.nodes = self.chest.listNodes(data_path)
@@ -78,14 +79,13 @@ class ControllerBase(HasRenderer):
         """
         pass
 
-
 class BaseImageController(ControllerBase):
     plot = t.Instance(BasePlotContainer)
     plotdata = t.Instance(ArrayPlotData)
     show_crop_ui = t.Bool(False)
 
-    def __init__(self, treasure_chest=None, data_path='/rawdata', *args, **kw):
-        super(BaseImageController, self).__init__(treasure_chest, data_path,
+    def __init__(self, parent, treasure_chest=None, data_path='/rawdata', *args, **kw):
+        super(BaseImageController, self).__init__(parent, treasure_chest, data_path,
                                               *args, **kw)
         self.plotdata = ArrayPlotData()
         if self.numfiles > 0:
@@ -98,6 +98,11 @@ class BaseImageController(ControllerBase):
                 title="%s of %s: " % (self.selected_index + 1,
                                       self.numfiles) + self.get_active_name()
                 )
+
+    def data_updated(self):
+        # reinitialize data
+        self.__init__(parent = self.parent, treasure_chest=self.chest,
+                      data_path=self.data_path)
 
     # this is a 2D image for plotting purposes
     def get_active_image(self):
@@ -129,14 +134,19 @@ class BaseImageController(ControllerBase):
                                           self.numfiles) + self.get_active_name())
         
 class CellController(BaseImageController):
-    def __init__(self, treasure_chest=None, data_path='/cells', *args, **kw):
-        super(CellController, self).__init__(treasure_chest, data_path,
+    def __init__(self, parent, treasure_chest=None, data_path='/cells', *args, **kw):
+        super(CellController, self).__init__(parent, treasure_chest, data_path,
                 *args, **kw)
         if self.chest is not None:
             self.numfiles = self.chest.root.cell_description.nrows
             if self.numfiles > 0:
                 self.init_plot()
                 print "initialized plot for data in %s" % data_path
+
+    def data_updated(self):
+        # reinitialize data
+        self.__init__(parent = self.parent, treasure_chest=self.chest,
+                      data_path=self.data_path)
 
     def get_active_image(self):
         # Find this cell in the cell description table.  We use this to look
@@ -437,14 +447,18 @@ class CellCropController(BaseImageController):
     # todo - we'll probably need to define this
     #csr=t.Instance(BaseCursorTool)
 
-    def __init__(self, treasure_chest=None, data_path='/rawdata', *args, **kw):
-        super(CellCropController, self).__init__(treasure_chest, data_path,
+    def __init__(self, parent, treasure_chest=None, data_path='/rawdata', *args, **kw):
+        super(CellCropController, self).__init__(parent, treasure_chest, data_path,
                                               *args, **kw)
-        #self.chest = treasure_chest
-        #self.data_path = data_path
         if self.numfiles > 0:
             self.init_plot()
             print "initialized plot for data in %s" % data_path
+    
+    def data_updated(self):
+        # reinitialize data
+        self.__init__(parent = self.parent, treasure_chest=self.chest,
+                      data_path=self.data_path)
+        
     
     def init_plot(self):
         self.plotdata.set_data('imagedata', self.get_active_image())
@@ -632,11 +646,12 @@ class CellCropController(BaseImageController):
         return mpeaks
 
     def crop_cells(self):
-        # clear the table of peaks
-        self.chest.root.cell_description.removeRows(0,-1)
-        # remove all existing entries in the data group
-        for node in self.chest.listNodes('/cells'):
-            self.chest.removeNode('/cells/' + node.name)
+        if self.chest.root.cell_description.nrows > 0:
+            # clear the table of peaks
+            self.chest.root.cell_description.removeRows(0,-1)
+            # remove all existing entries in the data group
+            for node in self.chest.listNodes('/cells'):
+                self.chest.removeNode('/cells/' + node.name)
         # store the template
         template_data = self.template_data.get_data('imagedata')
         template_array = self.chest.createCArray(self.chest.root.cells,
@@ -658,6 +673,7 @@ class CellCropController(BaseImageController):
             if data.shape[0] >0:
                 for i in xrange(peaks.shape[0]):
                     # store the peak in the table
+                    row['idx'] = i
                     row['input_data'] = self.data_path
                     row['original_image'] = self.get_active_name()
                     row['x_coordinate'] = peaks[i, 1]
@@ -674,11 +690,10 @@ class CellCropController(BaseImageController):
                                         filters = filters,
                                         )
                 cell_array[:] = data
-        self.chest.flush()
+                self.chest.root.cell_description.flush()
+                self.chest.flush()
+        self.parent.update_cell_data()
                 
-
-    
-
 # the UI controller
 class HighSeasAdventure(t.HasTraits):
     show_image_view = t.Bool(True)
@@ -694,24 +709,40 @@ class HighSeasAdventure(t.HasTraits):
 
     def __init__(self, *args, **kw):
         super(HighSeasAdventure, self).__init__(*args, **kw)
-        self.image_controller = BaseImageController()
-        self.cell_controller = CellController()
-        self.crop_controller = CellCropController()
+        self.image_controller = BaseImageController(parent=self)
+        self.cell_controller = CellController(parent=self)
+        self.crop_controller = CellCropController(parent=self)
         self.chest = None
+
+    def update_cell_data(self):
+        self.cell_controller = CellController(parent=self, 
+                                              treasure_chest=self.chest)
+        
+    def update_image_data(self):
+        self.image_controller.data_updated()
+        self.crop_controller.data_updated()
 
     def open_treasure_chest(self, filename):
         if self.chest is not None:
             self.chest.close()
         chest = file_import.open_treasure_chest(filename)
-        self.image_controller = BaseImageController(chest)
-        self.cell_controller = CellController(chest)
-        self.crop_controller = CellCropController(chest)
+        self.image_controller = BaseImageController(parent=self, 
+                                                    treasure_chest=chest)
+        self.cell_controller = CellController(parent=self, 
+                                              treasure_chest=chest)
+        self.crop_controller = CellCropController(parent=self, 
+                                                  treasure_chest=chest)
+        self.chest = chest
 
     def import_files(self, file_list):
         chest = file_import.import_files(file_list)
-        self.image_controller = BaseImageController(chest)
-        self.cell_controller = CellController(chest)
-        self.crop_controller = CellCropController(chest)
+        self.image_controller = BaseImageController(parent=self, 
+                                                    treasure_chest=chest)
+        self.cell_controller = CellController(parent=self,
+                                              treasure_chest=chest)
+        self.crop_controller = CellCropController(parent=self,
+                                                  treasure_chest=chest)
+        self.chest = chest
 
     def import_image(self):
         pass
