@@ -32,11 +32,15 @@ import enaml
 with enaml.imports():
     from ui.ucc import CellCropperInterface
 
+def open_callback(dlg):
+    if dlg.result=='accepted': 
+        dlg.controller.open_treasure_chest(dlg.path)
+
 enamldef OpenChestDialog(FileDialog):
     attr controller
     title = "WHARR BE YE TREASURE?"
     mode = "open_file"
-    closed :: controller.open_treasure_chest(self.path)
+    callback=open_callback
     destroy_on_close=False
 
 enamldef ImportFilesDialog(FileDialog):
