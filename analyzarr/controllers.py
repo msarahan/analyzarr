@@ -26,6 +26,7 @@ from chaco.api import ArrayPlotData, BasePlotContainer, Plot
 
 from ui.renderers import HasRenderer
 import file_import
+import data_structure
 
 class ControllerBase(HasRenderer):
     # current image index
@@ -646,9 +647,13 @@ class CellCropController(BaseImageController):
         return mpeaks
 
     def crop_cells(self):
-        if self.chest.root.cell_description.nrows > 0:
-            # clear the table of peaks
-            self.chest.root.cell_description.removeRows(0,-1)
+        rows = self.chest.root.cell_description.nrows
+        if rows > 0:
+            # remove the table
+            self.chest.removeNode('/cell_description')
+            # recreate it
+            self.chest.createTable('/', 'cell_description', 
+                                   data_structure.CellsTable)
             # remove all existing entries in the data group
             for node in self.chest.listNodes('/cells'):
                 self.chest.removeNode('/cells/' + node.name)
