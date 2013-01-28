@@ -129,6 +129,7 @@ class HasRenderer(HasTraits):
     _base_plot = Instance(Plot)
     _scatter_plot = Instance(Plot)
     _quiver_plot = Instance(Plot)
+    _csr=Instance(BaseCursorTool)    
     
     thresh = Trait([0,1],None,List,Tuple,Array)
     thresh_upper = Range(-1.0, 1.0, 1.0)

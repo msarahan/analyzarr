@@ -31,6 +31,8 @@ import data_structure
 class ControllerBase(HasRenderer):
     # current image index
     selected_index = t.Int(0)
+    _can_save = t.Bool(False)
+    _can_change_idx = t.Bool(False)
 
     def __init__(self, parent, treasure_chest=None, data_path='/rawdata', *args, **kw):
         super(ControllerBase, self).__init__(*args, **kw)
@@ -83,7 +85,8 @@ class ControllerBase(HasRenderer):
 class BaseImageController(ControllerBase):
     plot = t.Instance(BasePlotContainer)
     plotdata = t.Instance(ArrayPlotData)
-    show_crop_ui = t.Bool(False)
+    _show_crop_ui = t.Bool(False)
+    _can_crop_cells = t.Bool(False)
 
     def __init__(self, parent, treasure_chest=None, data_path='/rawdata', *args, **kw):
         super(BaseImageController, self).__init__(parent, treasure_chest, data_path,
@@ -92,6 +95,10 @@ class BaseImageController(ControllerBase):
         if self.numfiles > 0:
             self.init_plot()
             print "initialized plot for data in %s" % data_path
+            self._can_save = True
+            self._can_crop_cells = True
+            self._can_change_idx = True
+            self.parent.show_image_view=True
 
     def init_plot(self):
         self.plotdata.set_data('imagedata', self.get_active_image())
@@ -135,6 +142,12 @@ class BaseImageController(ControllerBase):
                                           self.numfiles) + self.get_active_name())
         
 class CellController(BaseImageController):
+    _can_characterize = t.Bool(False)
+    _can_map_peaks = t.Bool(False)
+    _selected_peak = t.Int(0)
+    _peak_ids = t.List([])
+    _characteristic = t.Int(0)
+    
     def __init__(self, parent, treasure_chest=None, data_path='/cells', *args, **kw):
         super(CellController, self).__init__(parent, treasure_chest, data_path,
                 *args, **kw)
@@ -143,11 +156,13 @@ class CellController(BaseImageController):
             if self.numfiles > 0:
                 self.init_plot()
                 print "initialized plot for data in %s" % data_path
+                self._toggle_UI(True)
+                self._can_change_idx = True
+                self.parent.show_cell_view=True
 
-    def data_updated(self):
-        # reinitialize data
-        self.__init__(parent = self.parent, treasure_chest=self.chest,
-                      data_path=self.data_path)
+    def _toggle_UI(self, enable):
+        self._can_save = enable
+        self._can_characterize = enable
 
     def get_active_image(self):
         # Find this cell in the cell description table.  We use this to look
@@ -167,6 +182,26 @@ class CellController(BaseImageController):
         #    among only its indexed cells - not the universal index!
         return self.nodes[selected_image][cell_record['idx'], :, :]
 
+    # TODO: is there any compelling reason that we need the whole stack at once?
+    def get_cell_set(self):
+        data = np.zeros((self.chest.root.cell_description.nrows,
+                         self.chest.root.cells.template.shape[1],
+                         self.chest.root.cells.template.shape[0]
+                         ),
+                        dtype = self.chest.root.cells.template.dtype,
+                        )
+        nodes = self.chest.listNodes('/cells')
+        start_idx = 0
+        end_idx=0
+        tmp_size = self.chest.root.cells.template.shape[0]
+        for node in nodes:
+            if node.name is not 'template':
+                end_idx = start_idx + node.shape[0]
+                data[start_idx:end_idx,:,:] = node[:]
+                start_idx = end_idx
+        return data
+        
+
     def get_active_name(self):
         cell_record = self.chest.root.cell_description.read(
                             start=self.selected_index,
@@ -178,9 +213,12 @@ class CellController(BaseImageController):
     def get_num_files(self):
         return self.chest.root.cell_description.nrows
 
-    def characterize(self, peak_width, subpixel=False,
+    # TODO: automatically determine the peak width from an average image
+    def characterize(self, peak_width, subpixel=True,
                      target_locations=None, peak_locations=None,
                      target_neighborhood=20, medfilt_radius=5):
+        # disable the UI while we're running
+        self._toggle_UI(False)
         # get the peak attributes
         attribs = pc.peak_attribs_stack(self.get_cell_set(),
                         peak_width=peak_width, subpixel=subpixel,
@@ -206,13 +244,17 @@ class CellController(BaseImageController):
         # for each column name, copy in the data
         for name_idx in xrange(len(names)):
             data[names[name_idx]] = attribs[:, name_idx]
+        # wipe out old results
+        self.chest.removeNode('/cell_peaks')        
         # populate a table with the results
         self.chest.createTable(self.chest.root,
                                'cell_peaks', description=data)
         # add an attribute for the total number of peaks recorded
         self.chest.root.cell_peaks.number_of_peaks = attribs.shape[1] // 7
-        #self.chest.root.cell_peaks.append([data[idx] for idx in xrange(1,attribs.shape[0])])
+        self._peak_ids = [str(idx) for idx in range(attribs.shape[1] // 7)]
         self.chest.root.cell_peaks.flush()
+        self._toggle_UI(True)
+        self._can_map_peaks = True
 
     def get_peak_data(self, chars=[], indices=[]):
         """
@@ -444,9 +486,6 @@ class CellCropController(BaseImageController):
     peak_width = t.Range(low=2, high=200, value=10)
     numpeaks_total = t.Int(0,cols=5)
     numpeaks_img = t.Int(0,cols=5)
-    
-    # todo - we'll probably need to define this
-    #csr=t.Instance(BaseCursorTool)
 
     def __init__(self, parent, treasure_chest=None, data_path='/rawdata', *args, **kw):
         super(CellCropController, self).__init__(parent, treasure_chest, data_path,
@@ -522,9 +561,9 @@ class CellCropController(BaseImageController):
         self.update_CC()        
 
     def add_cursor_tool(self):    
-        self.csr = CursorTool(self._base_plot, drag_button='left', color='white',
+        self._csr = CursorTool(self._base_plot, drag_button='left', color='white',
                                  line_width=2.0)
-        self._base_plot.overlays.append(self.csr)
+        self._base_plot.overlays.append(self._csr)
     
     @t.on_trait_change('selected_index, template_size')
     def _get_max_pos_x(self):
@@ -545,21 +584,21 @@ class CellCropController(BaseImageController):
     @t.on_trait_change('template_left, template_top')
     def update_csr_position(self):
         #if self.template_left>0:        
-            #self.csr.current_position=self.template_left,self.template_top
+            #self._csr.current_position=self.template_left,self.template_top
         pass
 
-    @t.on_trait_change('csr:current_position')
+    @t.on_trait_change('_csr:current_position')
     def update_top_left(self):
-        if self.csr.current_position[0]>0 or self.csr.current_position[1]>0:
-            if self.csr.current_position[0]>self.max_pos_x:
-                if self.csr.current_position[1]<self.max_pos_y:
-                    self.template_top=self.csr.current_position[1]
+        if self._csr.current_position[0]>0 or self._csr.current_position[1]>0:
+            if self._csr.current_position[0]>self.max_pos_x:
+                if self._csr.current_position[1]<self.max_pos_y:
+                    self.template_top=self._csr.current_position[1]
                 else:
-                    self.csr.current_position=self.max_pos_x, self.max_pos_y
-            elif self.csr.current_position[1]>self.max_pos_y:
-                self.template_left,self.template_top=self.csr.current_position[0],self.max_pos_y
+                    self._csr.current_position=self.max_pos_x, self.max_pos_y
+            elif self._csr.current_position[1]>self.max_pos_y:
+                self.template_left,self.template_top=self._csr.current_position[0],self.max_pos_y
             else:
-                self.template_left,self.template_top=self.csr.current_position
+                self.template_left,self.template_top=self._csr.current_position
 
     @t.on_trait_change('_colorbar_selection:selection')
     def update_thresh(self):
@@ -622,10 +661,6 @@ class CellCropController(BaseImageController):
 
     def locate_peaks(self):
         peaks={}
-        #progress = ProgressDialog(title="Peak finder progress", 
-        #               message="Finding peaks on %s images" % self.numfiles,
-        #               max=self.numfiles, show_time=True, can_cancel=False)
-        #progress.open()
         for idx in xrange(self.numfiles):
             self.set_active_index(idx)
             CC = cv_funcs.xcorr(self.template_data.get_data("imagedata"),
@@ -634,14 +669,9 @@ class CellCropController(BaseImageController):
             pks=pc.two_dim_findpeaks(CC*255, peak_width=self.peak_width, medfilt_radius=None)
             pks[:,2]=pks[:,2]/255.
             peaks[self.get_active_name()]=pks
-            #progress.update(idx+1)
-        #ipdb.set_trace()
         self.peaks=peaks
         
     def mask_peaks(self,image_id):
-        #thresh=self.colorbar_selection.selection
-        #if thresh==[]:
-        #    thresh=(-1,1)
         mpeaks=np.ma.asarray(self.peaks[image_id])
         mpeaks[:,2]=np.ma.masked_outside(mpeaks[:,2],self.thresh[0],self.thresh[1])
         return mpeaks
@@ -674,7 +704,8 @@ class CellCropController(BaseImageController):
             active_image = self.get_active_image()
             peaks=np.ma.compress_rows(self.mask_peaks(self.get_active_name()))
             tmp_sz=self.template_size
-            data=np.zeros((peaks.shape[0],tmp_sz,tmp_sz))
+            data=np.zeros((peaks.shape[0],tmp_sz,tmp_sz), 
+                          dtype=active_image.dtype)
             if data.shape[0] >0:
                 for i in xrange(peaks.shape[0]):
                     # store the peak in the table
@@ -701,7 +732,7 @@ class CellCropController(BaseImageController):
                 
 # the UI controller
 class HighSeasAdventure(t.HasTraits):
-    show_image_view = t.Bool(True)
+    show_image_view = t.Bool(False)
     show_cell_view = t.Bool(False)
     show_score_view = t.Bool(False)
     show_factor_view = t.Bool(False)
@@ -755,30 +786,6 @@ class HighSeasAdventure(t.HasTraits):
     def new_project(self):
         #new_file =
         self.image_controller = ImageController()
-
-    def add_cells(self, name, data, locations):
-        ds = self.chest.createCArray(self.chest.root.cells,
-                                    name,
-                                    tb.Atom.from_dtype(data.dtype),
-                                    data.shape,
-                                    filters=filters
-                                    )
-        ds[:] = data
-        self.chest.flush()
-
-        loc = self.chest.root.cell_description.row
-
-        for idx in xrange(locations.shape[0]):
-            loc['idx'] = idx
-            # TODO: generalize so that data can come from anywhere
-            loc['input_data'] = '/root/rawdata'
-            loc['original_image'] = name
-            loc['x_coordinate'] = locations[idx, 0]
-            loc['y_coordinate'] = locations[idx, 1]
-            loc.append()
-        self.chest.root.cell_description.flush()
-        self.chest.flush()
-        #self.active_data_source = 'cells'
 
 if __name__ == '__main__':
     import enaml

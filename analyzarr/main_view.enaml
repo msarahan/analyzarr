@@ -20,10 +20,11 @@ Implementation Notes:
     backend over Wx (this is generally a good life-rule).
 
 """
-from enaml.layout.api import vbox
+from enaml.layout.api import vbox, hbox, vertical, horizontal
 from enaml.widgets.api import (
     MainWindow, ToolBar, DockPane, MenuBar, Menu, Action, ActionGroup,
-    Container, Html, PushButton, EnableCanvas, CheckBox, FileDialog
+    Container, Html, PushButton, EnableCanvas, CheckBox, FileDialog,
+    Label, ComboBox, Field, GroupBox
 )
 
 from controllers import HighSeasAdventure, CellCropController
@@ -115,27 +116,59 @@ enamldef MyMenuBar(MenuBar): menu:
                 text = 'Justify'
                 toggled :: print '%s toggled %s' % (text, 'on' if checked else 'off')
 
-enamldef BasePlotToolbar(ToolBar):
+enamldef BasePlotToolbar(Container):
     attr controller
-    Action:
+    PushButton: save:
         text = "Save"
         tool_tip = "Save current plot"
+        enabled << controller._can_save
     
 enamldef BaseImagePlotToolbar(BasePlotToolbar):
-    Action:
+    PushButton: prev_image:
         text = "<"
         tool_tip = "View previous image in stack"
-        triggered :: controller.decrease_selected_index()
-    Action:
+        clicked :: controller.decrease_selected_index()
+        enabled << controller._can_change_idx
+    PushButton: next_image:
         text = ">"
         tool_tip = "View next image in stack"
-        triggered :: controller.increase_selected_index()
+        clicked :: controller.increase_selected_index()
+        enabled << controller._can_change_idx
 
 enamldef ImagePlotToolBar(BaseImagePlotToolbar):
-    Action:
+    constraints = [
+        hbox(save, prev_image, next_image, crop, characteristic_box)
+    ]
+    PushButton: crop:
         text = "Crop cells"
         tool_tip = "Open the cell cropping interface"
-        triggered :: controller.show_crop_ui=True
+        clicked :: controller._show_crop_ui=True
+        enabled << controller._can_crop_cells
+    GroupBox: characteristic_box:
+        title = "Characteristic Map:"
+        ComboBox: characteristic:
+            items = ["Shift", "Height", "Orientation", "Eccentricity"]
+            index = controller.parent.cell_controller._characteristic 
+            enabled = controller.parent.cell_controller._can_map_peaks
+        ComboBox: peak_id:
+            items = controller.parent.cell_controller._peak_ids
+            index = controller.parent.cell_controller._selected_peak
+            enabled = controller.parent.cell_controller._can_map_peaks
+        #: TODO: implement parser for math expressions
+        #:Field:
+        #:    text := controller._peak_expression
+        #:    enabled := controller.parent.cell_controller._can_edit_expression
+        
+
+enamldef CellPlotToolBar(BaseImagePlotToolbar):
+    constraints = [
+        hbox(save, prev_image, next_image, characterize)
+        ]
+    PushButton: characterize:
+        text = "Characterize Peaks"
+        tool_tip = "Locate and characterize peaks in the cell stack"
+        clicked :: controller.characterize(10)
+        enabled << controller._can_characterize
 
 enamldef ViewToolBar(ToolBar):
     attr controller
@@ -168,8 +201,8 @@ enamldef CellViewDockPane(DockPane): celldockpane:
         ]
         EnableCanvas: canvas:
             component << celldockpane.controller.plot
-        BaseImagePlotToolbar: toolbar:
-            movable = False
+        CellPlotToolBar: toolbar:
+            #:movable = False
             controller << celldockpane.controller
 
 enamldef ImageViewDockPane(DockPane): imagedockpane:
@@ -181,7 +214,6 @@ enamldef ImageViewDockPane(DockPane): imagedockpane:
         EnableCanvas: canvas:
             component << controller.plot
         ImagePlotToolBar: toolbar:
-            movable = False
             controller << imagedockpane.controller
 
 enamldef Main(MainWindow): main:
@@ -205,7 +237,7 @@ enamldef Main(MainWindow): main:
         visible := main.controller.show_cell_view
     CellCropperInterface: crop_ui:
         controller << main.controller.crop_controller
-        visible := main.controller.image_controller.show_crop_ui
+        visible := main.controller.image_controller._show_crop_ui
         
 
 """
