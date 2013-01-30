@@ -139,6 +139,20 @@ enamldef ImagePlotToolBar(BaseImagePlotToolbar):
     constraints = [
         hbox(save, prev_image, next_image, crop, characteristic_box)
     ]
+    PushButton: save:
+        text = "Save"
+        tool_tip = "Save current plot"
+        enabled << controller._can_save
+    PushButton: prev_image:
+        text = "<"
+        tool_tip = "View previous image in stack"
+        clicked :: controller.decrease_selected_index()
+        enabled << controller._can_change_idx
+    PushButton: next_image:
+        text = ">"
+        tool_tip = "View next image in stack"
+        clicked :: controller.increase_selected_index()
+        enabled << controller._can_change_idx
     PushButton: crop:
         text = "Crop cells"
         tool_tip = "Open the cell cropping interface"
@@ -164,6 +178,20 @@ enamldef CellPlotToolBar(BaseImagePlotToolbar):
     constraints = [
         hbox(save, prev_image, next_image, characterize)
         ]
+    PushButton: save:
+        text = "Save"
+        tool_tip = "Save current plot"
+        enabled << controller._can_save
+    PushButton: prev_image:
+        text = "<"
+        tool_tip = "View previous image in stack"
+        clicked :: controller.decrease_selected_index()
+        enabled << controller._can_change_idx
+    PushButton: next_image:
+        text = ">"
+        tool_tip = "View next image in stack"
+        clicked :: controller.increase_selected_index()
+        enabled << controller._can_change_idx
     PushButton: characterize:
         text = "Characterize Peaks"
         tool_tip = "Locate and characterize peaks in the cell stack"
