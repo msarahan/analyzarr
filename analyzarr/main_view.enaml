@@ -116,14 +116,16 @@ enamldef MyMenuBar(MenuBar): menu:
                 text = 'Justify'
                 toggled :: print '%s toggled %s' % (text, 'on' if checked else 'off')
 
-enamldef BasePlotToolbar(Container):
+enamldef ImagePlotButtons(Container):
     attr controller
+    attr cell_controller
+    constraints = [
+        hbox(save, prev_image, next_image, crop, characteristic_box)
+    ]
     PushButton: save:
         text = "Save"
         tool_tip = "Save current plot"
         enabled << controller._can_save
-    
-enamldef BaseImagePlotToolbar(BasePlotToolbar):
     PushButton: prev_image:
         text = "<"
         tool_tip = "View previous image in stack"
@@ -134,11 +136,6 @@ enamldef BaseImagePlotToolbar(BasePlotToolbar):
         tool_tip = "View next image in stack"
         clicked :: controller.increase_selected_index()
         enabled << controller._can_change_idx
-
-enamldef ImagePlotToolBar(BaseImagePlotToolbar):
-    constraints = [
-        hbox(save, prev_image, next_image, crop, characteristic_box)
-    ]
     PushButton: crop:
         text = "Crop cells"
         tool_tip = "Open the cell cropping interface"
@@ -148,22 +145,37 @@ enamldef ImagePlotToolBar(BaseImagePlotToolbar):
         title = "Characteristic Map:"
         ComboBox: characteristic:
             items = ["Shift", "Height", "Orientation", "Eccentricity"]
-            index = controller.parent.cell_controller._characteristic 
-            enabled = controller.parent.cell_controller._can_map_peaks
+            index := cell_controller._characteristic 
+            enabled << cell_controller._can_map_peaks
         ComboBox: peak_id:
-            items = controller.parent.cell_controller._peak_ids
-            index = controller.parent.cell_controller._selected_peak
-            enabled = controller.parent.cell_controller._can_map_peaks
+            items << cell_controller._peak_ids
+            index := cell_controller._selected_peak
+            enabled << cell_controller._can_map_peaks
         #: TODO: implement parser for math expressions
         #:Field:
         #:    text := controller._peak_expression
-        #:    enabled := controller.parent.cell_controller._can_edit_expression
+        #:    enabled := cell_controller._can_edit_expression
         
 
-enamldef CellPlotToolBar(BaseImagePlotToolbar):
+enamldef CellPlotButtons(Container):
+    attr controller
     constraints = [
         hbox(save, prev_image, next_image, characterize)
         ]
+    PushButton: save:
+        text = "Save"
+        tool_tip = "Save current plot"
+        enabled << controller._can_save
+    PushButton: prev_image:
+        text = "<"
+        tool_tip = "View previous image in stack"
+        clicked :: controller.decrease_selected_index()
+        enabled << controller._can_change_idx
+    PushButton: next_image:
+        text = ">"
+        tool_tip = "View next image in stack"
+        clicked :: controller.increase_selected_index()
+        enabled << controller._can_change_idx
     PushButton: characterize:
         text = "Characterize Peaks"
         tool_tip = "Locate and characterize peaks in the cell stack"
@@ -197,24 +209,26 @@ enamldef CellViewDockPane(DockPane): celldockpane:
     attr controller
     Container:
         constraints = [
-            vbox(canvas, toolbar)
+            vbox(canvas, buttons)
         ]
         EnableCanvas: canvas:
             component << celldockpane.controller.plot
-        CellPlotToolBar: toolbar:
+        CellPlotButtons: buttons:
             #:movable = False
             controller << celldockpane.controller
 
 enamldef ImageViewDockPane(DockPane): imagedockpane:
     attr controller
+    attr cell_controller
     Container:
         constraints = [
-            vbox(canvas, toolbar)
+            vbox(canvas, buttons)
         ]
         EnableCanvas: canvas:
             component << controller.plot
-        ImagePlotToolBar: toolbar:
+        ImagePlotButtons: buttons:
             controller << imagedockpane.controller
+            cell_controller << imagedockpane.cell_controller
 
 enamldef Main(MainWindow): main:
     attr controller = HighSeasAdventure()
@@ -226,6 +240,7 @@ enamldef Main(MainWindow): main:
         dock_area = 'left'
     ImageViewDockPane: image_view:
         controller << main.controller.image_controller
+        cell_controller << main.controller.cell_controller
         title << "Image view"
         dock_area = 'left'
         visible := main.controller.show_image_view

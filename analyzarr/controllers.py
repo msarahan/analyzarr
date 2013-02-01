@@ -87,6 +87,7 @@ class BaseImageController(ControllerBase):
     plotdata = t.Instance(ArrayPlotData)
     _show_crop_ui = t.Bool(False)
     _can_crop_cells = t.Bool(False)
+    _can_map_peaks = t.Bool(True)
 
     def __init__(self, parent, treasure_chest=None, data_path='/rawdata', *args, **kw):
         super(BaseImageController, self).__init__(parent, treasure_chest, data_path,
@@ -163,6 +164,8 @@ class CellController(BaseImageController):
     def _toggle_UI(self, enable):
         self._can_save = enable
         self._can_characterize = enable
+
+    
 
     def get_active_image(self):
         # Find this cell in the cell description table.  We use this to look
@@ -244,8 +247,12 @@ class CellController(BaseImageController):
         # for each column name, copy in the data
         for name_idx in xrange(len(names)):
             data[names[name_idx]] = attribs[:, name_idx]
-        # wipe out old results
-        self.chest.removeNode('/cell_peaks')        
+        try:
+            # wipe out old results
+            self.chest.removeNode('/cell_peaks')        
+            # any errors will be because the table doesn't exist. That's OK.
+        except:
+            pass
         # populate a table with the results
         self.chest.createTable(self.chest.root,
                                'cell_peaks', description=data)
