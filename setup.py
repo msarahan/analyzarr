@@ -20,66 +20,41 @@ import os
 import sys
 import shutil
 
+from distutils.extension import Extension
+from Cython.Distutils import build_ext
+
+import numpy as np
+
 import analyzarr.Release as Release
 # clean the build directory so we aren't mixing Windows and Linux 
 # installations carelessly.
 if os.path.exists('build'):
     distutils.dir_util.remove_tree('build')
 
-install_req = ['scipy', 'ipython', 'matplotlib', 'numpy', 
-               'traits', 'traitsui', 'scikit_learn', ]
+install_req = ['scipy', 'numpy', 'traits', 'chaco', 'enaml', 
+               'cython', 'scikit_learn', ]
 
-def are_we_building4linux():
-    for arg in sys.argv:
-        if 'wininst' in arg:
-            return True
-scripts = ['bin/analyzarr',]
+numpy_include_dir = np.get_include()
 
-if are_we_building4linux() or os.name in ['nt','dos']:
-    # In the Windows command prompt we can't execute Python scripts 
-    # without a .py extension. A solution is to create batch files
-    # that runs the different scripts.
-    # (code adapted from scitools)
-    scripts.extend(('bin/win_post_installation.py',
-                   'bin/install_analyzarr_here.py',
-                   'bin/uninstall_analyzarr_here.py'))
-    batch_files = []
-    for script in scripts:
-        batch_file = os.path.splitext(script)[0] + '.bat'
-        f = open(batch_file, "w")
-        f.write('set path=%~dp0;%~dp0\..\;%PATH%\n')
-        if script == 'bin/analyzarr':
-            f.write('start pythonw "%%~dp0\%s" --ipython_args qtconsole %%*\n' % os.path.split(script)[1])
-        else:
-            f.write('python "%%~dp0\%s" %%*\n' % os.path.split(script)[1])
-        f.close()
-        batch_files.append(batch_file)
-    scripts.extend(batch_files)
+peak_finder_cython = Extension(
+    'analyzarr.one_dim_findpeaks', 
+    sources=['analyzarr/one_dim_findpeaks.pyx'],
+    include_dirs=[numpy_include_dir],
+    )
     
 version = Release.version
 setup(
+    cmdclass = {'build_ext': build_ext},
     name = "analyzarr",
     package_dir = {'analyzarr': 'analyzarr'},
     version = version,
-    packages = ['analyzarr', 'analyzarr.io_plugins', 
-                'analyzarr.drawing', 'analyzarr.learn', 'analyzarr.signals',  'analyzarr.tests',
-                'analyzarr.tests.io', ],
+    packages = ['analyzarr', 'analyzarr.lib', 'analyzarr.lib.mda',
+                'analyzarr.lib.io', 'analyzarr.lib.io.libs',
+                'analyzarr.ui', ],
+    package_data = {
+        'analyzarr' : [ '*.enaml', 'ui/*.enaml',],
+        },
     requires = install_req,
-    scripts = scripts,
-    package_data = 
-    {
-        'analyzarr': 
-            [   'bin/*.py',
-                'ipython_profile/*',
-                'data/*.m', 
-                'data/*.csv',
-                'data/*.tar.gz',
-				'data/analyzarr_logo.ico',
-		'tests/io/dm3_1D_data/*.dm3',
-		'tests/io/dm3_2D_data/*.dm3',
-		'tests/io/dm3_3D_data/*.dm3',
-            ],
-    },
     author = Release.authors['M_S'][0],
     author_email = Release.authors['M_S'][1],
     maintainer = 'Michael Sarahan',
@@ -93,13 +68,12 @@ setup(
     keywords = Release.keywords,
     classifiers = [
         "Programming Language :: Python :: 2.7",
-        "Development Status :: 4 - Beta",
-        "Environment :: Console",
+        "Development Status :: 2 - Pre-Alpha",
         "Intended Audience :: Science/Research",
-        "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
         "Natural Language :: English",
         "Operating System :: OS Independent",
         "Topic :: Scientific/Engineering",
         "Topic :: Scientific/Engineering :: Physics",
         ],
+    ext_modules = [peak_finder_cython,]
     )

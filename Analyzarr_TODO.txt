@@ -22,3 +22,12 @@ File structure:
 - group per experiment:
    - group for each cropping experiment
      - subgroup for analyses
+
+2013/01/12:
+define "experiment" structure for mda:
+- date
+- type
+- results
+
+UI:
+provide menu to choose from available mda runs
