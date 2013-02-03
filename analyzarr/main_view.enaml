@@ -250,7 +250,7 @@ enamldef ImageViewDockPane(DockPane): imagedockpane:
 
 enamldef Main(MainWindow): main:
     attr controller = HighSeasAdventure()
-    initial_size = (600, 600)
+    initial_size = (1024, 750)
     MyMenuBar:
         controller << main.controller
     ViewToolBar: view_buttons:
