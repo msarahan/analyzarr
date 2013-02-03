@@ -38,12 +38,12 @@ class ImageDataTable(tables.IsDescription):
 
 
 class CellsTable(tables.IsDescription):
-    idx = tables.Int64Col(pos=0)
+    file_idx = tables.Int64Col(pos=0)
     # description of where data came from (as a path in the file, for example:
     # '/root/rawdata'
     input_data = tables.StringCol(250)
     # filename that the data is from
-    original_image = tables.StringCol(250, pos=1)
+    filename = tables.StringCol(250, pos=1)
     # the upper left coordinate of the parent image where this
     # cell was cropped from.
     x_coordinate = tables.Float32Col(pos=3)
