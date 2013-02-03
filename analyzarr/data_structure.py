@@ -27,29 +27,6 @@ class MdaResultsTable(tables.IsDescription):
     # was data filtered or reconstructed?
     treatments = tables.StringCol(250)
 
-
-# TODO: this table is not used - we instead dynamically create a table for
-#   having several columns for each peak.
-class PeakData(tables.IsDescription):
-    idx = tables.Int64Col(pos=0)
-    # description of where data came from (as a path in the file, for example:
-    # '/root/rawdata'
-    input_data = tables.StringCol(250)
-    # filename that the data is from
-    original_image = tables.StringCol(250, pos=1)
-    cell_id = tables.Int64Col(pos=2)
-    x = tables.Float32Col(pos=3)
-    y = tables.Float32Col(pos=4)
-    height = tables.Float32Col(pos=5)
-    orientation = tables.Float32Col(pos=6)
-    eccentricity = tables.Float32Col(pos=7)
-    # treatments - any prior processing (for example, reconstruction)
-    treatments = tables.StringCol(250)
-
-    # Higher order moments - third: shift from center?
-    # how to introduce Chebyshev polynomials?
-
-
 class ImageDataTable(tables.IsDescription):
     idx = tables.Int64Col(pos=0)
     # metadata = tables.
