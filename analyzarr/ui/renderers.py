@@ -40,15 +40,16 @@ def _render_image(array_plot_data, title=None):
     plot.overlays.append(zoom)
     return plot
 
-def _create_colorbar(colormap):
+def _create_colorbar(colormap, add_tool=False):
     colorbar = ColorBar(index_mapper=LinearMapper(range=colormap.range),
                             color_mapper=colormap,
                             orientation='v',
                             resizable='v',
                             width=30,
                             padding=20)
-    colorbar.tools.append(RangeSelection(component=colorbar))
-    colorbar.overlays.append(RangeSelectionOverlay(component=colorbar,
+    if add_tool:
+        colorbar.tools.append(RangeSelection(component=colorbar))
+        colorbar.overlays.append(RangeSelectionOverlay(component=colorbar,
                                                    border_color="white",
                                                    alpha=0.8,
                                                    fill_color="lightgray"))
@@ -56,7 +57,7 @@ def _create_colorbar(colormap):
 
 def _render_scatter_overlay(base_plot, array_plot_data,
                             marker="circle", fill_alpha=0.5,
-                            marker_size=6):
+                            marker_size=6, add_tool=False):
     if 'index' not in array_plot_data.arrays:
         return base_plot, None
     
@@ -84,24 +85,25 @@ def _render_scatter_overlay(base_plot, array_plot_data,
                       fill_alpha = fill_alpha,
                       marker_size = marker_size,
                       )
-        # this part is for making the colormapped points fade when they
-        #  are not selected by the threshold.
-        # The renderer is the actual class that does the rendering - 
-        # the Plot class calls this other class.  When we say 
-        #   plots['scatter_plot']
-        # we are getting the named plot that we created above.
-        # The extra [0] on the end is because we get a list - in case
-        # there is more than one plot named "scatter_plot"
         scatter_renderer = scatter_plot.plots['scatter_plot'][0]
-        selection = ColormappedSelectionOverlay(scatter_renderer, 
-                                                fade_alpha=0.35, 
-                                                selection_type="range")
-        scatter_renderer.overlays.append(selection)
-
-        colorbar = _create_colorbar(scatter_plot.color_mapper)
+        colorbar = _create_colorbar(scatter_plot.color_mapper, 
+                                    add_tool=add_tool)
         colorbar.plot = scatter_renderer
         colorbar.padding_top = scatter_renderer.padding_top
         colorbar.padding_bottom = scatter_renderer.padding_bottom
+        if add_tool:
+            # this part is for making the colormapped points fade when they
+            #  are not selected by the threshold.
+            # The renderer is the actual class that does the rendering - 
+            # the Plot class calls this other class.  When we say 
+            #   plots['scatter_plot']
+            # we are getting the named plot that we created above.
+            # The extra [0] on the end is because we get a list - in case
+            # there is more than one plot named "scatter_plot"
+            selection = ColormappedSelectionOverlay(scatter_renderer, 
+                                                    fade_alpha=0.35, 
+                                                    selection_type="range")
+            scatter_renderer.overlays.append(selection)        
     scatter_plot.x_grid.visible = False
     scatter_plot.y_grid.visible = False
     scatter_plot.range2d = base_plot.range2d
@@ -155,10 +157,11 @@ class HasRenderer(HasTraits):
         return image_container
 
     # TODO - add optional appearance tweaks
-    def get_scatter_overlay_plot(self, array_plot_data, title=None):
+    def get_scatter_overlay_plot(self, array_plot_data, title=None, add_tool=False):
         image_plot = _render_image(array_plot_data, title)
         scatter_plot, colorbar = _render_scatter_overlay(image_plot, 
-                                                         array_plot_data)
+                                                         array_plot_data,
+                                                         add_tool=add_tool)
         image_container = OverlayPlotContainer(image_plot, scatter_plot)
         if colorbar is not None:
             image_container = HPlotContainer(image_container, colorbar)
@@ -168,18 +171,21 @@ class HasRenderer(HasTraits):
                 scatter_renderer.color_data.metadata_changed={
                     'selections':self.thresh}
             self._colorbar = colorbar
-            self._colorbar_selection = colorbar.tools[0]
+            if add_tool:
+                self._colorbar_selection = colorbar.tools[0]
         self._base_plot = image_plot
         self._scatter_plot = scatter_plot
         self.image_container = image_container
         return image_container
             
     # TODO - add optional appearance tweaks
-    def get_scatter_quiver_plot(self, array_plot_data, title=None):
+    def get_scatter_quiver_plot(self, array_plot_data, title=None,
+                                add_tool=False):
         colorbar = None
         image_plot = _render_image(array_plot_data, title)
         scatter_plot, colorbar = _render_scatter_overlay(image_plot,
-                                                         array_plot_data)
+                                                         array_plot_data,
+                                                         add_tool=add_tool)
         quiver_plot = _render_quiver_overlay(image_plot, array_plot_data)
         image_container = OverlayPlotContainer(image_plot, quiver_plot, 
                                                scatter_plot)
