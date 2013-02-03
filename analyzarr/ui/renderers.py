@@ -111,7 +111,7 @@ def _render_quiver_overlay(base_plot, array_plot_data,
                            line_color="white", line_width=1.0, 
                            arrow_size=5):
     if 'index' not in array_plot_data.arrays:
-        return Plot()
+        return base_plot
     plot = Plot(array_plot_data, aspect_ratio = base_plot.aspect_ratio, 
                 default_origin="top left")
     plot.quiverplot(("index", "value", "vectors"), name="quiver_plot",

@@ -88,12 +88,18 @@ class BaseImageController(ControllerBase):
     _show_crop_ui = t.Bool(False)
     _can_crop_cells = t.Bool(False)
     _can_map_peaks = t.Bool(True)
+    _characteristics = t.List(["Height", "Orientation", "Eccentricity"])
+    _characteristic = t.Int(0)
+    _selected_peak = t.Int(0)
+    _peak_ids = t.List([])
+    _show_shift = t.Bool(False)
+    
 
     def __init__(self, parent, treasure_chest=None, data_path='/rawdata', *args, **kw):
         super(BaseImageController, self).__init__(parent, treasure_chest, data_path,
                                               *args, **kw)
         self.plotdata = ArrayPlotData()
-        if self.numfiles > 0:
+        if self.numfiles > 0:        
             self.init_plot()
             print "initialized plot for data in %s" % data_path
             self._can_save = True
@@ -108,10 +114,67 @@ class BaseImageController(ControllerBase):
                                       self.numfiles) + self.get_active_name()
                 )
 
+    @t.on_trait_change('_peak_ids, selected_index')
+    def update_peak_map_choices(self):
+        # do we have any entries in the peak characteristic table for this image?
+        # knowing about the arrays in the cell data group is enough - if
+        #  there aren't any cells from an image, there won't be any entries.
+        if (len(self.chest.root.cell_description.getWhereList(
+               'original_image == "%s"' % self.get_active_name)) > 0) \
+           and \
+               len(_peak_ids) > 0:
+            self._can_map_peaks=True
+
     def data_updated(self):
         # reinitialize data
         self.__init__(parent = self.parent, treasure_chest=self.chest,
                       data_path=self.data_path)
+
+    @t.on_trait_change('_characteristic, _selected_peak, _show_shift')
+    def plot_peak_map(self):
+        self.plotdata.set_data('value',
+                               self.chest.root.cell_description.readWhere(
+                                   'original_image == "%s"' % self.get_active_name(),
+                                   field='x_coordinate',)
+                               )
+        self.plotdata.set_data('index',
+                              self.chest.root.cell_description.readWhere(
+                                  'original_image == "%s"' % self.get_active_name(),
+                                  field='y_coordinate',)  
+                              )
+        
+        if self._show_shift:
+            vectors = np.hstack((self.chest.root.cell_peaks.readWhere(
+                                   'filename == "%s"' % self.get_active_name(),
+                                   field='dx%i'%_selected_peak,
+                                   ),
+                                self.chest.root.cell_peaks.readWhere(
+                                    'filename == "%s"' % self.get_active_name(),
+                                    field='dy%i'%_selected_peak,
+                                   ),)
+                                )
+            self.plotdata.set_data('vectors',vectors)
+        else:
+            #TODO: replace this with a proper check of whether it exists
+            try:
+                self.plotdata.del_data('vectors')
+            except:
+                pass
+        # clear vector data
+        prefix = self._characteristics[self._characteristic][0].lower()
+        column = prefix + str(self._selected_peak)
+        self.plotdata.set_data('color', 
+                               self.chest.root.cell_peaks.readWhere(
+                                   'filename == "%s"' % self.get_active_name(),
+                                   field=column,
+                               )
+                               )
+        # look up how many layers the existing plot has.  If it's less than
+        #   3, then we need to recreate the plot as a more complicated scatter
+        #   quiver plot.        
+        if len(self.plot.overlays) < 3:
+            self.plot = self.get_scatter_overlay_plot(self.plotdata, 
+                                                      title=self.get_active_name())
 
     # this is a 2D image for plotting purposes
     def get_active_image(self):
@@ -144,10 +207,6 @@ class BaseImageController(ControllerBase):
         
 class CellController(BaseImageController):
     _can_characterize = t.Bool(False)
-    _can_map_peaks = t.Bool(False)
-    _selected_peak = t.Int(0)
-    _peak_ids = t.List([])
-    _characteristic = t.Int(0)
     
     def __init__(self, parent, treasure_chest=None, data_path='/cells', *args, **kw):
         super(CellController, self).__init__(parent, treasure_chest, data_path,
@@ -164,18 +223,15 @@ class CellController(BaseImageController):
     def _toggle_UI(self, enable):
         self._can_save = enable
         self._can_characterize = enable
-
-    
-
+        
     def get_active_image(self):
         # Find this cell in the cell description table.  We use this to look
         # up the parent image and subsequently the local cell index (the
         # index among only the cells from that image)
         cell_record = self.chest.root.cell_description.read(
                             start=self.selected_index,
-                            stop=self.selected_index + 1)[0]
-        # find the parent that this cell comes from
-        parent = cell_record['original_image']
+                            stop=self.selected_index + 1)[0]        
+        parent = self.get_cell_parent()
         # select that parent as the selected image (int because it is an index)
         selected_image = int([x['idx'] for x in
                                        self.chest.root.image_description.where(
@@ -185,6 +241,16 @@ class CellController(BaseImageController):
         #    among only its indexed cells - not the universal index!
         return self.nodes[selected_image][cell_record['idx'], :, :]
 
+    def get_cell_parent(self):
+        # Find this cell in the cell description table.  We use this to look
+        # up the parent image and subsequently the local cell index (the
+        # index among only the cells from that image)
+        cell_record = self.chest.root.cell_description.read(
+                            start=self.selected_index,
+                            stop=self.selected_index + 1)[0]
+        # find the parent that this cell comes from
+        return cell_record['original_image']
+        
     # TODO: is there any compelling reason that we need the whole stack at once?
     def get_cell_set(self):
         data = np.zeros((self.chest.root.cell_description.nrows,
@@ -204,64 +270,70 @@ class CellController(BaseImageController):
                 start_idx = end_idx
         return data
         
-
+    def _get_average_image(self):
+        return np.average(self.get_cell_set(), axis=0)
+        
     def get_active_name(self):
-        cell_record = self.chest.root.cell_description.read(
-                            start=self.selected_index,
-                            stop=self.selected_index + 1)[0]
-        # find the parent that this cell comes from
-        parent = cell_record['original_image']
+        parent = self.get_cell_parent()
         return '(from %s)' % parent
 
     def get_num_files(self):
         return self.chest.root.cell_description.nrows
-
+        
     # TODO: automatically determine the peak width from an average image
     def characterize(self, peak_width, subpixel=True,
-                     target_locations=None, peak_locations=None,
-                     target_neighborhood=20, medfilt_radius=5):
+                     target_locations=None, target_neighborhood=20, 
+                     medfilt_radius=5):
         # disable the UI while we're running
         self._toggle_UI(False)
-        # get the peak attributes
-        attribs = pc.peak_attribs_stack(self.get_cell_set(),
-                        peak_width=peak_width, subpixel=subpixel,
-                        target_locations=target_locations,
-                        peak_locations=peak_locations,
-                        target_neighborhood=target_neighborhood,
-                        medfilt_radius=medfilt_radius)
-        # transpose the results - they come in the form of one column per image
-        #    Should be one row per image.
-        attribs = attribs.T
-        # generate a list of column names
-        names = [('x%i, y%i, dx%i, dy%i, h%i, o%i, e%i' % ((x,)*7)).split(', ') for x in xrange(attribs.shape[1]//7)]
-        # flatten that from a list of lists to a simple list
-        names = [item for sublist in names for item in sublist]
-        # make tuples of each column name and 'f8' for the data type
-        dtypes = zip(names, ['f8', ] * attribs.shape[1])
-        # prepend the index column
-        dtypes = [('idx', "i4"), ] + dtypes
-        # make a blank recarray with our column names and dtypes
-        data = np.zeros((attribs.shape[0]), dtype=dtypes)
-        # fill in the index column
-        data['idx'] = np.arange(attribs.shape[0])
-        # for each column name, copy in the data
-        for name_idx in xrange(len(names)):
-            data[names[name_idx]] = attribs[:, name_idx]
         try:
             # wipe out old results
             self.chest.removeNode('/cell_peaks')        
-            # any errors will be because the table doesn't exist. That's OK.
         except:
-            pass
-        # populate a table with the results
+            # any errors will be because the table doesn't exist. That's OK.
+            pass        
+        # locate peaks on the average image to use as target locations.
+        #   also determines the number of peaks, which in turn determines
+        #   the table columns.
+        target_locations = pc.two_dim_findpeaks(self._get_average_image(),
+                                                subpixel=True)[:,:2]
+        numpeaks = target_locations.shape[0]
+        # generate a list of column names
+        names = [('x%i, y%i, dx%i, dy%i, h%i, o%i, e%i' % ((x,)*7)).split(', ') 
+                 for x in xrange(numpeaks)]
+        # flatten that from a list of lists to a simple list
+        names = [item for sublist in names for item in sublist]
+        # make tuples of each column name and 'f8' for the data type
+        dtypes = zip(names, ['f8', ] * numpeaks*7)
+        # prepend the index column
+        dtypes = [('filename', '|S30'), ('file_idx', 'i4')] + dtypes
+        desc = np.recarray((0,), dtype=dtypes)
         self.chest.createTable(self.chest.root,
-                               'cell_peaks', description=data)
+                               'cell_peaks', description=desc)        
+        # for each file in the cell_data group, run analysis.
+        nodes = self.chest.listNodes('/cells')
+        node_names = [node.name for node in nodes if node.name != 'template']
+        for node in node_names:
+            numcells = nodes[node_names.index(node)].shape[0]
+            data = np.zeros((numcells),dtype=dtypes)
+            data['filename'] = node
+            data['file_idx'] = np.arange(numcells)
+            attribs = pc.peak_attribs_stack(nodes[node_names.index(node)][:],
+                            peak_width=peak_width, subpixel=subpixel,
+                            target_locations=target_locations,
+                            target_neighborhood=target_neighborhood,
+                            medfilt_radius=medfilt_radius)
+            attribs = attribs.T
+            # for each column name, copy in the data
+            for name_idx in xrange(len(names)):
+                data[names[name_idx]] = attribs[:, name_idx]
+            # add the data to the table
+            self.chest.root.cell_peaks.append(data)
         # add an attribute for the total number of peaks recorded
-        self.chest.root.cell_peaks.number_of_peaks = attribs.shape[1] // 7
-        self._peak_ids = [str(idx) for idx in range(attribs.shape[1] // 7)]
+        self.chest.root.cell_peaks.number_of_peaks = numpeaks
+        self.parent.image_controller._peak_ids = [str(idx) for idx in range(numpeaks)]
         self.chest.root.cell_peaks.flush()
         self._toggle_UI(True)
-        self._can_map_peaks = True
 
     def get_peak_data(self, chars=[], indices=[]):
         """

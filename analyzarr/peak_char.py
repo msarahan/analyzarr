@@ -118,7 +118,8 @@ except:
         # (not the whole maxpeakn x 3 array)
         return P[:peak], H[:peak]
 
-def two_dim_findpeaks(arr,subpixel=False,peak_width=10,medfilt_radius=5,maxpeakn=10000):
+def two_dim_findpeaks(arr,subpixel=False, peak_width=10, medfilt_radius=5,
+                      maxpeakn=10000):
     """
     Locate peaks on a 2-D image.  Basic idea is to locate peaks in X direction,
     then in Y direction, and see where they overlay.
@@ -181,7 +182,7 @@ def two_dim_findpeaks(arr,subpixel=False,peak_width=10,medfilt_radius=5,maxpeakn
     coords=np.hstack((coords,heights))
     return coords 
 
-def subpix_locate(data,points,peak_width,scale=None):
+def subpix_locate(data, points, peak_width,scale=None):
     from scipy.ndimage.measurements import center_of_mass as CofM
     top=left=peak_width/2+1
     centers=np.array(points,dtype=np.float32)
@@ -209,7 +210,7 @@ def stack_coords(stack,peak_width,subpixel=False,maxpeakn=5000):
             coords[row,:,i]=ctmp[row,:2]
     return coords
 
-def best_match(arr,target,neighborhood=None):
+def best_match(arr, target, neighborhood=None):
     """
     Attempts to find the best match (least distance) for target coordinates 
     in array of coordinates arr. 
@@ -217,13 +218,13 @@ def best_match(arr,target,neighborhood=None):
     Usage:
         best_match(arr, target)
     """
-    arr_sub=arr[:]
-    arr_sub=arr-target
+    arr_sub = arr[:]
+    arr_sub = arr - target
     if neighborhood:
         # mask any peaks outside the neighborhood
-        arr_sub=np.ma.masked_outside(arr_sub,-neighborhood,neighborhood)
+        arr_sub = np.ma.masked_outside(arr_sub, -neighborhood, neighborhood)
         # set the masked pixel values to 10000, so that they won't be the nearest peak.
-        arr_sub=np.ma.filled(arr_sub,10000)
+        arr_sub = np.ma.filled(arr_sub, 10000)
     # locate the peak with the smallest euclidean distance to the target
     match=np.argmin(np.sqrt(np.sum(
         np.power(arr_sub,2),
@@ -313,8 +314,7 @@ def peak_attribs_image(image, peak_width, subpixel=False,
     return rlt
 
 def peak_attribs_stack(stack, peak_width, subpixel=True, target_locations=None,
-                       peak_locations=None, target_neighborhood=20,
-                       medfilt_radius=5):
+                       target_neighborhood=20, medfilt_radius=5):
     """
     Characterizes the peaks in a stack of images.
 
@@ -332,12 +332,6 @@ def peak_attribs_stack(stack, peak_width, subpixel=True, target_locations=None,
         target_locations : numpy array (n x 2)
                 array of n target locations.  If left as None, will create 
                 target locations by locating peaks on the average image of the stack.
-                default is None (peaks detected from average image)
-
-        peak_locations : numpy array (n x m x 2)
-                array of n peak locations for m images.  If left as None,
-                will find all peaks on all images, and keep only the ones closest to
-                the peaks specified in target_locations.
                 default is None (peaks detected from average image)
 
         img_size : tuple, 2 elements
@@ -386,20 +380,19 @@ def peak_attribs_stack(stack, peak_width, subpixel=True, target_locations=None,
         target_locations=two_dim_findpeaks(avgImage, subpixel=subpixel,
                                            peak_width=peak_width)
 
-    if peak_locations is None:
-        # get all peaks on all images
-        peaks=stack_coords(stack, peak_width=peak_width, subpixel=subpixel)
-        # two loops here - outer loop loops over images (i index)
-        # inner loop loops over target peak locations (j index)
-        peak_locations=np.array([[best_match(peaks[:,:,i], 
-                                             target_locations[j,:2], 
-                                             target_neighborhood) \
-                                  for i in xrange(peaks.shape[2])] \
-                                 for j in xrange(target_locations.shape[0])])
+    # get all peaks on all images
+    peaks=stack_coords(stack, peak_width=peak_width, subpixel=subpixel)
+    # two loops here - outer loop loops over images (i index)
+    # inner loop loops over target peak locations (j index)
+    peak_locations=np.array([[best_match(peaks[:,:,i], 
+                                         target_locations[j,:2], 
+                                         target_neighborhood) \
+                              for i in xrange(peaks.shape[2])] \
+                             for j in xrange(target_locations.shape[0])])
 
     # pre-allocate result array.  7 rows for each peak, 1 column for each image
-    rlt=np.zeros((7*peak_locations.shape[0],stack.shape[0]))
-    rlt_tmp=np.zeros((peak_locations.shape[0],5))
+    rlt = np.zeros((7*peak_locations.shape[0],stack.shape[0]))
+    rlt_tmp = np.zeros((peak_locations.shape[0],5))
     for i in xrange(stack.shape[0]):
         rlt_tmp=peak_attribs_image(stack[i,:,:], 
                                    target_locations=peak_locations[:,i,:], 
