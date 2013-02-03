@@ -167,16 +167,25 @@ class MappableImageController(BaseImageController):
     
     @t.on_trait_change('_characteristic, _selected_peak, _show_shift, selected_index')
     def plot_peak_map(self):
-        self.plotdata.set_data('value',
-                               self.chest.root.cell_description.readWhere(
-                                   'filename == "%s"' % self.get_active_name(),
-                                   field='x_coordinate',)
-                               )
-        self.plotdata.set_data('index',
-                              self.chest.root.cell_description.readWhere(
-                                  'filename == "%s"' % self.get_active_name(),
-                                  field='y_coordinate',)  
-                              )
+        values = \
+            self.chest.root.cell_description.readWhere(
+                'filename == "%s"' % self.get_active_name(),
+                field='x_coordinate',) \
+            + \
+            self.chest.root.cell_peaks.readWhere(
+                'filename == "%s"' % self.get_active_name(),
+                field='y%i'%self._selected_peak,)
+        
+        indices = \
+            self.chest.root.cell_description.readWhere(
+                'filename == "%s"' % self.get_active_name(),
+                field='y_coordinate',) \
+            + \
+            self.chest.root.cell_peaks.readWhere(
+                'filename == "%s"' % self.get_active_name(),
+                field='x%i'%self._selected_peak,)
+        self.plotdata.set_data('value', values)
+        self.plotdata.set_data('index', indices)
         
         if self._show_shift:
             vectors = np.hstack((self.chest.root.cell_peaks.readWhere(
