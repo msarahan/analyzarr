@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 
 from traits.api import Float, List, Tuple, Array, Trait, Instance, \
-     HasTraits, Range
+     HasTraits, Range, Dict
 from chaco.tools.api import PanTool, ZoomTool, RangeSelection, \
-     RangeSelectionOverlay
+     RangeSelectionOverlay, DataLabelTool
 from chaco.api import Plot, ArrayPlotData, jet, gray, \
      ColorBar, ColormappedSelectionOverlay, LinearMapper, \
-     HPlotContainer, OverlayPlotContainer, BasePlotContainer
+     HPlotContainer, OverlayPlotContainer, BasePlotContainer, \
+     DataLabel
 from chaco.tools.cursor_tool import CursorTool, BaseCursorTool
 
 from chaco.data_range_1d import DataRange1D
@@ -124,6 +125,29 @@ def _render_quiver_overlay(base_plot, array_plot_data,
     quiverplot.range2d = base_plot.range2d
     return quiverplot
 
+def _create_label(base_plot, point, label_text, show_label_coords=False,
+                  movable=True):
+    # Another 'bubble' label.  This one sets arrow_min_length=20, so
+    # the arrow is not drawn when the label is close to the data point.
+    label = DataLabel(component=base_plot, data_point=point,
+                       border_padding=10,
+                       marker_color="green",
+                       marker_size=2,
+                       show_label_coords=show_label_coords,
+                       label_style='bubble',
+                       label_position=(25, 5),
+                       label_text=label_text,
+                       border_visible=False,
+                       arrow_min_length=20,
+                       font='modern 14',
+                       bgcolor=(0.75, 0.75, 0.75, 1),
+                       )
+    if movable:
+        tool = DataLabelTool(label, drag_button="left",
+                          auto_arrow_root=True)
+        label.tools.append(tool)
+    return label
+
 class HasRenderer(HasTraits):
     _quiver_scale = Float(1.0)
     _colorbar = Instance(ColorBar)
@@ -131,13 +155,14 @@ class HasRenderer(HasTraits):
     _base_plot = Instance(Plot)
     _scatter_plot = Instance(Plot)
     _quiver_plot = Instance(Plot)
-    _csr=Instance(BaseCursorTool)    
+    _csr=Instance(BaseCursorTool)
+    _labels = Dict({})
     
     thresh = Trait([0,1],None,List,Tuple,Array)
     thresh_upper = Range(-1.0, 1.0, 1.0)
-    thresh_lower = Range(-1.0, 1.0, -1.0)    
+    thresh_lower = Range(-1.0, 1.0, -1.0)
     
-    def get_line_plot(self, array_plot_data, title=None):
+    def get_line_plot(self, array_plot_data, title=''):
         plot = self._render_line_plot(array_plot_data)
         # container isn't necessary here, but we do it to keep it consistent
         #   with how the other plot types return data.        
@@ -146,7 +171,7 @@ class HasRenderer(HasTraits):
         self.plot_container = plot_container
         return plot_container
 
-    def get_simple_image_plot(self, array_plot_data, title=None):
+    def get_simple_image_plot(self, array_plot_data, title=''):
         image_plot = _render_image(array_plot_data=array_plot_data, 
                                         title=title)
         # container isn't necessary here, but we do it to keep it consistent
@@ -157,7 +182,7 @@ class HasRenderer(HasTraits):
         return image_container
 
     # TODO - add optional appearance tweaks
-    def get_scatter_overlay_plot(self, array_plot_data, title=None, add_tool=False):
+    def get_scatter_overlay_plot(self, array_plot_data, title='', add_tool=False):
         image_plot = _render_image(array_plot_data, title)
         scatter_plot, colorbar = _render_scatter_overlay(image_plot, 
                                                          array_plot_data,
@@ -179,7 +204,7 @@ class HasRenderer(HasTraits):
         return image_container
             
     # TODO - add optional appearance tweaks
-    def get_scatter_quiver_plot(self, array_plot_data, title=None,
+    def get_scatter_quiver_plot(self, array_plot_data, title='',
                                 add_tool=False):
         colorbar = None
         image_plot = _render_image(array_plot_data, title)
@@ -199,3 +224,24 @@ class HasRenderer(HasTraits):
     
     def set_plot_title(self, title):
         self._base_plot.title=title
+        
+    # TODO: are we going to need to delete labels somehow?
+    def plot_labels(self, labels):
+        for label in labels.keys():
+            if label in self._labels:
+                data_point = labels[label]
+                self._labels[label].data_point = data_point
+                label_text = '%s: %.2f,%.2f' %(label, data_point[0], data_point[1])
+                self._labels[label].label_text = label_text
+            else:
+                data_point = labels[label]
+                label_text = '%s: %.2f,%.2f' %(label, data_point[0], data_point[1])                
+                self._labels[label]=_create_label(self._base_plot, 
+                                         point=data_point,
+                                         label_text=label_text)
+    def show_labels(self, show=True):
+        for label in self._labels.keys():
+            if show:
+                self._base_plot.overlays.append(self._labels[label])
+            else:
+                pass

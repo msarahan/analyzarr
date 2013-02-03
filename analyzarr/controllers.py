@@ -160,7 +160,7 @@ class MappableImageController(BaseImageController):
         # knowing about the arrays in the cell data group is enough - if
         #  there aren't any cells from an image, there won't be any entries.
         if (len(self.chest.root.cell_description.getWhereList(
-               'original_image == "%s"' % self.get_active_name)) > 0) \
+               'filename == "%s"' % self.get_active_name)) > 0) \
            and \
                len(_peak_ids) > 0:
             self._can_map_peaks=True    
@@ -169,12 +169,12 @@ class MappableImageController(BaseImageController):
     def plot_peak_map(self):
         self.plotdata.set_data('value',
                                self.chest.root.cell_description.readWhere(
-                                   'original_image == "%s"' % self.get_active_name(),
+                                   'filename == "%s"' % self.get_active_name(),
                                    field='x_coordinate',)
                                )
         self.plotdata.set_data('index',
                               self.chest.root.cell_description.readWhere(
-                                  'original_image == "%s"' % self.get_active_name(),
+                                  'filename == "%s"' % self.get_active_name(),
                                   field='y_coordinate',)  
                               )
         
@@ -213,6 +213,7 @@ class MappableImageController(BaseImageController):
         
 class CellController(BaseImageController):
     _can_characterize = t.Bool(False)
+    numpeaks = t.Int(0)
     
     def __init__(self, parent, treasure_chest=None, data_path='/cells', *args, **kw):
         super(CellController, self).__init__(parent, treasure_chest, data_path,
@@ -229,6 +230,27 @@ class CellController(BaseImageController):
     def _toggle_UI(self, enable):
         self._can_save = enable
         self._can_characterize = enable
+
+    @t.on_trait_change("selected_index")
+    def update_data_labels(self):
+        # labels is a dict consisting of data points as tuples
+        labels = {}
+        # this is the record in the cell_description table
+        cell_record = self.chest.root.cell_description.read(
+                            start=self.selected_index,
+                            stop=self.selected_index + 1)[0]
+        file_idx = cell_record['file_idx']
+        # this is the corresponding record in the cell_peaks table:
+        peak_record = self.chest.root.cell_peaks.readWhere(
+            'filename == "%s" and file_idx == %i'%(self.get_cell_parent(), file_idx)
+            )[0]        
+        for peak in range(self.numpeaks):
+            x = peak_record['x%i'%peak]
+            y = peak_record['y%i'%peak]
+            label = '%i' %peak
+            labels[label]=(x,y)
+        self.plot_labels(labels)
+        self.show_labels()
         
     def get_active_image(self):
         # Find this cell in the cell description table.  We use this to look
@@ -245,7 +267,7 @@ class CellController(BaseImageController):
 
         # return the cell data - the index is the index of this cell
         #    among only its indexed cells - not the universal index!
-        return self.nodes[selected_image][cell_record['idx'], :, :]
+        return self.nodes[selected_image][cell_record['file_idx'], :, :]
 
     def get_cell_parent(self):
         # Find this cell in the cell description table.  We use this to look
@@ -255,7 +277,7 @@ class CellController(BaseImageController):
                             start=self.selected_index,
                             stop=self.selected_index + 1)[0]
         # find the parent that this cell comes from
-        return cell_record['original_image']
+        return cell_record['filename']
         
     # TODO: is there any compelling reason that we need the whole stack at once?
     def get_cell_set(self):
@@ -303,14 +325,14 @@ class CellController(BaseImageController):
         #   the table columns.
         target_locations = pc.two_dim_findpeaks(self._get_average_image(),
                                                 subpixel=True)[:,:2]
-        numpeaks = target_locations.shape[0]
+        self.numpeaks = int(target_locations.shape[0])
         # generate a list of column names
         names = [('x%i, y%i, dx%i, dy%i, h%i, o%i, e%i' % ((x,)*7)).split(', ') 
-                 for x in xrange(numpeaks)]
+                 for x in xrange(self.numpeaks)]
         # flatten that from a list of lists to a simple list
         names = [item for sublist in names for item in sublist]
         # make tuples of each column name and 'f8' for the data type
-        dtypes = zip(names, ['f8', ] * numpeaks*7)
+        dtypes = zip(names, ['f8', ] * self.numpeaks*7)
         # prepend the index column
         dtypes = [('filename', '|S30'), ('file_idx', 'i4')] + dtypes
         desc = np.recarray((0,), dtype=dtypes)
@@ -336,9 +358,11 @@ class CellController(BaseImageController):
             # add the data to the table
             self.chest.root.cell_peaks.append(data)
         # add an attribute for the total number of peaks recorded
-        self.chest.root.cell_peaks.number_of_peaks = numpeaks
-        self.parent.image_controller._peak_ids = [str(idx) for idx in range(numpeaks)]
+        self.chest.root.cell_peaks.number_of_peaks = self.numpeaks
+        self.parent.image_controller._peak_ids = [str(idx) for idx in 
+                                                  range(self.numpeaks)]
         self.chest.root.cell_peaks.flush()
+        self.update_data_labels()
         self._toggle_UI(True)
 
     def get_peak_data(self, chars=[], indices=[]):
@@ -796,9 +820,9 @@ class CellCropController(BaseImageController):
             if data.shape[0] >0:
                 for i in xrange(peaks.shape[0]):
                     # store the peak in the table
-                    row['idx'] = i
+                    row['file_idx'] = i
                     row['input_data'] = self.data_path
-                    row['original_image'] = self.get_active_name()
+                    row['filename'] = self.get_active_name()
                     row['x_coordinate'] = peaks[i, 1]
                     row['y_coordinate'] = peaks[i, 0]
                     row.append()
