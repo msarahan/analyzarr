@@ -85,27 +85,17 @@ class ControllerBase(HasRenderer):
 class BaseImageController(ControllerBase):
     plot = t.Instance(BasePlotContainer)
     plotdata = t.Instance(ArrayPlotData)
-    _show_crop_ui = t.Bool(False)
-    _can_crop_cells = t.Bool(False)
-    _can_map_peaks = t.Bool(True)
-    _characteristics = t.List(["Height", "Orientation", "Eccentricity"])
-    _characteristic = t.Int(0)
-    _selected_peak = t.Int(0)
-    _peak_ids = t.List([])
-    _show_shift = t.Bool(False)
     
-
     def __init__(self, parent, treasure_chest=None, data_path='/rawdata', *args, **kw):
         super(BaseImageController, self).__init__(parent, treasure_chest, data_path,
                                               *args, **kw)
         self.plotdata = ArrayPlotData()
-        if self.numfiles > 0:        
+        if self.numfiles > 0:
             self.init_plot()
             print "initialized plot for data in %s" % data_path
             self._can_save = True
             self._can_crop_cells = True
             self._can_change_idx = True
-            self.parent.show_image_view=True
 
     def init_plot(self):
         self.plotdata.set_data('imagedata', self.get_active_image())
@@ -114,6 +104,56 @@ class BaseImageController(ControllerBase):
                                       self.numfiles) + self.get_active_name()
                 )
 
+    def data_updated(self):
+        # reinitialize data
+        self.__init__(parent = self.parent, treasure_chest=self.chest,
+                      data_path=self.data_path)
+
+    # this is a 2D image for plotting purposes
+    def get_active_image(self):
+        nodes = self.chest.listNodes('/rawdata')
+        return nodes[self.selected_index][:]
+
+    # this is a potentially 3D image stack for feeding into analyses
+    def get_active_image_set(self, names=None):
+        # TODO: this isn't rational for non-3D data yet.
+        if names is None:
+            # query the raw data table for filenames
+            nodes = self.chest.listNodes('/' + self.active_data_source)
+            data = nodes[0][:]
+            # collect all the cells
+            for node in nodes[1:]:
+                data = np.append(data, node[:], axis=0)
+        else:
+            # TODO: need to implement image selection
+            data = None
+        return data
+
+    def get_active_name(self):
+        return self.nodes[self.selected_index].name
+    
+    @t.on_trait_change("selected_index")
+    def update_image(self):
+        self.plotdata.set_data("imagedata", self.get_active_image())
+        self.set_plot_title("%s of %s: " % (self.selected_index + 1,
+                                          self.numfiles) + self.get_active_name())
+
+class MappableImageController(BaseImageController):
+    _show_crop_ui = t.Bool(False)
+    _can_crop_cells = t.Bool(False)
+    _can_map_peaks = t.Bool(True)
+    _characteristics = t.List(["Height", "Orientation", "Eccentricity"])
+    _characteristic = t.Int(0)
+    _selected_peak = t.Int(0)
+    _peak_ids = t.List([])
+    _show_shift = t.Bool(False)
+
+    def __init__(self, parent, treasure_chest=None, data_path='/rawdata', *args, **kw):
+        super(MappableImageController, self).__init__(parent, treasure_chest, data_path,
+                                              *args, **kw)
+        if self.numfiles > 0:    
+            self.parent.show_image_view=True
+    
     @t.on_trait_change('_peak_ids, selected_index')
     def update_peak_map_choices(self):
         # do we have any entries in the peak characteristic table for this image?
@@ -123,14 +163,9 @@ class BaseImageController(ControllerBase):
                'original_image == "%s"' % self.get_active_name)) > 0) \
            and \
                len(_peak_ids) > 0:
-            self._can_map_peaks=True
-
-    def data_updated(self):
-        # reinitialize data
-        self.__init__(parent = self.parent, treasure_chest=self.chest,
-                      data_path=self.data_path)
-
-    @t.on_trait_change('_characteristic, _selected_peak, _show_shift')
+            self._can_map_peaks=True    
+    
+    @t.on_trait_change('_characteristic, _selected_peak, _show_shift, selected_index')
     def plot_peak_map(self):
         self.plotdata.set_data('value',
                                self.chest.root.cell_description.readWhere(
@@ -174,36 +209,7 @@ class BaseImageController(ControllerBase):
         #   quiver plot.        
         if len(self.plot.overlays) < 3:
             self.plot = self.get_scatter_overlay_plot(self.plotdata, 
-                                                      title=self.get_active_name())
-
-    # this is a 2D image for plotting purposes
-    def get_active_image(self):
-        nodes = self.chest.listNodes('/rawdata')
-        return nodes[self.selected_index][:]
-
-    # this is a potentially 3D image stack for feeding into analyses
-    def get_active_image_set(self, names=None):
-        # TODO: this isn't rational for non-3D data yet.
-        if names is None:
-            # query the raw data table for filenames
-            nodes = self.chest.listNodes('/' + self.active_data_source)
-            data = nodes[0][:]
-            # collect all the cells
-            for node in nodes[1:]:
-                data = np.append(data, node[:], axis=0)
-        else:
-            # TODO: need to implement image selection
-            data = None
-        return data
-
-    def get_active_name(self):
-        return self.nodes[self.selected_index].name
-    
-    @t.on_trait_change("selected_index")
-    def update_image(self):
-        self.plotdata.set_data("imagedata", self.get_active_image())
-        self.set_plot_title("%s of %s: " % (self.selected_index + 1,
-                                          self.numfiles) + self.get_active_name())
+                                                      title=self.get_active_name())    
         
 class CellController(BaseImageController):
     _can_characterize = t.Bool(False)
@@ -583,7 +589,8 @@ class CellCropController(BaseImageController):
         self.plotdata.set_data('imagedata', self.get_active_image())
         self.plot = self.get_scatter_overlay_plot(array_plot_data=self.plotdata,
                 title="%s of %s: " % (self.selected_index + 1,
-                                      self.numfiles) + self.get_active_name()
+                                      self.numfiles) + self.get_active_name(),
+                add_tool=True,
                     )
         # pick an initial template with default parameters
         self.template_data = ArrayPlotData()
@@ -730,7 +737,8 @@ class CellCropController(BaseImageController):
         self.plotdata.set_data("color",self.peaks[self.get_active_name()][:,2])
         self.plot = self.get_scatter_overlay_plot(array_plot_data=self.plotdata,
                 title="%s of %s: " % (self.selected_index + 1,
-                                      self.numfiles) + self.get_active_name()
+                                      self.numfiles) + self.get_active_name(),
+                add_tool=True,
                     )
         scatter_renderer = self._scatter_plot.plots['scatter_plot'][0]
         scatter_renderer.color_data.metadata['selections']=self.thresh
@@ -816,7 +824,7 @@ class HighSeasAdventure(t.HasTraits):
     show_score_view = t.Bool(False)
     show_factor_view = t.Bool(False)
 
-    image_controller = t.Instance(BaseImageController)
+    image_controller = t.Instance(MappableImageController)
     cell_controller = t.Instance(CellController)
     crop_controller = t.Instance(CellCropController)
 
@@ -824,7 +832,7 @@ class HighSeasAdventure(t.HasTraits):
 
     def __init__(self, *args, **kw):
         super(HighSeasAdventure, self).__init__(*args, **kw)
-        self.image_controller = BaseImageController(parent=self)
+        self.image_controller = MappableImageController(parent=self)
         self.cell_controller = CellController(parent=self)
         self.crop_controller = CellCropController(parent=self)
         self.chest = None
@@ -841,7 +849,7 @@ class HighSeasAdventure(t.HasTraits):
         if self.chest is not None:
             self.chest.close()
         chest = file_import.open_treasure_chest(filename)
-        self.image_controller = BaseImageController(parent=self, 
+        self.image_controller = MappableImageController(parent=self, 
                                                     treasure_chest=chest)
         self.cell_controller = CellController(parent=self, 
                                               treasure_chest=chest)
@@ -851,7 +859,7 @@ class HighSeasAdventure(t.HasTraits):
 
     def import_files(self, file_list):
         chest = file_import.import_files(file_list)
-        self.image_controller = BaseImageController(parent=self, 
+        self.image_controller = MappableImageController(parent=self, 
                                                     treasure_chest=chest)
         self.cell_controller = CellController(parent=self,
                                               treasure_chest=chest)
