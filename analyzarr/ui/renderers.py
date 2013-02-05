@@ -7,10 +7,12 @@ from chaco.tools.api import PanTool, ZoomTool, RangeSelection, \
 from chaco.api import Plot, ArrayPlotData, jet, gray, \
      ColorBar, ColormappedSelectionOverlay, LinearMapper, \
      HPlotContainer, OverlayPlotContainer, BasePlotContainer, \
-     DataLabel
+     DataLabel, ScatterInspectorOverlay
 from chaco.tools.cursor_tool import CursorTool, BaseCursorTool
 
 from chaco.data_range_1d import DataRange1D
+
+from custom_tools import PeakSelectionTool
 
 import numpy as np
 
@@ -41,14 +43,14 @@ def _render_image(array_plot_data, title=None):
     plot.overlays.append(zoom)
     return plot
 
-def _create_colorbar(colormap, add_tool=False):
+def _create_colorbar(colormap, tool=None):
     colorbar = ColorBar(index_mapper=LinearMapper(range=colormap.range),
                             color_mapper=colormap,
                             orientation='v',
                             resizable='v',
                             width=30,
                             padding=20)
-    if add_tool:
+    if tool=='colorbar':
         colorbar.tools.append(RangeSelection(component=colorbar))
         colorbar.overlays.append(RangeSelectionOverlay(component=colorbar,
                                                    border_color="white",
@@ -58,7 +60,7 @@ def _create_colorbar(colormap, add_tool=False):
 
 def _render_scatter_overlay(base_plot, array_plot_data,
                             marker="circle", fill_alpha=0.5,
-                            marker_size=6, add_tool=False):
+                            marker_size=6, tool=None):
     if 'index' not in array_plot_data.arrays:
         return base_plot, None
     
@@ -87,12 +89,11 @@ def _render_scatter_overlay(base_plot, array_plot_data,
                       marker_size = marker_size,
                       )
         scatter_renderer = scatter_plot.plots['scatter_plot'][0]
-        colorbar = _create_colorbar(scatter_plot.color_mapper, 
-                                    add_tool=add_tool)
+        colorbar = _create_colorbar(scatter_plot.color_mapper, tool=tool)
         colorbar.plot = scatter_renderer
         colorbar.padding_top = scatter_renderer.padding_top
         colorbar.padding_bottom = scatter_renderer.padding_bottom
-        if add_tool:
+        if tool=='colorbar':
             # this part is for making the colormapped points fade when they
             #  are not selected by the threshold.
             # The renderer is the actual class that does the rendering - 
@@ -104,7 +105,15 @@ def _render_scatter_overlay(base_plot, array_plot_data,
             selection = ColormappedSelectionOverlay(scatter_renderer, 
                                                     fade_alpha=0.35, 
                                                     selection_type="range")
-            scatter_renderer.overlays.append(selection)        
+            scatter_renderer.overlays.append(selection)
+    if tool=='inspector':
+        # Attach the inspector and its overlay
+        scatter_renderer = scatter_plot.plots['scatter_plot'][0]
+        scatter_plot.tools.append(PeakSelectionTool(scatter_renderer))
+        selection = ColormappedSelectionOverlay(scatter_renderer, 
+                                                fade_alpha=0.35, 
+                                                selection_type="mask")
+        scatter_plot.overlays.append(selection)
     scatter_plot.x_grid.visible = False
     scatter_plot.y_grid.visible = False
     scatter_plot.range2d = base_plot.range2d
@@ -182,11 +191,19 @@ class HasRenderer(HasTraits):
         return image_container
 
     # TODO - add optional appearance tweaks
-    def get_scatter_overlay_plot(self, array_plot_data, title='', add_tool=False):
+    def get_scatter_overlay_plot(self, array_plot_data, title='', 
+                                 tool=None):
+        """
+        tool can be either:
+        'colorbar' - the range selection colobar (for thresholding cells)
+        or
+        'inspector' - the peak-picking tool that uses clicks to select cells
+            from the parent image
+        """
         image_plot = _render_image(array_plot_data, title)
         scatter_plot, colorbar = _render_scatter_overlay(image_plot, 
-                                                         array_plot_data,
-                                                         add_tool=add_tool)
+                                    array_plot_data,
+                                    tool=tool,)
         image_container = OverlayPlotContainer(image_plot, scatter_plot)
         if colorbar is not None:
             image_container = HPlotContainer(image_container, colorbar)
@@ -196,8 +213,11 @@ class HasRenderer(HasTraits):
                 scatter_renderer.color_data.metadata_changed={
                     'selections':self.thresh}
             self._colorbar = colorbar
-            if add_tool:
+            if tool == 'colorbar':
                 self._colorbar_selection = colorbar.tools[0]
+        if tool == 'inspector':
+            scatter_renderer = scatter_plot.plots['scatter_plot'][0]
+            
         self._base_plot = image_plot
         self._scatter_plot = scatter_plot
         self.image_container = image_container
