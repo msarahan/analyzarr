@@ -908,15 +908,3 @@ class HighSeasAdventure(t.HasTraits):
     def new_project(self):
         #new_file =
         self.image_controller = ImageController()
-
-if __name__ == '__main__':
-    import enaml
-    from enaml.stdlib.sessions import simple_session
-    from enaml.qt.qt_application import QtApplication
-    with enaml.imports():
-        from main_view import Main
-    qtapp = QtApplication([])
-    session = simple_session('bonerfart', 'The main UI window', Main)
-    qtapp.add_factories([session])
-    qtapp.start_session('bonerfart')
-    qtapp.start()
