@@ -211,14 +211,16 @@ class MappableImageController(BaseImageController):
                                self.chest.root.cell_peaks.readWhere(
                                    'filename == "%s"' % self.get_active_name(),
                                    field=column,
-                               )
+                               ),
+                               
                                )
         # look up how many layers the existing plot has.  If it's less than
         #   3, then we need to recreate the plot as a more complicated scatter
         #   quiver plot.        
         if len(self.plot.overlays) < 3:
             self.plot = self.get_scatter_overlay_plot(self.plotdata, 
-                                                      title=self.get_active_name())    
+                                                      title=self.get_active_name(),
+                                                      tool='inspector')
         
 class CellController(BaseImageController):
     _can_characterize = t.Bool(False)
@@ -623,7 +625,7 @@ class CellCropController(BaseImageController):
         self.plot = self.get_scatter_overlay_plot(array_plot_data=self.plotdata,
                 title="%s of %s: " % (self.selected_index + 1,
                                       self.numfiles) + self.get_active_name(),
-                add_tool=True,
+                tool='colorbar',
                     )
         # pick an initial template with default parameters
         self.template_data = ArrayPlotData()
@@ -771,7 +773,7 @@ class CellCropController(BaseImageController):
         self.plot = self.get_scatter_overlay_plot(array_plot_data=self.plotdata,
                 title="%s of %s: " % (self.selected_index + 1,
                                       self.numfiles) + self.get_active_name(),
-                add_tool=True,
+                tool='colorbar',
                     )
         scatter_renderer = self._scatter_plot.plots['scatter_plot'][0]
         scatter_renderer.color_data.metadata['selections']=self.thresh
