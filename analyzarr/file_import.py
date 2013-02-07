@@ -17,7 +17,7 @@ dm_extensions = ['.dm3',]
 # Sorry.
 
 def new_treasure_chest(filename):
-    h5file = get_image_h5file(output_filename)
+    h5file = get_image_h5file(filename)
     return h5file
 
 def open_treasure_chest(filename):
@@ -77,7 +77,7 @@ def import_tiff(h5file, flist):
     data_record = h5file.root.image_description.row
     # any kind of jpg, png can be lumped together
     for f in flist:
-        filename = os.path.split(f)[1])[0]
+        filename = os.path.splitext(os.path.split(f)[1])[0]
         if len(h5file.root.image_description.getWhereList('filename=="%s"'%filename)) == 0:
             # get data as numpy array
             d = imread(f)

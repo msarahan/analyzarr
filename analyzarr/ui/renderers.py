@@ -7,12 +7,12 @@ from chaco.tools.api import PanTool, ZoomTool, RangeSelection, \
 from chaco.api import Plot, ArrayPlotData, jet, gray, \
      ColorBar, ColormappedSelectionOverlay, LinearMapper, \
      HPlotContainer, OverlayPlotContainer, BasePlotContainer, \
-     DataLabel, ScatterInspectorOverlay
+     DataLabel, ScatterInspectorOverlay, PlotGraphicsContext
 from chaco.tools.cursor_tool import CursorTool, BaseCursorTool
 
 from chaco.data_range_1d import DataRange1D
 
-from custom_tools import PeakSelectionTool
+#from custom_tools import PeakSelectionTool
 
 import numpy as np
 
@@ -109,7 +109,7 @@ def _render_scatter_overlay(base_plot, array_plot_data,
     if tool=='inspector':
         # Attach the inspector and its overlay
         scatter_renderer = scatter_plot.plots['scatter_plot'][0]
-        scatter_plot.tools.append(PeakSelectionTool(scatter_renderer))
+        #scatter_plot.tools.append(PeakSelectionTool(scatter_renderer))
         selection = ColormappedSelectionOverlay(scatter_renderer, 
                                                 fade_alpha=0.35, 
                                                 selection_type="mask")
@@ -265,3 +265,12 @@ class HasRenderer(HasTraits):
                 self._base_plot.overlays.append(self._labels[label])
             else:
                 pass
+            
+    def _save_plot(self, plot, filename, width=800, height=600, dpi=72):
+        original_outer_bounds = plot.outer_bounds
+        plot.outer_bounds = [width, height]
+        plot.do_layout(force=True)
+        gc = PlotGraphicsContext((width, height), dpi=dpi)
+        gc.render_component(plot)
+        gc.save(filename)
+        plot.outer_bounds = original_outer_bounds    

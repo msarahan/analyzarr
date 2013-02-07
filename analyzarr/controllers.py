@@ -103,6 +103,9 @@ class BaseImageController(ControllerBase):
                 title="%s of %s: " % (self.selected_index + 1,
                                       self.numfiles) + self.get_active_name()
                 )
+        
+    def save_plot(self, filename):
+        self._save_plot(self.plot, filename)
 
     def data_updated(self):
         # reinitialize data
@@ -142,6 +145,7 @@ class MappableImageController(BaseImageController):
     _show_crop_ui = t.Bool(False)
     _can_crop_cells = t.Bool(False)
     _can_map_peaks = t.Bool(True)
+    _is_mapping_peaks = t.Bool(False)
     _characteristics = t.List(["Height", "Orientation", "Eccentricity"])
     _characteristic = t.Int(0)
     _selected_peak = t.Int(0)
@@ -154,6 +158,9 @@ class MappableImageController(BaseImageController):
         if self.numfiles > 0:    
             self.parent.show_image_view=True
     
+    def get_characteristic_name(self):
+        return self._characteristics[self._characteristic]
+    
     @t.on_trait_change('_peak_ids, selected_index')
     def update_peak_map_choices(self):
         # do we have any entries in the peak characteristic table for this image?
@@ -163,64 +170,73 @@ class MappableImageController(BaseImageController):
                'filename == "%s"' % self.get_active_name)) > 0) \
            and \
                len(_peak_ids) > 0:
-            self._can_map_peaks=True    
+            self._can_map_peaks=True
+            self.plot_peak_map()
     
-    @t.on_trait_change('_characteristic, _selected_peak, _show_shift, selected_index')
-    def plot_peak_map(self):
-        values = \
-            self.chest.root.cell_description.readWhere(
-                'filename == "%s"' % self.get_active_name(),
-                field='x_coordinate',) \
-            + \
-            self.chest.root.cell_peaks.readWhere(
-                'filename == "%s"' % self.get_active_name(),
-                field='y%i'%self._selected_peak,)
+    def get_active_name(self):
+        name = super(MappableImageController, self).get_active_name()
+        #if self._is_mapping_peaks:
+        #    name += ', %s from peak %i' % (self.get_characteristic_name(), self._selected_peak)
+        return name
+    
+    @t.on_trait_change('_peak_ids, _characteristic, _selected_peak, _show_shift, selected_index')
+    def update_image(self):
+        super(MappableImageController, self).update_image()
+        try:
+            self.chest.getNode('/','cell_peaks')    
+            values = \
+                self.chest.root.cell_description.readWhere(
+                    'filename == "%s"' % self.get_active_name(),
+                    field='x_coordinate',) \
+                + \
+                self.chest.root.cell_peaks.readWhere(
+                    'filename == "%s"' % self.get_active_name(),
+                    field='y%i'%self._selected_peak,)
         
-        indices = \
-            self.chest.root.cell_description.readWhere(
-                'filename == "%s"' % self.get_active_name(),
-                field='y_coordinate',) \
-            + \
-            self.chest.root.cell_peaks.readWhere(
-                'filename == "%s"' % self.get_active_name(),
-                field='x%i'%self._selected_peak,)
-        self.plotdata.set_data('value', values)
-        self.plotdata.set_data('index', indices)
+            indices = \
+                self.chest.root.cell_description.readWhere(
+                    'filename == "%s"' % self.get_active_name(),
+                    field='y_coordinate',) \
+                + \
+                self.chest.root.cell_peaks.readWhere(
+                    'filename == "%s"' % self.get_active_name(),
+                    field='x%i'%self._selected_peak,)
+            self.plotdata.set_data('value', values)
+            self.plotdata.set_data('index', indices)
         
-        if self._show_shift:
-            vectors = np.hstack((self.chest.root.cell_peaks.readWhere(
-                                   'filename == "%s"' % self.get_active_name(),
-                                   field='dx%i'%_selected_peak,
-                                   ),
-                                self.chest.root.cell_peaks.readWhere(
+            if self._show_shift:
+                vectors = np.hstack((self.chest.root.cell_peaks.readWhere(
                                     'filename == "%s"' % self.get_active_name(),
-                                    field='dy%i'%_selected_peak,
-                                   ),)
+                                    field='dx%i'%_selected_peak,
+                                    ),
+                                 self.chest.root.cell_peaks.readWhere(
+                                     'filename == "%s"' % self.get_active_name(),
+                                     field='dy%i'%_selected_peak,
+                                     ),)
                                 )
-            self.plotdata.set_data('vectors',vectors)
-        else:
-            #TODO: replace this with a proper check of whether it exists
-            try:
-                self.plotdata.del_data('vectors')
-            except:
-                pass
-        # clear vector data
-        prefix = self._characteristics[self._characteristic][0].lower()
-        column = prefix + str(self._selected_peak)
-        self.plotdata.set_data('color', 
-                               self.chest.root.cell_peaks.readWhere(
-                                   'filename == "%s"' % self.get_active_name(),
-                                   field=column,
-                               ),
-                               
-                               )
-        # look up how many layers the existing plot has.  If it's less than
-        #   3, then we need to recreate the plot as a more complicated scatter
-        #   quiver plot.        
-        if len(self.plot.overlays) < 3:
-            self.plot = self.get_scatter_overlay_plot(self.plotdata, 
-                                                      title=self.get_active_name(),
-                                                      tool='inspector')
+                self.plotdata.set_data('vectors',vectors)
+            else:
+                #TODO: replace this with a proper check of whether it exists
+                try:
+                    self.plotdata.del_data('vectors')
+                except:
+                    pass
+                # clear vector data
+                prefix = self._characteristics[self._characteristic][0].lower()
+                column = prefix + str(self._selected_peak)
+                self.plotdata.set_data('color', 
+                                   self.chest.root.cell_peaks.readWhere(
+                                       'filename == "%s"' % self.get_active_name(),
+                                       field=column,
+                                       ),
+                                   )
+                if not self._is_mapping_peaks:
+                    self.plot = self.get_scatter_overlay_plot(self.plotdata,
+                                                                      tool='inspector')                
+                self.set_plot_title(self.get_active_name())
+                self._is_mapping_peaks=True
+        except:
+            pass
         
 class CellController(BaseImageController):
     _can_characterize = t.Bool(False)
@@ -244,6 +260,10 @@ class CellController(BaseImageController):
 
     @t.on_trait_change("selected_index")
     def update_data_labels(self):
+        try:
+            self.chest.getNode('/','cell_peaks')
+        except:
+            return
         # labels is a dict consisting of data points as tuples
         labels = {}
         # this is the record in the cell_description table
@@ -880,6 +900,16 @@ class HighSeasAdventure(t.HasTraits):
         self.image_controller.data_updated()
         self.crop_controller.data_updated()
 
+    def new_treasure_chest(self, filename):
+        chest = file_import.new_treasure_chest(filename)
+        self.image_controller = MappableImageController(parent=self, 
+                                                    treasure_chest=chest)
+        self.cell_controller = CellController(parent=self, 
+                                              treasure_chest=chest)
+        self.crop_controller = CellCropController(parent=self, 
+                                                  treasure_chest=chest)
+        self.chest = chest        
+
     def open_treasure_chest(self, filename):
         if self.chest is not None:
             self.chest.close()
@@ -893,18 +923,11 @@ class HighSeasAdventure(t.HasTraits):
         self.chest = chest
 
     def import_files(self, file_list):
-        chest = file_import.import_files(file_list)
+        file_import.import_files(self.chest, file_list)
         self.image_controller = MappableImageController(parent=self, 
-                                                    treasure_chest=chest)
+                                                    treasure_chest=self.chest)
         self.cell_controller = CellController(parent=self,
-                                              treasure_chest=chest)
+                                              treasure_chest=self.chest)
         self.crop_controller = CellCropController(parent=self,
-                                                  treasure_chest=chest)
-        self.chest = chest
+                                                  treasure_chest=self.chest)
 
-    def import_image(self):
-        pass
-
-    def new_project(self):
-        #new_file =
-        self.image_controller = ImageController()
