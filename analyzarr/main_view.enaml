@@ -64,7 +64,7 @@ enamldef MyMenuBar(MenuBar): menu:
     Menu:
         title = '&File'
         Action:
-            text = 'New File\tCtrl+N'
+            text = 'New Chest\tCtrl+N'
             triggered :: print 'New File triggered'
         Action:
             text = 'Open Chest\tCtrl+O'
@@ -72,6 +72,7 @@ enamldef MyMenuBar(MenuBar): menu:
         Action:
             text = 'Import Files'
             triggered :: import_dialog.open()
+"""            
     Menu:
         title = '&Edit'
         Action:
@@ -119,6 +120,7 @@ enamldef MyMenuBar(MenuBar): menu:
                 checkable = True
                 text = 'Justify'
                 toggled :: print '%s toggled %s' % (text, 'on' if checked else 'off')
+"""
 
 enamldef ImagePlotButtons(Container):
     attr controller
@@ -126,20 +128,6 @@ enamldef ImagePlotButtons(Container):
     constraints = [
         hbox(save, prev_image, next_image, crop, characteristic_box)
     ]
-    PushButton: save:
-        text = "Save"
-        tool_tip = "Save current plot"
-        enabled << controller._can_save
-    PushButton: prev_image:
-        text = "<"
-        tool_tip = "View previous image in stack"
-        clicked :: controller.decrease_selected_index()
-        enabled << controller._can_change_idx
-    PushButton: next_image:
-        text = ">"
-        tool_tip = "View next image in stack"
-        clicked :: controller.increase_selected_index()
-        enabled << controller._can_change_idx
     PushButton: save:
         text = "Save"
         tool_tip = "Save current plot"
