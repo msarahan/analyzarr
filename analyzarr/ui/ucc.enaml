@@ -8,9 +8,9 @@ from enaml.stdlib.fields import FloatField
 
 # TODO: need to import controller
 
-enamldef CellCropperInterface(DockPane):
+enamldef CellCropperInterface(Window):
     attr controller
-    floating=True
+    #:floating=True
     title = "Cell Cropper"
     Container:
         constraints = [hbox(image_container, template_container)]
@@ -19,18 +19,18 @@ enamldef CellCropperInterface(DockPane):
             constraints = [ vbox(imageCanvas, hbox(prev_img, next_img, showCC))]
             #: the image (Chaco/Enable canvas)
             EnableCanvas: imageCanvas:
-                component << controller.plot
+                component << controller.crop_controller.plot
             #: the checkbox to show cross correlation view
             CheckBox: showCC:
                 text = "Show cross-correlation"
-                checked := controller.ShowCC
+                checked := controller.crop_controller.ShowCC
             #: the buttons to go between images
             PushButton: prev_img:
                 text = '<'
-                clicked :: controller.decrease_selected_index()
+                clicked :: controller.crop_controller.decrease_selected_index()
             PushButton: next_img:
                 text = '>'
-                clicked :: controller.increase_selected_index()
+                clicked :: controller.crop_controller.increase_selected_index()
                 
         #: now the right view the template, controls, and info
         Container: template_container:
@@ -44,42 +44,54 @@ enamldef CellCropperInterface(DockPane):
                     hbox(l_thresh_lower, thresh_lower, 
                         l_thresh_upper, thresh_upper
                         ),
+                    hbox(image_numpeaks_label, image_numpeaks,
+                        total_numpeaks_label, total_numpeaks),
                     hbox(find_peaks, crop),
                     ),
                     ]
                                 
             EnableCanvas: templateCanvas:
-                component << controller.template_plot
+                component << controller.crop_controller.template_plot
             Label: l_left_coord:
                 text = "Left coordinate"
             SpinBox: left_coord:
-                value := controller.template_left
-                maximum << controller.max_pos_x
+                value := controller.crop_controller.template_left
+                maximum << controller.crop_controller.max_pos_x
             Label: l_top_coord:
                 text = "Top coordinate"
             SpinBox: top_coord:
-                value := controller.template_top
-                maximum << controller.max_pos_y
+                value := controller.crop_controller.template_top
+                maximum << controller.crop_controller.max_pos_y
             Label: l_size:
                 text = "Size"
             SpinBox: size:
-                value := controller.template_size
+                value := controller.crop_controller.template_size
                 maximum = 1024
             Label: l_peak_width:
                 text = 'Peak Width'
             SpinBox: peak_width:
-                value := controller.peak_width
+                value := controller.crop_controller.peak_width
             Label: l_thresh_upper:
                 text = 'Upper Threshold'
             FloatField: thresh_upper:
-                value := controller.thresh_upper
+                value := controller.crop_controller.thresh_upper
             Label: l_thresh_lower:
                 text = 'Lower Threshold'
             FloatField: thresh_lower:
-                value := controller.thresh_lower
+                value := controller.crop_controller.thresh_lower
             PushButton: find_peaks:
                 text = 'Find peaks!'
-                clicked :: controller.locate_peaks()
+                clicked :: controller.crop_controller.locate_peaks()
             PushButton: crop:
                 text = 'Crop!'
-                clicked :: controller.crop_cells()
+                clicked :: controller.crop_controller.crop_cells()
+            Label: image_numpeaks_label:
+                text = "# peaks (this image):"
+            Label: image_numpeaks:
+                #text << controller.crop_controller._numpeaks_image
+                pass
+            Label: total_numpeaks_label:
+                text = "# peaks (total):"
+            Label: total_numpeaks:
+                #text << controller.crop_controller._numpeaks_total
+                pass
