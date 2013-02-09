@@ -28,6 +28,8 @@ from ui.renderers import HasRenderer
 import file_import
 import data_structure
 
+from enaml.application import Application
+
 class ControllerBase(HasRenderer):
     # current image index
     selected_index = t.Int(0)
@@ -144,7 +146,7 @@ class BaseImageController(ControllerBase):
 class MappableImageController(BaseImageController):
     _show_crop_ui = t.Bool(False)
     _can_crop_cells = t.Bool(False)
-    _can_map_peaks = t.Bool(True)
+    _can_map_peaks = t.Bool(False)
     _is_mapping_peaks = t.Bool(False)
     _characteristics = t.List(["Height", "Orientation", "Eccentricity"])
     _characteristic = t.Int(0)
@@ -157,33 +159,44 @@ class MappableImageController(BaseImageController):
                                               *args, **kw)
         if self.numfiles > 0:    
             self.parent.show_image_view=True
+            self.update_peak_map_choices()
     
     def get_characteristic_name(self):
         return self._characteristics[self._characteristic]
     
-    @t.on_trait_change('_peak_ids, selected_index')
+    @t.on_trait_change('selected_index')
     def update_peak_map_choices(self):
         # do we have any entries in the peak characteristic table for this image?
         # knowing about the arrays in the cell data group is enough - if
         #  there aren't any cells from an image, there won't be any entries.
         if (len(self.chest.root.cell_description.getWhereList(
-               'filename == "%s"' % self.get_active_name)) > 0) \
-           and \
-               len(_peak_ids) > 0:
+               'filename == "%s"' % self.get_active_name())) > 0):
+            try:
+                # if this table doesn't exist, we raise an exception
+                peak_table = self.chest.root.cell_peaks
+            except:
+                return
+            try:
+                #TODO: need to figure out pytables attributes
+                self._peak_ids = [str(idx) for idx in 
+                              range(peak_table.getAttr('number_of_peaks'))]
+            except:
+                return
             self._can_map_peaks=True
-            self.plot_peak_map()
+            self.update_image()
+        else:
+            # clear the image and disable the comboboxes
+            pass
     
-    def get_active_name(self):
-        name = super(MappableImageController, self).get_active_name()
-        #if self._is_mapping_peaks:
-        #    name += ', %s from peak %i' % (self.get_characteristic_name(), self._selected_peak)
-        return name
+    def get_characteristic_plot_title(self):
+        return self.get_active_name() + ', %s from peak %i' % (
+            self.get_characteristic_name(), self._selected_peak)
     
     @t.on_trait_change('_peak_ids, _characteristic, _selected_peak, _show_shift, selected_index')
     def update_image(self):
         super(MappableImageController, self).update_image()
         try:
-            self.chest.getNode('/','cell_peaks')    
+            self.chest.getNode('/','cell_peaks')
             values = \
                 self.chest.root.cell_description.readWhere(
                     'filename == "%s"' % self.get_active_name(),
@@ -233,7 +246,7 @@ class MappableImageController(BaseImageController):
                 if not self._is_mapping_peaks:
                     self.plot = self.get_scatter_overlay_plot(self.plotdata,
                                                                       tool='inspector')                
-                self.set_plot_title(self.get_active_name())
+                self.set_plot_title(self.get_characteristic_plot_title())
                 self._is_mapping_peaks=True
         except:
             pass
@@ -389,11 +402,13 @@ class CellController(BaseImageController):
             # add the data to the table
             self.chest.root.cell_peaks.append(data)
         # add an attribute for the total number of peaks recorded
-        self.chest.root.cell_peaks.number_of_peaks = self.numpeaks
-        self.parent.image_controller._peak_ids = [str(idx) for idx in 
-                                                  range(self.numpeaks)]
+        self.chest.root.cell_peaks.setAttr('number_of_peaks', self.numpeaks)
+        
         self.chest.root.cell_peaks.flush()
         self.update_data_labels()
+        
+        self.parent.image_controller.update_peak_map_choices()
+        
         self._toggle_UI(True)
 
     def get_peak_data(self, chars=[], indices=[]):
