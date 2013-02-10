@@ -274,6 +274,7 @@ enamldef Main(MainWindow): main:
     #:attr controller = HighSeasAdventure()
     attr controller
     initial_size = (500, 500)
+    title = "Analyzarr"
     MyMenuBar:
         controller << main.controller
     ViewToolBar: view_buttons:

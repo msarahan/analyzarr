@@ -31,7 +31,7 @@ def _render_plot(self, array_plot_data):
     return plot
 
 def _render_image(array_plot_data, title=None):
-    plot = Plot(array_plot_data,default_origin="top left")        
+    plot = Plot(array_plot_data, default_origin="top left")        
     plot.img_plot("imagedata", colormap=gray, name="base_plot")
     # todo: generalize title and aspect ratio
     plot.title = title
