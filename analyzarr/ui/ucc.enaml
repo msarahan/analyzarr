@@ -4,7 +4,7 @@ from enaml.widgets.api import (
     Container, Html, PushButton, EnableCanvas, CheckBox, FileDialog,
     SpinBox, Label
 )
-from enaml.stdlib.fields import FloatField
+from enaml.stdlib.fields import FloatField, IntField
 
 # TODO: need to import controller
 
@@ -12,6 +12,7 @@ enamldef CellCropperInterface(Window):
     attr controller
     #:floating=True
     title = "Cell Cropper"
+    initial_size = (1024, 700)
     Container:
         constraints = [hbox(image_container, template_container)]
         #: First, the left view with the parent image
@@ -87,11 +88,11 @@ enamldef CellCropperInterface(Window):
                 clicked :: controller.crop_controller.crop_cells()
             Label: image_numpeaks_label:
                 text = "# peaks (this image):"
-            Label: image_numpeaks:
-                #text << controller.crop_controller._numpeaks_image
-                pass
+            IntField: image_numpeaks:
+                value << controller.crop_controller.numpeaks_img
+                read_only=True
             Label: total_numpeaks_label:
                 text = "# peaks (total):"
-            Label: total_numpeaks:
-                #text << controller.crop_controller._numpeaks_total
-                pass
+            IntField: total_numpeaks:
+                value << controller.crop_controller.numpeaks_total
+                read_only=True
