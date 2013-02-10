@@ -664,7 +664,7 @@ class CellCropController(BaseImageController):
                     )
         # pick an initial template with default parameters
         self.template_data = ArrayPlotData()
-        self.template_plot = Plot(self.template_data)        
+        self.template_plot = Plot(self.template_data, default_origin="top left")
         self.template_data.set_data('imagedata',
                     self.get_active_image()[
                         self.template_top:self.template_top + self.template_size,
@@ -691,7 +691,7 @@ class CellCropController(BaseImageController):
             grid_data_source = self._base_plot.range2d.sources[0]
             grid_data_source.set_data(np.arange(self.get_active_image().shape[1]), 
                                       np.arange(self.get_active_image().shape[0]))
-        if self.peaks.has_key(self.get_active_name()):
+        if self.get_active_name() in self.peaks:
             self.plotdata.set_data("index",self.peaks[self.get_active_name()][:,0])
             self.plotdata.set_data("value",self.peaks[self.get_active_name()][:,1])
             self.plotdata.set_data("color",self.peaks[self.get_active_name()][:,2])
@@ -702,6 +702,8 @@ class CellCropController(BaseImageController):
                 self.plotdata.del_data('value')
             if 'color' in self.plotdata.arrays:
                 self.plotdata.del_data('color')
+            self.init_plot()
+        
 
     @on_trait_change('template_left, template_top, template_size')
     def update_template_data(self):
@@ -713,8 +715,7 @@ class CellCropController(BaseImageController):
                     )
         if self.numpeaks_total>0:
             print "clearing peaks"
-            self.peaks=[np.array([[0,0,-1]])]
-        self.update_CC()        
+            self.peaks={}
 
     def add_cursor_tool(self):    
         self._csr = CursorTool(self._base_plot, drag_button='left', color='white',
@@ -781,7 +782,7 @@ class CellCropController(BaseImageController):
     @on_trait_change('peaks, _colorbar_selection:selection, selected_index')
     def calc_numpeaks(self):
         try:
-            thresh=self.cbar_selection.selection
+            thresh=self._colorbar_selection.selection
             self.thresh=thresh
         except:
             thresh=[]
@@ -802,20 +803,27 @@ class CellCropController(BaseImageController):
 
     @on_trait_change('peaks')
     def update_scatter_plot(self):
-        self.plotdata.set_data("index",self.peaks[self.get_active_name()][:,0])
-        self.plotdata.set_data("value",self.peaks[self.get_active_name()][:,1])
-        self.plotdata.set_data("color",self.peaks[self.get_active_name()][:,2])
-        self.plot = self.get_scatter_overlay_plot(array_plot_data=self.plotdata,
-                title="%s of %s: " % (self.selected_index + 1,
-                                      self.numfiles) + self.get_active_name(),
-                tool='colorbar',
-                    )
-        scatter_renderer = self._scatter_plot.plots['scatter_plot'][0]
-        scatter_renderer.color_data.metadata['selections']=self.thresh
-        scatter_renderer.color_data.metadata_changed={'selections':self.thresh}
+        if self.get_active_name() in self.peaks:
+            self.plotdata.set_data("index",self.peaks[self.get_active_name()][:,0])
+            self.plotdata.set_data("value",self.peaks[self.get_active_name()][:,1])
+            self.plotdata.set_data("color",self.peaks[self.get_active_name()][:,2])
+            self.plot = self.get_scatter_overlay_plot(array_plot_data=self.plotdata,
+                                                      title="%s of %s: " % (self.selected_index + 1,
+                                                                            self.numfiles) + self.get_active_name(),
+                                                      tool='colorbar',
+                                                      )
+            scatter_renderer = self._scatter_plot.plots['scatter_plot'][0]
+            scatter_renderer.color_data.metadata['selections']=self.thresh
+            scatter_renderer.color_data.metadata_changed={'selections':self.thresh}
+        else:
+            if 'index' in self.plotdata.arrays:
+                self.plotdata.del_data('index')
+                # value will implicitly exist if value exists.
+                self.plotdata.del_data('value')
+            if 'color' in self.plotdata.arrays:
+                self.plotdata.del_data('color')
         self.update_image()
-    
-
+            
     def locate_peaks(self):
         peaks={}
         for idx in xrange(self.numfiles):
