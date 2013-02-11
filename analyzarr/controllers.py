@@ -197,7 +197,10 @@ class MappableImageController(BaseImageController):
                         selected_index, shift_scale')
     def update_image(self):
         super(MappableImageController, self).update_image()
-        self.chest.getNode('/','cell_peaks')
+        try:
+            self.chest.getNode('/','cell_peaks')
+        except:
+            return
         values = \
                 self.chest.root.cell_description.readWhere(
                     'filename == "%s"' % self.get_active_name(),
@@ -686,19 +689,6 @@ class CellCropController(BaseImageController):
             grid_data_source = self._base_plot.range2d.sources[0]
             grid_data_source.set_data(np.arange(self.get_active_image().shape[1]), 
                                       np.arange(self.get_active_image().shape[0]))
-        if self.get_active_name() in self.peaks:
-            self.plotdata.set_data("index",self.peaks[self.get_active_name()][:,0])
-            self.plotdata.set_data("value",self.peaks[self.get_active_name()][:,1])
-            self.plotdata.set_data("color",self.peaks[self.get_active_name()][:,2])
-        else:
-            if 'index' in self.plotdata.arrays:
-                self.plotdata.del_data('index')
-                # value will implicitly exist if value exists.
-                self.plotdata.del_data('value')
-            if 'color' in self.plotdata.arrays:
-                self.plotdata.del_data('color')
-            self.init_plot()
-        
 
     @on_trait_change('template_left, template_top, template_size')
     def update_template_data(self):
@@ -796,15 +786,13 @@ class CellCropController(BaseImageController):
         except:
             self.numpeaks_img=0
 
-    @on_trait_change('peaks')
+    @on_trait_change('peaks, selected_index')
     def update_scatter_plot(self):
         if self.get_active_name() in self.peaks:
             self.plotdata.set_data("index",self.peaks[self.get_active_name()][:,0])
             self.plotdata.set_data("value",self.peaks[self.get_active_name()][:,1])
             self.plotdata.set_data("color",self.peaks[self.get_active_name()][:,2])
             self.plot = self.get_scatter_overlay_plot(array_plot_data=self.plotdata,
-                                                      title="%s of %s: " % (self.selected_index + 1,
-                                                                            self.numfiles) + self.get_active_name(),
                                                       tool='colorbar',
                                                       )
             scatter_renderer = self._scatter_plot.plots['scatter_plot'][0]
@@ -817,7 +805,9 @@ class CellCropController(BaseImageController):
                 self.plotdata.del_data('value')
             if 'color' in self.plotdata.arrays:
                 self.plotdata.del_data('color')
-        self.update_image()
+            self.plot = self.get_scatter_overlay_plot(array_plot_data=self.plotdata,
+                                                      tool=None,
+                                                      )
             
     def locate_peaks(self):
         peaks={}
@@ -841,6 +831,11 @@ class CellCropController(BaseImageController):
         if rows > 0:
             # remove the table
             self.chest.removeNode('/cell_description')
+            try:
+                # remove the table of peak characteristics - they are not valid.
+                self.chest.removeNode('/cell_peaks')
+            except:
+                pass
             # recreate it
             self.chest.createTable('/', 'cell_description', 
                                    data_structure.CellsTable)
@@ -889,6 +884,7 @@ class CellCropController(BaseImageController):
                 self.chest.root.cell_description.flush()
                 self.chest.flush()
         self.parent.update_cell_data()
+        #Application.instance().end_session('cropper')
                 
 # the UI controller
 class HighSeasAdventure(t.HasTraits):

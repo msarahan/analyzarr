@@ -161,6 +161,7 @@ enamldef ImagePlotButtons(Container): image_buttons:
         next_image.width == save.width,
         crop.width == save.width,
     ]
+    hug_height='required'
     SaveFileDialog: save_dialog:
         controller = image_buttons.controller
     PushButton: save:
