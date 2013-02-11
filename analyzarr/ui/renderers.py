@@ -91,8 +91,8 @@ def _render_scatter_overlay(base_plot, array_plot_data,
         scatter_renderer = scatter_plot.plots['scatter_plot'][0]
         colorbar = _create_colorbar(scatter_plot.color_mapper, tool=tool)
         colorbar.plot = scatter_renderer
-        colorbar.padding_top = scatter_renderer.padding_top
-        colorbar.padding_bottom = scatter_renderer.padding_bottom
+        #colorbar.padding_top = scatter_renderer.padding_top
+        #colorbar.padding_bottom = scatter_renderer.padding_bottom
         if tool=='colorbar':
             # this part is for making the colormapped points fade when they
             #  are not selected by the threshold.
@@ -122,11 +122,11 @@ def _render_scatter_overlay(base_plot, array_plot_data,
 def _render_quiver_overlay(base_plot, array_plot_data, 
                            line_color="white", line_width=1.0, 
                            arrow_size=5):
-    if 'index' not in array_plot_data.arrays:
+    if 'vectors' not in array_plot_data.arrays:
         return base_plot
-    plot = Plot(array_plot_data, aspect_ratio = base_plot.aspect_ratio, 
+    quiverplot = Plot(array_plot_data, aspect_ratio = base_plot.aspect_ratio, 
                 default_origin="top left")
-    plot.quiverplot(("index", "value", "vectors"), name="quiver_plot",
+    quiverplot.quiverplot(("index", "value", "vectors"), name="quiver_plot",
                     line_color=line_color, line_width=line_width, 
                     arrow_size=arrow_size)
     quiverplot.x_grid.visible = False
@@ -225,15 +225,15 @@ class HasRenderer(HasTraits):
             
     # TODO - add optional appearance tweaks
     def get_scatter_quiver_plot(self, array_plot_data, title='',
-                                add_tool=False):
+                                tool=None):
         colorbar = None
         image_plot = _render_image(array_plot_data, title)
         scatter_plot, colorbar = _render_scatter_overlay(image_plot,
                                                          array_plot_data,
-                                                         add_tool=add_tool)
+                                                         tool=tool)
         quiver_plot = _render_quiver_overlay(image_plot, array_plot_data)
-        image_container = OverlayPlotContainer(image_plot, quiver_plot, 
-                                               scatter_plot)
+        image_container = OverlayPlotContainer(image_plot, scatter_plot,
+                                               quiver_plot, )
         if colorbar is not None:
             image_container = HPlotContainer(image_container, colorbar)
         self._base_plot = image_plot

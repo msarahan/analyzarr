@@ -153,6 +153,7 @@ class MappableImageController(BaseImageController):
     _selected_peak = t.Int(0)
     _peak_ids = t.List([])
     _show_shift = t.Bool(False)
+    shift_scale = t.Float(1.0)
 
     def __init__(self, parent, treasure_chest=None, data_path='/rawdata', *args, **kw):
         super(MappableImageController, self).__init__(parent, treasure_chest, data_path,
@@ -192,12 +193,12 @@ class MappableImageController(BaseImageController):
         return self.get_active_name() + ', %s from peak %i' % (
             self.get_characteristic_name(), self._selected_peak)
     
-    @t.on_trait_change('_peak_ids, _characteristic, _selected_peak, _show_shift, selected_index')
+    @t.on_trait_change('_peak_ids, _characteristic, _selected_peak, _show_shift, \
+                        selected_index, shift_scale')
     def update_image(self):
         super(MappableImageController, self).update_image()
-        try:
-            self.chest.getNode('/','cell_peaks')
-            values = \
+        self.chest.getNode('/','cell_peaks')
+        values = \
                 self.chest.root.cell_description.readWhere(
                     'filename == "%s"' % self.get_active_name(),
                     field='x_coordinate',) \
@@ -206,7 +207,7 @@ class MappableImageController(BaseImageController):
                     'filename == "%s"' % self.get_active_name(),
                     field='y%i'%self._selected_peak,)
         
-            indices = \
+        indices = \
                 self.chest.root.cell_description.readWhere(
                     'filename == "%s"' % self.get_active_name(),
                     field='y_coordinate',) \
@@ -214,42 +215,38 @@ class MappableImageController(BaseImageController):
                 self.chest.root.cell_peaks.readWhere(
                     'filename == "%s"' % self.get_active_name(),
                     field='x%i'%self._selected_peak,)
-            self.plotdata.set_data('value', values)
-            self.plotdata.set_data('index', indices)
+        self.plotdata.set_data('value', values)
+        self.plotdata.set_data('index', indices)
         
-            if self._show_shift:
-                vectors = np.hstack((self.chest.root.cell_peaks.readWhere(
+        if self._show_shift:
+            x_comp = self.chest.root.cell_peaks.readWhere(
                                     'filename == "%s"' % self.get_active_name(),
-                                    field='dx%i'%_selected_peak,
-                                    ),
-                                 self.chest.root.cell_peaks.readWhere(
+                                    field='dx%i'%self._selected_peak,
+                                    ).reshape((-1,1))
+            y_comp = self.chest.root.cell_peaks.readWhere(
                                      'filename == "%s"' % self.get_active_name(),
-                                     field='dy%i'%_selected_peak,
-                                     ),)
-                                )
-                self.plotdata.set_data('vectors',vectors)
-            else:
-                #TODO: replace this with a proper check of whether it exists
-                try:
-                    self.plotdata.del_data('vectors')
-                except:
-                    pass
+                                     field='dy%i'%self._selected_peak,
+                                     ).reshape((-1,1))
+            vectors = np.hstack((x_comp,y_comp))
+            vectors *= self.shift_scale
+            self.plotdata.set_data('vectors',vectors)
+        else:
+            if 'vectors' in self.plotdata.arrays:
+                self.plotdata.del_data('vectors')
                 # clear vector data
-                prefix = self._characteristics[self._characteristic][0].lower()
-                column = prefix + str(self._selected_peak)
-                self.plotdata.set_data('color', 
-                                   self.chest.root.cell_peaks.readWhere(
-                                       'filename == "%s"' % self.get_active_name(),
-                                       field=column,
+        prefix = self._characteristics[self._characteristic][0].lower()
+        column = prefix + str(self._selected_peak)
+        self.plotdata.set_data('color', 
+                               self.chest.root.cell_peaks.readWhere(
+                                   'filename == "%s"' % self.get_active_name(),
+                                   field=column,
                                        ),
                                    )
-                if not self._is_mapping_peaks:
-                    self.plot = self.get_scatter_overlay_plot(self.plotdata,
-                                                                      tool='inspector')                
-                self.set_plot_title(self.get_characteristic_plot_title())
-                self._is_mapping_peaks=True
-        except:
-            pass
+
+        self.plot = self.get_scatter_quiver_plot(self.plotdata,
+                                                      tool='inspector')
+        self.set_plot_title(self.get_characteristic_plot_title())
+        self._is_mapping_peaks=True
         
 class CellController(BaseImageController):
     _can_characterize = t.Bool(False)
@@ -403,10 +400,8 @@ class CellController(BaseImageController):
             self.chest.root.cell_peaks.append(data)
         # add an attribute for the total number of peaks recorded
         self.chest.root.cell_peaks.setAttr('number_of_peaks', self.numpeaks)
-        
         self.chest.root.cell_peaks.flush()
         self.update_data_labels()
-        
         self.parent.image_controller.update_peak_map_choices()
         
         self._toggle_UI(True)

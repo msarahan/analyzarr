@@ -50,7 +50,7 @@ enamldef CellCropperInterface(Window):
                     hbox(find_peaks, crop),
                     ),
                     ]
-                                
+            hug_width = 'strong'
             EnableCanvas: templateCanvas:
                 component << controller.crop_controller.template_plot
             Label: l_left_coord:
