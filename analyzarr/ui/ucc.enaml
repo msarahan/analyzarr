@@ -17,7 +17,8 @@ enamldef CellCropperInterface(Window):
         constraints = [hbox(image_container, template_container)]
         #: First, the left view with the parent image
         Container: image_container:
-            constraints = [ vbox(imageCanvas, hbox(prev_img, next_img, showCC))]
+            constraints = [ vbox(imageCanvas, hbox(prev_img, next_img, showCC)),
+                next_img.width == prev_img.width,]
             #: the image (Chaco/Enable canvas)
             EnableCanvas: imageCanvas:
                 component << controller.crop_controller.plot
@@ -49,6 +50,7 @@ enamldef CellCropperInterface(Window):
                         total_numpeaks_label, total_numpeaks),
                     hbox(find_peaks, crop),
                     ),
+                    crop.width == find_peaks.width,
                     ]
             hug_width = 'strong'
             EnableCanvas: templateCanvas:
