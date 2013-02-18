@@ -38,10 +38,6 @@ class DictionaryBrowser(object):
     def load_dictionary(self, dictionary):
         for key, value in dictionary.iteritems():
             if isinstance(value, dict):
-                if 'mapped_parameters' in value.keys():
-                    from analyzarr.signal import Signal
-                    value=Signal(value)
-                else:
                     value = DictionaryBrowser(value)
             self.__setattr__(key, value)
 
@@ -58,31 +54,31 @@ class DictionaryBrowser(object):
             if type(item) != types.MethodType:
                 if isinstance(value, DictionaryBrowser):
                     if j == eoi - 1:
-                        symbol = '└── '
+                        symbol = u'└── '
                     else:
-                        symbol = '├── '
-                    string += '%s%s%s\n' % (padding, symbol, item)
+                        symbol = u'├── '
+                    string += u'%s%s%s\n' % (padding, symbol, item)
                     if j == eoi - 1:
-                        extra_padding = '    '
+                        extra_padding = u'    '
                     else:
-                        extra_padding = '│   '
+                        extra_padding = u'│   '
                     string += value._get_print_items(padding + extra_padding)
                 else:
                     if j == eoi - 1:
-                        symbol = '└── '
+                        symbol = u'└── '
                     else:
-                        symbol = '├── '
+                        symbol = u'├── '
                     strvalue = str(value)
                     if len(strvalue) > 2 * max_len:
                         right_limit = min(max_len, len(strvalue) - max_len)
-                        value = '%s ... %s' % (strvalue[:max_len],
+                        value = u'%s ... %s' % (strvalue[:max_len],
                                               strvalue[-right_limit:])
-                    string += "%s%s%s = %s\n" % (padding, symbol, item, value)
+                    string += u"%s%s%s = %s\n" % (padding, symbol, item, value)
             j += 1
         return string
 
     def __repr__(self):
-        return self._get_print_items()
+        return self._get_print_items().encode('utf8', errors='ignore')
 
     def __getitem__(self,key):
         return self.__dict__.__getitem__(key)
