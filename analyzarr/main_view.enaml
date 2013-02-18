@@ -29,8 +29,6 @@ from enaml.widgets.api import (
 
 from enaml.stdlib.fields import FloatField, IntField
 
-from controllers import HighSeasAdventure, CellCropController
-
 import enaml
 with enaml.imports():
     from ui.ucc import CellCropperInterface
@@ -278,6 +276,22 @@ enamldef CellViewDockPane(DockPane): celldockpane:
         CellPlotButtons: buttons:
             #:movable = False
             controller << celldockpane.controller
+
+enamldef FactorViewDockPane(DockPane): factordockpane:
+    attr controller
+    Container:
+        EnableCanvas: canvas:
+            component << factordockpane.controller.factor_plot
+        FactorViewButtons: buttons:
+            controller << factordockpane.controller
+
+enamldef ScoreViewDockPane(DockPane): scoredockpane:
+    attr controller
+    Container:
+        EnableCanvas: canvas:
+            component << scoredockpane.controller.score_plot
+        ScoreViewButtons: buttons:
+            controller << scoredockpane.controller
 
 enamldef ImageViewDockPane(DockPane): imagedockpane:
     attr controller
