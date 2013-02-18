@@ -18,7 +18,7 @@ def main():
     with enaml.imports():
         from main_view import Main
         from ui.ucc import CellCropperInterface
-    from controllers import HighSeasAdventure
+    from controllers.HighSeasAdventure import HighSeasAdventure
     
     controller = HighSeasAdventure()
     qtapp = QtApplication([])
