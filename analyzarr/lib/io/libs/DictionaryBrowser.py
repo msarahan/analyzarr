@@ -7,7 +7,7 @@ def fsdict(nodes, value, dic):
     fashion creating a dictionary of dictionaries from the
     items present in the list 'nodes' and assigning the value
     'value' to the innermost dictionary.
-    
+
     'dic' will be of the type:
     dic['node1']['node2']['node3']...['nodeN'] = value
     where each node is like a directory that contains other
@@ -33,13 +33,17 @@ class DictionaryBrowser(object):
         self.cd(pwd) # update self.dic and self.pwd
         self.oldpwd = self.pwd[:]
         self.load_dictionary(dictionary)
-        
+
 
     def load_dictionary(self, dictionary):
         for key, value in dictionary.iteritems():
             if isinstance(value, dict):
-                    value = DictionaryBrowser(value)
-            self.__setattr__(key, value)
+                value = DictionaryBrowser(value)
+            try:
+                self.__setattr__(key.encode('utf-8'), value)
+            except:
+                print "warning: could not set attribute %s with value:" %key
+                print value
 
     def _get_print_items(self, padding = '', max_len=20):
         """Prints only the attributes that are not methods"""
@@ -72,7 +76,7 @@ class DictionaryBrowser(object):
                     if len(strvalue) > 2 * max_len:
                         right_limit = min(max_len, len(strvalue) - max_len)
                         value = u'%s ... %s' % (strvalue[:max_len],
-                                              strvalue[-right_limit:])
+                                                strvalue[-right_limit:])
                     string += u"%s%s%s = %s\n" % (padding, symbol, item, value)
             j += 1
         return string
@@ -97,18 +101,18 @@ class DictionaryBrowser(object):
                     value = value.as_dictionary()
                 par_dict.__setitem__(item, value)
         return par_dict
-        
+
     def has_item(self, item_path):
         """Given a path, return True if it exists
-        
+
         Parameters
         ----------
         item_path : Str
             A string describing the path with each item separated by a point
-            
+
         Example
         -------
-        
+
         >>> dict = {'To' : {'be' : True}}
         >>> dict_browser = DictionaryBrowser(dict)
         >>> dict_browser.has_item('To')
@@ -117,8 +121,8 @@ class DictionaryBrowser(object):
         True
         >>> dict_browser.has_item('To.be.or')
         False
-        
-        
+
+
         """
         if type(item_path) is str:
             item_path = item_path.split('.')
@@ -142,12 +146,12 @@ class DictionaryBrowser(object):
             if key not in current_dict:
                 current_dict[key] = DictionaryBrowser()
             current_dict = current_dict[key].__dict__
- 
+
     def ls(self, pwd=[], dbg=False):
-	"""List the contents of the instance's dictionary
+        """List the contents of the instance's dictionary
         attribute 'dic' given the path in pwd in a *nix-like
         fashion.
-    
+
         'pwd' can be either a list or a string of keys
         separated by the separator attribute 'sep' (defaults to '.')
 
@@ -155,7 +159,7 @@ class DictionaryBrowser(object):
         relative to the previous key (directory).
 
         if 'dbg' is True, useful information is printed on screen
-        
+
         E.g.
         obj.ls('root.dir1.dir2.dir3')
         obj.ls(['root', 'dir1', 'dir2', 'dir3'])
@@ -165,7 +169,7 @@ class DictionaryBrowser(object):
         if pwd == '..':
             dic = DictionaryBrowser(dictionary=self.home, pwd=self.pwd[:-1])
             return dic.ls()
-        
+
         if type(pwd) is str:
             pwd = pwd.split(self.sep) # turn pwd into a list
         try:
@@ -214,9 +218,9 @@ class DictionaryBrowser(object):
         """Updates the instance's 'dic' attribute to the
         sub-dictionary given by the path in 'pwd' in a
         *nix-like fashion.
-        
+
         'dic' should be a dictionary of dictionaries
-        
+
         'pwd' can be either a list or a string of keys
         separated by the separator attribute 'sep' (defaults to '.')
 
@@ -230,7 +234,7 @@ class DictionaryBrowser(object):
         the old key (directory).
 
         if 'dbg' is True, useful information is printed on screen
-        
+
         E.g.
         obj.cd('root.dir1.dir2.dir3')
         obj.cd(['root', 'dir1', 'dir2', 'dir3'])
@@ -276,7 +280,7 @@ class DictionaryBrowser(object):
                         return None
                     if pwd:
                         newdic = DictionaryBrowser(dictionary=self.dic, pwd=pwd,
-                                             sep=self.sep)
+                                                   sep=self.sep)
                         self.dic = newdic.dic.copy()
                         self.pwd += newdic.pwd
                 except KeyError, key: # non existing key (directory)
