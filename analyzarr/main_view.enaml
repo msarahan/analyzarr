@@ -27,11 +27,15 @@ from enaml.widgets.api import (
     Label, ComboBox, Field, GroupBox
 )
 
+from enaml.stdlib.fields import FloatField, IntField
+
 from controllers import HighSeasAdventure, CellCropController
 
 import enaml
 with enaml.imports():
     from ui.ucc import CellCropperInterface
+
+from enaml.application import Application
 
 def open_callback(dlg):
     if dlg.result=='accepted': 
@@ -40,6 +44,28 @@ def open_callback(dlg):
 def import_callback(dlg):
     if dlg.result=='accepted': 
         dlg.controller.import_files(dlg.paths)
+
+def new_callback(dlg):
+    if dlg.result=='accepted':
+        dlg.controller.new_treasure_chest(dlg.path)
+
+def save_callback(dlg):
+    if dlg.result=='accepted':
+        dlg.controller.save_plot(dlg.path)
+
+enamldef SaveFileDialog(FileDialog):
+    attr controller
+    title = "WHARR TO STORE YOUR MAP?"
+    mode = "save_file"
+    callback=save_callback
+    destroy_on_close=False
+
+enamldef NewChestDialog(FileDialog):
+    attr controller
+    title = "WHARR TO BURY YE TREASURE?"
+    mode = "save_file"
+    callback=new_callback
+    destroy_on_close=False
 
 enamldef OpenChestDialog(FileDialog):
     attr controller
@@ -57,6 +83,8 @@ enamldef ImportFilesDialog(FileDialog):
 
 enamldef MyMenuBar(MenuBar): menu:
     attr controller
+    NewChestDialog: new_dialog:
+        controller = menu.controller
     OpenChestDialog: chest_dialog:
         controller = menu.controller
     ImportFilesDialog: import_dialog:
@@ -64,14 +92,15 @@ enamldef MyMenuBar(MenuBar): menu:
     Menu:
         title = '&File'
         Action:
-            text = 'New File\tCtrl+N'
-            triggered :: print 'New File triggered'
+            text = 'New Chest\tCtrl+N'
+            triggered :: new_dialog.open()
         Action:
             text = 'Open Chest\tCtrl+O'
             triggered :: chest_dialog.open()
         Action:
             text = 'Import Files'
             triggered :: import_dialog.open()
+"""            
     Menu:
         title = '&Edit'
         Action:
@@ -119,31 +148,27 @@ enamldef MyMenuBar(MenuBar): menu:
                 checkable = True
                 text = 'Justify'
                 toggled :: print '%s toggled %s' % (text, 'on' if checked else 'off')
+"""
 
-enamldef ImagePlotButtons(Container):
+enamldef ImagePlotButtons(Container): image_buttons:
     attr controller
     attr cell_controller
     constraints = [
-        hbox(save, prev_image, next_image, crop, characteristic_box)
+        vbox(characteristic_box,
+        hbox(save, prev_image, next_image, crop),
+            ),
+        prev_image.width == save.width,
+        next_image.width == save.width,
+        crop.width == save.width,
     ]
+    hug_height='required'
+    SaveFileDialog: save_dialog:
+        controller = image_buttons.controller
     PushButton: save:
         text = "Save"
         tool_tip = "Save current plot"
         enabled << controller._can_save
-    PushButton: prev_image:
-        text = "<"
-        tool_tip = "View previous image in stack"
-        clicked :: controller.decrease_selected_index()
-        enabled << controller._can_change_idx
-    PushButton: next_image:
-        text = ">"
-        tool_tip = "View next image in stack"
-        clicked :: controller.increase_selected_index()
-        enabled << controller._can_change_idx
-    PushButton: save:
-        text = "Save"
-        tool_tip = "Save current plot"
-        enabled << controller._can_save
+        clicked :: save_dialog.open()
     PushButton: prev_image:
         text = "<"
         tool_tip = "View previous image in stack"
@@ -157,33 +182,53 @@ enamldef ImagePlotButtons(Container):
     PushButton: crop:
         text = "Crop cells"
         tool_tip = "Open the cell cropping interface"
-        clicked :: controller._show_crop_ui=True
+        #clicked :: controller._show_crop_ui=True
+        clicked :: Application.instance().start_session('cropper')
         enabled << controller._can_crop_cells
     GroupBox: characteristic_box:
+        constraints = [hbox(characteristic,
+                        peak_id, show_shift,
+                        scale_label, shift_scale),]
+        hug_height='required'
         title = "Characteristic Map:"
+        #:visible << controller._can_map_peaks
         ComboBox: characteristic:
             items << controller._characteristics
             index := controller._characteristic 
-            enabled << controller._can_map_peaks
+            enabled <<  controller._can_map_peaks
         ComboBox: peak_id:
             items << controller._peak_ids
             index := controller._selected_peak
-            enabled << controller._can_map_peaks
+            enabled <<  controller._can_map_peaks
+        CheckBox: show_shift:
+            text = "Show shifts"
+            checked := controller._show_shift
+        Label: scale_label:
+            text = "Shift scale"
+        FloatField: shift_scale:
+            value := controller.shift_scale
         #: TODO: implement parser for math expressions
         #:Field:
         #:    text := controller._peak_expression
         #:    enabled := cell_controller._can_edit_expression
         
 
-enamldef CellPlotButtons(Container):
+enamldef CellPlotButtons(Container): cell_buttons:
     attr controller
     constraints = [
-        hbox(save, prev_image, next_image, characterize)
+        hbox(save, prev_image, next_image, characterize),
+        prev_image.width == save.width,
+        next_image.width == save.width,
+        characterize.width == save.width,
         ]
+    hug_height='required'
+    SaveFileDialog: save_dialog:
+        controller = cell_buttons.controller
     PushButton: save:
         text = "Save"
         tool_tip = "Save current plot"
         enabled << controller._can_save
+        clicked :: save_dialog.open()
     PushButton: prev_image:
         text = "<"
         tool_tip = "View previous image in stack"
@@ -212,6 +257,7 @@ enamldef ViewToolBar(ToolBar):
         checkable = True
         checked := controller.show_cell_view
         toggled :: print "toggled cell view"
+"""
     Action: show_scores:
         text = "Scores"
         checkable = True
@@ -222,13 +268,11 @@ enamldef ViewToolBar(ToolBar):
         checkable = True
         checked := controller.show_factor_view
         toggled :: print "toggled factor view"
+"""
     
 enamldef CellViewDockPane(DockPane): celldockpane:
     attr controller
     Container:
-        constraints = [
-            vbox(canvas, buttons)
-        ]
         EnableCanvas: canvas:
             component << celldockpane.controller.plot
         CellPlotButtons: buttons:
@@ -239,18 +283,17 @@ enamldef ImageViewDockPane(DockPane): imagedockpane:
     attr controller
     attr cell_controller
     Container:
-        constraints = [
-            vbox(canvas, buttons)
-        ]
         EnableCanvas: canvas:
-            component << controller.plot
+            component << imagedockpane.controller.plot
+            
         ImagePlotButtons: buttons:
             controller << imagedockpane.controller
             cell_controller << imagedockpane.cell_controller
 
 enamldef Main(MainWindow): main:
-    attr controller = HighSeasAdventure()
-    initial_size = (1024, 750)
+    attr controller
+    initial_size = (500, 500)
+    title = "Analyzarr"
     MyMenuBar:
         controller << main.controller
     ViewToolBar: view_buttons:
@@ -269,7 +312,7 @@ enamldef Main(MainWindow): main:
         #: floating = True
         visible := main.controller.show_cell_view
     CellCropperInterface: crop_ui:
-        controller << main.controller.crop_controller
+        controller << main.controller
         visible := main.controller.image_controller._show_crop_ui
         
 

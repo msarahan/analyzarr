@@ -7,12 +7,12 @@ from chaco.tools.api import PanTool, ZoomTool, RangeSelection, \
 from chaco.api import Plot, ArrayPlotData, jet, gray, \
      ColorBar, ColormappedSelectionOverlay, LinearMapper, \
      HPlotContainer, OverlayPlotContainer, BasePlotContainer, \
-     DataLabel, ScatterInspectorOverlay
+     DataLabel, ScatterInspectorOverlay, PlotGraphicsContext
 from chaco.tools.cursor_tool import CursorTool, BaseCursorTool
 
 from chaco.data_range_1d import DataRange1D
 
-from custom_tools import PeakSelectionTool
+#from custom_tools import PeakSelectionTool
 
 import numpy as np
 
@@ -31,7 +31,7 @@ def _render_plot(self, array_plot_data):
     return plot
 
 def _render_image(array_plot_data, title=None):
-    plot = Plot(array_plot_data,default_origin="top left")        
+    plot = Plot(array_plot_data, default_origin="top left")        
     plot.img_plot("imagedata", colormap=gray, name="base_plot")
     # todo: generalize title and aspect ratio
     plot.title = title
@@ -91,8 +91,8 @@ def _render_scatter_overlay(base_plot, array_plot_data,
         scatter_renderer = scatter_plot.plots['scatter_plot'][0]
         colorbar = _create_colorbar(scatter_plot.color_mapper, tool=tool)
         colorbar.plot = scatter_renderer
-        colorbar.padding_top = scatter_renderer.padding_top
-        colorbar.padding_bottom = scatter_renderer.padding_bottom
+        #colorbar.padding_top = scatter_renderer.padding_top
+        #colorbar.padding_bottom = scatter_renderer.padding_bottom
         if tool=='colorbar':
             # this part is for making the colormapped points fade when they
             #  are not selected by the threshold.
@@ -109,7 +109,7 @@ def _render_scatter_overlay(base_plot, array_plot_data,
     if tool=='inspector':
         # Attach the inspector and its overlay
         scatter_renderer = scatter_plot.plots['scatter_plot'][0]
-        scatter_plot.tools.append(PeakSelectionTool(scatter_renderer))
+        #scatter_plot.tools.append(PeakSelectionTool(scatter_renderer))
         selection = ColormappedSelectionOverlay(scatter_renderer, 
                                                 fade_alpha=0.35, 
                                                 selection_type="mask")
@@ -122,11 +122,11 @@ def _render_scatter_overlay(base_plot, array_plot_data,
 def _render_quiver_overlay(base_plot, array_plot_data, 
                            line_color="white", line_width=1.0, 
                            arrow_size=5):
-    if 'index' not in array_plot_data.arrays:
+    if 'vectors' not in array_plot_data.arrays:
         return base_plot
-    plot = Plot(array_plot_data, aspect_ratio = base_plot.aspect_ratio, 
+    quiverplot = Plot(array_plot_data, aspect_ratio = base_plot.aspect_ratio, 
                 default_origin="top left")
-    plot.quiverplot(("index", "value", "vectors"), name="quiver_plot",
+    quiverplot.quiverplot(("index", "value", "vectors"), name="quiver_plot",
                     line_color=line_color, line_width=line_width, 
                     arrow_size=arrow_size)
     quiverplot.x_grid.visible = False
@@ -225,15 +225,15 @@ class HasRenderer(HasTraits):
             
     # TODO - add optional appearance tweaks
     def get_scatter_quiver_plot(self, array_plot_data, title='',
-                                add_tool=False):
+                                tool=None):
         colorbar = None
         image_plot = _render_image(array_plot_data, title)
         scatter_plot, colorbar = _render_scatter_overlay(image_plot,
                                                          array_plot_data,
-                                                         add_tool=add_tool)
+                                                         tool=tool)
         quiver_plot = _render_quiver_overlay(image_plot, array_plot_data)
-        image_container = OverlayPlotContainer(image_plot, quiver_plot, 
-                                               scatter_plot)
+        image_container = OverlayPlotContainer(image_plot, scatter_plot,
+                                               quiver_plot, )
         if colorbar is not None:
             image_container = HPlotContainer(image_container, colorbar)
         self._base_plot = image_plot
@@ -265,3 +265,12 @@ class HasRenderer(HasTraits):
                 self._base_plot.overlays.append(self._labels[label])
             else:
                 pass
+            
+    def _save_plot(self, plot, filename, width=800, height=600, dpi=72):
+        original_outer_bounds = plot.outer_bounds
+        plot.outer_bounds = [width, height]
+        plot.do_layout(force=True)
+        gc = PlotGraphicsContext((width, height), dpi=dpi)
+        gc.render_component(plot)
+        gc.save(filename)
+        plot.outer_bounds = original_outer_bounds    

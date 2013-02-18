@@ -28,6 +28,8 @@ from ui.renderers import HasRenderer
 import file_import
 import data_structure
 
+from enaml.application import Application
+
 class ControllerBase(HasRenderer):
     # current image index
     selected_index = t.Int(0)
@@ -103,6 +105,9 @@ class BaseImageController(ControllerBase):
                 title="%s of %s: " % (self.selected_index + 1,
                                       self.numfiles) + self.get_active_name()
                 )
+        
+    def save_plot(self, filename):
+        self._save_plot(self.plot, filename)
 
     def data_updated(self):
         # reinitialize data
@@ -141,86 +146,110 @@ class BaseImageController(ControllerBase):
 class MappableImageController(BaseImageController):
     _show_crop_ui = t.Bool(False)
     _can_crop_cells = t.Bool(False)
-    _can_map_peaks = t.Bool(True)
+    _can_map_peaks = t.Bool(False)
+    _is_mapping_peaks = t.Bool(False)
     _characteristics = t.List(["Height", "Orientation", "Eccentricity"])
     _characteristic = t.Int(0)
     _selected_peak = t.Int(0)
     _peak_ids = t.List([])
     _show_shift = t.Bool(False)
+    shift_scale = t.Float(1.0)
 
     def __init__(self, parent, treasure_chest=None, data_path='/rawdata', *args, **kw):
         super(MappableImageController, self).__init__(parent, treasure_chest, data_path,
                                               *args, **kw)
         if self.numfiles > 0:    
             self.parent.show_image_view=True
+            self.update_peak_map_choices()
     
-    @t.on_trait_change('_peak_ids, selected_index')
+    def get_characteristic_name(self):
+        return self._characteristics[self._characteristic]
+    
+    @t.on_trait_change('selected_index')
     def update_peak_map_choices(self):
         # do we have any entries in the peak characteristic table for this image?
         # knowing about the arrays in the cell data group is enough - if
         #  there aren't any cells from an image, there won't be any entries.
         if (len(self.chest.root.cell_description.getWhereList(
-               'filename == "%s"' % self.get_active_name)) > 0) \
-           and \
-               len(_peak_ids) > 0:
-            self._can_map_peaks=True    
+               'filename == "%s"' % self.get_active_name())) > 0):
+            try:
+                # if this table doesn't exist, we raise an exception
+                peak_table = self.chest.root.cell_peaks
+            except:
+                return
+            try:
+                #TODO: need to figure out pytables attributes
+                self._peak_ids = [str(idx) for idx in 
+                              range(peak_table.getAttr('number_of_peaks'))]
+            except:
+                return
+            self._can_map_peaks=True
+            self.update_image()
+        else:
+            # clear the image and disable the comboboxes
+            pass
     
-    @t.on_trait_change('_characteristic, _selected_peak, _show_shift, selected_index')
-    def plot_peak_map(self):
+    def get_characteristic_plot_title(self):
+        return self.get_active_name() + ', %s from peak %i' % (
+            self.get_characteristic_name(), self._selected_peak)
+    
+    @t.on_trait_change('_peak_ids, _characteristic, _selected_peak, _show_shift, \
+                        selected_index, shift_scale')
+    def update_image(self):
+        super(MappableImageController, self).update_image()
+        try:
+            self.chest.getNode('/','cell_peaks')
+        except:
+            return
         values = \
-            self.chest.root.cell_description.readWhere(
-                'filename == "%s"' % self.get_active_name(),
-                field='x_coordinate',) \
-            + \
-            self.chest.root.cell_peaks.readWhere(
-                'filename == "%s"' % self.get_active_name(),
-                field='y%i'%self._selected_peak,)
+                self.chest.root.cell_description.readWhere(
+                    'filename == "%s"' % self.get_active_name(),
+                    field='x_coordinate',) \
+                + \
+                self.chest.root.cell_peaks.readWhere(
+                    'filename == "%s"' % self.get_active_name(),
+                    field='y%i'%self._selected_peak,)
         
         indices = \
-            self.chest.root.cell_description.readWhere(
-                'filename == "%s"' % self.get_active_name(),
-                field='y_coordinate',) \
-            + \
-            self.chest.root.cell_peaks.readWhere(
-                'filename == "%s"' % self.get_active_name(),
-                field='x%i'%self._selected_peak,)
+                self.chest.root.cell_description.readWhere(
+                    'filename == "%s"' % self.get_active_name(),
+                    field='y_coordinate',) \
+                + \
+                self.chest.root.cell_peaks.readWhere(
+                    'filename == "%s"' % self.get_active_name(),
+                    field='x%i'%self._selected_peak,)
         self.plotdata.set_data('value', values)
         self.plotdata.set_data('index', indices)
         
         if self._show_shift:
-            vectors = np.hstack((self.chest.root.cell_peaks.readWhere(
-                                   'filename == "%s"' % self.get_active_name(),
-                                   field='dx%i'%_selected_peak,
-                                   ),
-                                self.chest.root.cell_peaks.readWhere(
+            x_comp = self.chest.root.cell_peaks.readWhere(
                                     'filename == "%s"' % self.get_active_name(),
-                                    field='dy%i'%_selected_peak,
-                                   ),)
-                                )
+                                    field='dx%i'%self._selected_peak,
+                                    ).reshape((-1,1))
+            y_comp = self.chest.root.cell_peaks.readWhere(
+                                     'filename == "%s"' % self.get_active_name(),
+                                     field='dy%i'%self._selected_peak,
+                                     ).reshape((-1,1))
+            vectors = np.hstack((x_comp,y_comp))
+            vectors *= self.shift_scale
             self.plotdata.set_data('vectors',vectors)
         else:
-            #TODO: replace this with a proper check of whether it exists
-            try:
+            if 'vectors' in self.plotdata.arrays:
                 self.plotdata.del_data('vectors')
-            except:
-                pass
-        # clear vector data
+                # clear vector data
         prefix = self._characteristics[self._characteristic][0].lower()
         column = prefix + str(self._selected_peak)
         self.plotdata.set_data('color', 
                                self.chest.root.cell_peaks.readWhere(
                                    'filename == "%s"' % self.get_active_name(),
                                    field=column,
-                               ),
-                               
-                               )
-        # look up how many layers the existing plot has.  If it's less than
-        #   3, then we need to recreate the plot as a more complicated scatter
-        #   quiver plot.        
-        if len(self.plot.overlays) < 3:
-            self.plot = self.get_scatter_overlay_plot(self.plotdata, 
-                                                      title=self.get_active_name(),
+                                       ),
+                                   )
+
+        self.plot = self.get_scatter_quiver_plot(self.plotdata,
                                                       tool='inspector')
+        self.set_plot_title(self.get_characteristic_plot_title())
+        self._is_mapping_peaks=True
         
 class CellController(BaseImageController):
     _can_characterize = t.Bool(False)
@@ -244,6 +273,10 @@ class CellController(BaseImageController):
 
     @t.on_trait_change("selected_index")
     def update_data_labels(self):
+        try:
+            self.chest.getNode('/','cell_peaks')
+        except:
+            return
         # labels is a dict consisting of data points as tuples
         labels = {}
         # this is the record in the cell_description table
@@ -369,11 +402,11 @@ class CellController(BaseImageController):
             # add the data to the table
             self.chest.root.cell_peaks.append(data)
         # add an attribute for the total number of peaks recorded
-        self.chest.root.cell_peaks.number_of_peaks = self.numpeaks
-        self.parent.image_controller._peak_ids = [str(idx) for idx in 
-                                                  range(self.numpeaks)]
+        self.chest.root.cell_peaks.setAttr('number_of_peaks', self.numpeaks)
         self.chest.root.cell_peaks.flush()
         self.update_data_labels()
+        self.parent.image_controller.update_peak_map_choices()
+        
         self._toggle_UI(True)
 
     def get_peak_data(self, chars=[], indices=[]):
@@ -629,7 +662,7 @@ class CellCropController(BaseImageController):
                     )
         # pick an initial template with default parameters
         self.template_data = ArrayPlotData()
-        self.template_plot = Plot(self.template_data)        
+        self.template_plot = Plot(self.template_data, default_origin="top left")
         self.template_data.set_data('imagedata',
                     self.get_active_image()[
                         self.template_top:self.template_top + self.template_size,
@@ -656,17 +689,6 @@ class CellCropController(BaseImageController):
             grid_data_source = self._base_plot.range2d.sources[0]
             grid_data_source.set_data(np.arange(self.get_active_image().shape[1]), 
                                       np.arange(self.get_active_image().shape[0]))
-        if self.peaks.has_key(self.get_active_name()):
-            self.plotdata.set_data("index",self.peaks[self.get_active_name()][:,0])
-            self.plotdata.set_data("value",self.peaks[self.get_active_name()][:,1])
-            self.plotdata.set_data("color",self.peaks[self.get_active_name()][:,2])
-        else:
-            if 'index' in self.plotdata.arrays:
-                self.plotdata.del_data('index')
-                # value will implicitly exist if value exists.
-                self.plotdata.del_data('value')
-            if 'color' in self.plotdata.arrays:
-                self.plotdata.del_data('color')
 
     @on_trait_change('template_left, template_top, template_size')
     def update_template_data(self):
@@ -678,8 +700,7 @@ class CellCropController(BaseImageController):
                     )
         if self.numpeaks_total>0:
             print "clearing peaks"
-            self.peaks=[np.array([[0,0,-1]])]
-        self.update_CC()        
+            self.peaks={}
 
     def add_cursor_tool(self):    
         self._csr = CursorTool(self._base_plot, drag_button='left', color='white',
@@ -746,7 +767,7 @@ class CellCropController(BaseImageController):
     @on_trait_change('peaks, _colorbar_selection:selection, selected_index')
     def calc_numpeaks(self):
         try:
-            thresh=self.cbar_selection.selection
+            thresh=self._colorbar_selection.selection
             self.thresh=thresh
         except:
             thresh=[]
@@ -765,22 +786,29 @@ class CellCropController(BaseImageController):
         except:
             self.numpeaks_img=0
 
-    @on_trait_change('peaks')
+    @on_trait_change('peaks, selected_index')
     def update_scatter_plot(self):
-        self.plotdata.set_data("index",self.peaks[self.get_active_name()][:,0])
-        self.plotdata.set_data("value",self.peaks[self.get_active_name()][:,1])
-        self.plotdata.set_data("color",self.peaks[self.get_active_name()][:,2])
-        self.plot = self.get_scatter_overlay_plot(array_plot_data=self.plotdata,
-                title="%s of %s: " % (self.selected_index + 1,
-                                      self.numfiles) + self.get_active_name(),
-                tool='colorbar',
-                    )
-        scatter_renderer = self._scatter_plot.plots['scatter_plot'][0]
-        scatter_renderer.color_data.metadata['selections']=self.thresh
-        scatter_renderer.color_data.metadata_changed={'selections':self.thresh}
-        self.update_image()
-    
-
+        if self.get_active_name() in self.peaks:
+            self.plotdata.set_data("index",self.peaks[self.get_active_name()][:,0])
+            self.plotdata.set_data("value",self.peaks[self.get_active_name()][:,1])
+            self.plotdata.set_data("color",self.peaks[self.get_active_name()][:,2])
+            self.plot = self.get_scatter_overlay_plot(array_plot_data=self.plotdata,
+                                                      tool='colorbar',
+                                                      )
+            scatter_renderer = self._scatter_plot.plots['scatter_plot'][0]
+            scatter_renderer.color_data.metadata['selections']=self.thresh
+            scatter_renderer.color_data.metadata_changed={'selections':self.thresh}
+        else:
+            if 'index' in self.plotdata.arrays:
+                self.plotdata.del_data('index')
+                # value will implicitly exist if value exists.
+                self.plotdata.del_data('value')
+            if 'color' in self.plotdata.arrays:
+                self.plotdata.del_data('color')
+            self.plot = self.get_scatter_overlay_plot(array_plot_data=self.plotdata,
+                                                      tool=None,
+                                                      )
+            
     def locate_peaks(self):
         peaks={}
         for idx in xrange(self.numfiles):
@@ -803,6 +831,11 @@ class CellCropController(BaseImageController):
         if rows > 0:
             # remove the table
             self.chest.removeNode('/cell_description')
+            try:
+                # remove the table of peak characteristics - they are not valid.
+                self.chest.removeNode('/cell_peaks')
+            except:
+                pass
             # recreate it
             self.chest.createTable('/', 'cell_description', 
                                    data_structure.CellsTable)
@@ -851,6 +884,7 @@ class CellCropController(BaseImageController):
                 self.chest.root.cell_description.flush()
                 self.chest.flush()
         self.parent.update_cell_data()
+        #Application.instance().end_session('cropper')
                 
 # the UI controller
 class HighSeasAdventure(t.HasTraits):
@@ -880,6 +914,16 @@ class HighSeasAdventure(t.HasTraits):
         self.image_controller.data_updated()
         self.crop_controller.data_updated()
 
+    def new_treasure_chest(self, filename):
+        chest = file_import.new_treasure_chest(filename)
+        self.image_controller = MappableImageController(parent=self, 
+                                                    treasure_chest=chest)
+        self.cell_controller = CellController(parent=self, 
+                                              treasure_chest=chest)
+        self.crop_controller = CellCropController(parent=self, 
+                                                  treasure_chest=chest)
+        self.chest = chest        
+
     def open_treasure_chest(self, filename):
         if self.chest is not None:
             self.chest.close()
@@ -893,18 +937,11 @@ class HighSeasAdventure(t.HasTraits):
         self.chest = chest
 
     def import_files(self, file_list):
-        chest = file_import.import_files(file_list)
+        file_import.import_files(self.chest, file_list)
         self.image_controller = MappableImageController(parent=self, 
-                                                    treasure_chest=chest)
+                                                    treasure_chest=self.chest)
         self.cell_controller = CellController(parent=self,
-                                              treasure_chest=chest)
+                                              treasure_chest=self.chest)
         self.crop_controller = CellCropController(parent=self,
-                                                  treasure_chest=chest)
-        self.chest = chest
+                                                  treasure_chest=self.chest)
 
-    def import_image(self):
-        pass
-
-    def new_project(self):
-        #new_file =
-        self.image_controller = ImageController()

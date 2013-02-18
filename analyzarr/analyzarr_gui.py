@@ -17,12 +17,16 @@ def main():
     from enaml.qt.qt_application import QtApplication
     with enaml.imports():
         from main_view import Main
+        from ui.ucc import CellCropperInterface
+    from controllers import HighSeasAdventure
+    
+    controller = HighSeasAdventure()
     qtapp = QtApplication([])
-    session = simple_session('bonerfart', 'The main UI window', Main)
-    qtapp.add_factories([session])
-    qtapp.start_session('bonerfart')
+    main_ui = simple_session('main', 'The main UI window', Main, controller=controller)
+    cell_cropper = simple_session('cropper', 'Cell cropper', CellCropperInterface, controller=controller)
+    qtapp.add_factories([main_ui, cell_cropper])
+    qtapp.start_session('main')
     qtapp.start()
-
 
 if __name__ == '__main__':
     main()
