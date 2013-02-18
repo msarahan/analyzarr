@@ -45,7 +45,6 @@ class ControllerBase(HasRenderer):
         if treasure_chest is not None:
             self.chest = treasure_chest
             self.nodes = self.chest.listNodes(data_path)
-            self.numfiles = len(self.nodes)
 
     # used by the cell cropper
     def set_active_index(self, idx):
@@ -92,12 +91,8 @@ class BaseImageController(ControllerBase):
         super(BaseImageController, self).__init__(parent, treasure_chest, data_path,
                                               *args, **kw)
         self.plotdata = ArrayPlotData()
-        if self.numfiles > 0:
-            self.init_plot()
-            print "initialized plot for data in %s" % data_path
-            self._can_save = True
-            self._can_crop_cells = True
-            self._can_change_idx = True
+        self._can_save = True
+        self._can_change_idx = True
 
     def init_plot(self):
         self.plotdata.set_data('imagedata', self.get_active_image())
@@ -158,7 +153,12 @@ class MappableImageController(BaseImageController):
     def __init__(self, parent, treasure_chest=None, data_path='/rawdata', *args, **kw):
         super(MappableImageController, self).__init__(parent, treasure_chest, data_path,
                                               *args, **kw)
-        if self.numfiles > 0:    
+        
+        if self.chest is not None:
+            self.numfiles = len(self.nodes)
+            self.init_plot()
+            print "initialized plot for data in %s" % data_path
+            self._can_crop_cells = True
             self.parent.show_image_view=True
             self.update_peak_map_choices()
     
@@ -170,6 +170,10 @@ class MappableImageController(BaseImageController):
         # do we have any entries in the peak characteristic table for this image?
         # knowing about the arrays in the cell data group is enough - if
         #  there aren't any cells from an image, there won't be any entries.
+        try:
+            cell_desc = self.chest.root.cell_description
+        except:
+            return
         if (len(self.chest.root.cell_description.getWhereList(
                'filename == "%s"' % self.get_active_name())) > 0):
             try:
@@ -259,6 +263,10 @@ class CellController(BaseImageController):
         super(CellController, self).__init__(parent, treasure_chest, data_path,
                 *args, **kw)
         if self.chest is not None:
+            try:
+                self.chest.getNode('/','cell_description')
+            except:
+                return            
             self.numfiles = self.chest.root.cell_description.nrows
             if self.numfiles > 0:
                 self.init_plot()
@@ -300,6 +308,10 @@ class CellController(BaseImageController):
         # Find this cell in the cell description table.  We use this to look
         # up the parent image and subsequently the local cell index (the
         # index among only the cells from that image)
+        try:
+            self.chest.getNode('/','cell_description')
+        except:
+            return       
         cell_record = self.chest.root.cell_description.read(
                             start=self.selected_index,
                             stop=self.selected_index + 1)[0]        
@@ -317,6 +329,10 @@ class CellController(BaseImageController):
         # Find this cell in the cell description table.  We use this to look
         # up the parent image and subsequently the local cell index (the
         # index among only the cells from that image)
+        try:
+            self.chest.getNode('/','cell_description')
+        except:
+            return        
         cell_record = self.chest.root.cell_description.read(
                             start=self.selected_index,
                             stop=self.selected_index + 1)[0]
@@ -643,7 +659,9 @@ class CellCropController(BaseImageController):
     def __init__(self, parent, treasure_chest=None, data_path='/rawdata', *args, **kw):
         super(CellCropController, self).__init__(parent, treasure_chest, data_path,
                                               *args, **kw)
-        if self.numfiles > 0:
+        
+        if self.chest is not None:
+            self.numfiles = len(self.nodes)
             self.init_plot()
             print "initialized plot for data in %s" % data_path
     
