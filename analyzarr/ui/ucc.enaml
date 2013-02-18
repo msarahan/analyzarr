@@ -88,6 +88,7 @@ enamldef CellCropperInterface(Window):
             PushButton: crop:
                 text = 'Crop!'
                 clicked :: controller.crop_controller.crop_cells()
+                enabled << (controller.crop_controller.numpeaks_total > 0)
             Label: image_numpeaks_label:
                 text = "# peaks (this image):"
             IntField: image_numpeaks:
