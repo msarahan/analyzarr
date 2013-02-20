@@ -2,6 +2,8 @@ from BaseImage import BaseImageController
 from traits.api import Bool, List, Int, Float, on_trait_change
 import numpy as np
 
+from enaml.application import Application
+
 class MappableImageController(BaseImageController):
     _show_crop_ui = Bool(False)
     _can_crop_cells = Bool(False)
@@ -119,3 +121,7 @@ class MappableImageController(BaseImageController):
                                                       tool='inspector')
         self.set_plot_title(self.get_characteristic_plot_title())
         self._is_mapping_peaks=True
+
+    def open_crop_UI(self):
+        session_id = Application.instance().start_session('cropper')
+        self.parent.crop_controller._session_id = session_id

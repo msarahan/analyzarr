@@ -1,4 +1,5 @@
-from traits.api import Instance, Range, Dict, Bool, Int, on_trait_change
+from traits.api import Instance, Range, Dict, Bool, Int, String, \
+     on_trait_change
 from BaseImage import BaseImageController
 
 from chaco.default_colormaps import gray
@@ -9,6 +10,8 @@ from file_import import filters
 
 import numpy as np
 import tables as tb
+
+from enaml.application import Application
 
 class CellCropController(BaseImageController):
     zero=Int(0)
@@ -25,6 +28,7 @@ class CellCropController(BaseImageController):
     peak_width = Range(low=2, high=200, value=10)
     numpeaks_total = Int(0,cols=5)
     numpeaks_img = Int(0,cols=5)
+    _session_id = String('')
 
     def __init__(self, parent, treasure_chest=None, data_path='/rawdata', *args, **kw):
         super(CellCropController, self).__init__(parent, treasure_chest, data_path,
@@ -284,4 +288,4 @@ class CellCropController(BaseImageController):
         average_array[:] = average_data
         self.chest.flush()
         self.parent.update_cell_data()
-        #Application.instance().end_session('cropper')
+        Application.instance().end_session(self._session_id)

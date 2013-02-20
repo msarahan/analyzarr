@@ -33,8 +33,6 @@ import enaml
 with enaml.imports():
     from ui.ucc import CellCropperInterface
 
-from enaml.application import Application
-
 def open_callback(dlg):
     if dlg.result=='accepted': 
         dlg.controller.open_treasure_chest(dlg.path)
@@ -181,7 +179,7 @@ enamldef ImagePlotButtons(Container): image_buttons:
         text = "Crop cells"
         tool_tip = "Open the cell cropping interface"
         #clicked :: controller._show_crop_ui=True
-        clicked :: Application.instance().start_session('cropper')
+        clicked :: controller.open_crop_UI()
         enabled << controller._can_crop_cells
     GroupBox: characteristic_box:
         constraints = [hbox(characteristic,
