@@ -3,6 +3,10 @@ from traits.api import Bool, List, Int, Float, on_trait_change
 import numpy as np
 
 from enaml.application import Application
+from enaml.stdlib.sessions import simple_session
+import enaml
+with enaml.imports():
+    from ui.ucc import CellCropperInterface
 
 class MappableImageController(BaseImageController):
     _show_crop_ui = Bool(False)
@@ -123,5 +127,8 @@ class MappableImageController(BaseImageController):
         self._is_mapping_peaks=True
 
     def open_crop_UI(self):
+        cell_cropper = simple_session('cropper', 'Cell cropper', CellCropperInterface, 
+                                      controller=self.parent.crop_controller)
+        Application.instance().add_factories([cell_cropper])
         session_id = Application.instance().start_session('cropper')
         self.parent.crop_controller._session_id = session_id

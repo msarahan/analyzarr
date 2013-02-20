@@ -17,14 +17,12 @@ def main():
     from enaml.qt.qt_application import QtApplication
     with enaml.imports():
         from main_view import Main
-        from ui.ucc import CellCropperInterface
     from controllers.HighSeasAdventure import HighSeasAdventure
     
     controller = HighSeasAdventure()
     qtapp = QtApplication([])
     main_ui = simple_session('main', 'The main UI window', Main, controller=controller)
-    cell_cropper = simple_session('cropper', 'Cell cropper', CellCropperInterface, controller=controller)
-    qtapp.add_factories([main_ui, cell_cropper])
+    qtapp.add_factories([main_ui])
     qtapp.start_session('main')
     qtapp.start()
 

@@ -323,10 +323,6 @@ enamldef Main(MainWindow): main:
         dock_area = 'right'
         #: floating = True
         visible := main.controller.show_cell_view
-    CellCropperInterface: crop_ui:
-        controller << main.controller
-        visible := main.controller.image_controller._show_crop_ui
-        
 
 """
     ImageViewDockPane: score_view:
