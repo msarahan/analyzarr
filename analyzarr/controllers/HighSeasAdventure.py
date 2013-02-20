@@ -11,36 +11,24 @@ Redistribution and use in source and binary forms, with or without modification,
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
-import traits.api as t
-from traits.api import on_trait_change
-from data_structure import filters
-import tables as tb
-import numpy as np
-from lib.mda import mda_sklearn as mda
+from traits.api import HasTraits, Bool, Instance
 
-import cv_funcs
-import peak_char as pc
+from MappableImage import MappableImageController
+from Cell import CellController
+from CellCrop import CellCropController
 
-from controllers.MappableImage import MappableImageController
-from controllers.Cell import CellController
-from controllers.CellCrop import CellCropController
-
-from ui.renderers import HasRenderer
-import file_import
-import data_structure
-
-from enaml.application import Application
+from analyzarr import file_import
  
 # the UI controller
-class HighSeasAdventure(t.HasTraits):
-    show_image_view = t.Bool(False)
-    show_cell_view = t.Bool(False)
-    show_score_view = t.Bool(False)
-    show_factor_view = t.Bool(False)
+class HighSeasAdventure(HasTraits):
+    show_image_view = Bool(False)
+    show_cell_view = Bool(False)
+    show_score_view = Bool(False)
+    show_factor_view = Bool(False)
 
-    image_controller = t.Instance(MappableImageController)
-    cell_controller = t.Instance(CellController)
-    crop_controller = t.Instance(CellCropController)
+    image_controller = Instance(MappableImageController)
+    cell_controller = Instance(CellController)
+    crop_controller = Instance(CellCropController)
 
     # TODO: need method for opening files
 

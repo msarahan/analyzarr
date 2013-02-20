@@ -3,7 +3,7 @@ from BaseImage import BaseImageController
 from traits.api import Bool, Int, on_trait_change
 import numpy as np
 
-import peak_char as pc
+from analyzarr import peak_char as pc
 
 #from chaco.default_colormaps import gray
 #from chaco.api import ArrayPlotData, BasePlotContainer, Plot
@@ -153,7 +153,7 @@ class CellController(BaseImageController):
                                'cell_peaks', description=desc)        
         # for each file in the cell_data group, run analysis.
         nodes = self.chest.listNodes('/cells')
-        node_names = [node.name for node in nodes if node.name != 'template']
+        node_names = [node.name for node in nodes if node.name not in ['template', 'average']]
         for node in node_names:
             numcells = nodes[node_names.index(node)].shape[0]
             data = np.zeros((numcells),dtype=dtypes)
