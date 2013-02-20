@@ -1,5 +1,5 @@
 from traits.api import Int, Bool
-from ui.renderers import HasRenderer
+from analyzarr.ui.renderers import HasRenderer
 
 class ControllerBase(HasRenderer):
     # current image index

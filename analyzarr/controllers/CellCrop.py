@@ -5,8 +5,10 @@ from BaseImage import BaseImageController
 from chaco.default_colormaps import gray
 from chaco.api import ArrayPlotData, BasePlotContainer, Plot
 
-import cv_funcs
-from file_import import filters
+from analyzarr import peak_char as pc
+from analyzarr import cv_funcs
+from analyzarr.file_import import filters
+from analyzarr import data_structure
 
 import numpy as np
 import tables as tb
@@ -30,9 +32,10 @@ class CellCropController(BaseImageController):
     numpeaks_img = Int(0,cols=5)
     _session_id = String('')
 
-    def __init__(self, parent, treasure_chest=None, data_path='/rawdata', *args, **kw):
-        super(CellCropController, self).__init__(parent, treasure_chest, data_path,
-                                              *args, **kw)
+    def __init__(self, parent, treasure_chest=None, data_path='/rawdata', 
+                 *args, **kw):
+        super(CellCropController, self).__init__(parent, treasure_chest, 
+                                                 data_path, *args, **kw)
         
         if self.chest is not None:
             self.numfiles = len(self.nodes)

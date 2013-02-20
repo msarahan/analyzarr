@@ -50,7 +50,7 @@ setup(
     version = version,
     packages = ['analyzarr', 'analyzarr.lib', 'analyzarr.lib.mda',
                 'analyzarr.lib.io', 'analyzarr.lib.io.libs',
-                'analyzarr.ui', ],
+                'analyzarr.ui', 'analyzarr.controllers'],
     package_data = {
         'analyzarr' : [ '*.enaml', 'ui/*.enaml',],
         },
