@@ -1,5 +1,5 @@
 from chaco.api import ArrayPlotData, BasePlotContainer, Plot
-from traits.api import Instance, Bool, Int, on_trait_change
+from traits.api import Instance, Bool, Int, List, String, on_trait_change
 from Base import ControllerBase
 
 class MDAController(ControllerBase):
@@ -12,8 +12,14 @@ class MDAController(ControllerBase):
     score_plotdata = Instance(ArrayPlotData)
     score_plot = Instance(BasePlotContainer)
     on_peaks = Bool(False)
+    has_peaks = Bool(False)
+    number_to_derive = Int(69)
+    dimensionality = Int(1)
     component_index = Int(0)
     _selected_peak = Int(0)
+    selected_method_idx = Int(0)
+    methods = List(['PCA', 'ICA'])
+    _session_id = String('')
 
     def __init__(self, treasure_chest=None, data_path='/mda_results',
                  *args, **kw):
@@ -44,6 +50,22 @@ class MDAController(ControllerBase):
                 title="%s of %s: " % (self.selected_index + 1,
                                       self.numfiles) + self.get_active_name()
                 )
+
+    def set_target(self,target='images'):
+        if target == 'peaks':
+            self.on_peaks = True
+        else:
+            self.on_peaks = False
+    
+    def execute(self):
+        method = self.methods[self.selected_method_idx]
+        if method == 'PCA':
+            self.PCA(n_components=self.number_to_derive)
+        elif method == 'ICA':
+            self.ICA(n_components=self.number_to_derive)
+        # close the control panel
+        
+        # now update the UI
 
     def render_active_factor_image(self):
         # return average cell image (will be overlaid with peak info)
@@ -152,7 +174,7 @@ class MDAController(ControllerBase):
             data = data.view((np.float64, len(data.dtype.names)))
             active_data_shape = data.shape
         else:
-            active_data = self.get_active_image_set()
+            active_data = self.parent.cell_controller.get_cell_set()
             active_data_shape = active_data.shape
             data = active_data.reshape((active_data.shape[0], -1))
         return data, active_data_shape

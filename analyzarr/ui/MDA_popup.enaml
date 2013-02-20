@@ -1,0 +1,31 @@
+from enaml.layout.api import vbox, hbox
+from enaml.widgets.api import (
+    Window, Container, PushButton, CheckBox, SpinBox, Label, ComboBox
+)
+from enaml.stdlib.fields import FloatField, IntField
+
+enamldef MDAInterface(Window):
+    attr controller
+    title = "MDA run parameters"
+    initial_size = (400, 300)
+    Container:
+        ComboBox: 
+            items << controller.methods
+            index := controller.selected_method_idx
+        SpinBox: number_components:
+            enabled << (controller.number_components > 0)
+            minimum = 1
+            maximum << controller.dimensionality
+            value := controller.number_to_derive
+        Container: type_radio:
+            RadioButton: images:
+                text = 'Images'
+                toggled :: controller.set_target('images')
+            RadioButton: peaks:
+                text = 'Peaks'
+                toggled :: controller.set_target('peaks')
+                enabled << controller.has_peaks
+        #: go button
+        PushButton: go:
+            clicked :: controller.execute()
+                
