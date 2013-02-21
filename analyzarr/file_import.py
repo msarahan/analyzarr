@@ -73,7 +73,7 @@ def import_image(h5file, flist, output_filename=None):
 
 def import_tiff(h5file, flist):
     # for tiff, we use Christoph Gohlke's reader
-    from lib.io.tifffile import imread
+    from analyzarr.lib.io.tifffile import imread
     data_record = h5file.root.image_description.row
     # any kind of jpg, png can be lumped together
     for f in flist:
@@ -100,7 +100,7 @@ def import_tiff(h5file, flist):
 
 # DM3 files
 def import_dm(h5file, flist):
-    from lib.io.digital_micrograph import file_reader
+    from analyzarr.lib.io.digital_micrograph import file_reader
     tmp_dm3, tmp_tags = file_reader(flist[0])
     
     data_record = h5file.root.image_description.row
