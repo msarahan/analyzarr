@@ -67,6 +67,7 @@ class CellCropController(BaseImageController):
                     )
         self.template_plot.img_plot('imagedata', title = "Template")
         self.template_plot.aspect_ratio=1 #square templates
+        self._get_max_positions()
 
     @on_trait_change("selected_index, ShowCC")
     def update_image(self):
@@ -104,20 +105,13 @@ class CellCropController(BaseImageController):
         self._base_plot.overlays.append(self._csr)
     
     @on_trait_change('selected_index, template_size')
-    def _get_max_pos_x(self):
+    def _get_max_positions(self):
         max_pos_x=self.get_active_image().shape[-1]-self.template_size-1
         if max_pos_x>0:
-            return max_pos_x
-        else:
-            return None
-
-    @on_trait_change('selected_index, template_size')
-    def _get_max_pos_y(self):
+            self.max_pos_x = int(max_pos_x)
         max_pos_y=self.get_active_image().shape[-2]-self.template_size-1
         if max_pos_y>0:
-            return max_pos_y
-        else:
-            return None
+            self.max_pos_y = int(max_pos_y)
 
     @on_trait_change('template_left, template_top')
     def update_csr_position(self):
