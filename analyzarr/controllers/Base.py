@@ -4,6 +4,7 @@ from analyzarr.ui.renderers import HasRenderer
 class ControllerBase(HasRenderer):
     # current image index
     selected_index = Int(0)
+    numfiles = Int(0)
     _can_save = Bool(False)
     _can_change_idx = Bool(False)
 

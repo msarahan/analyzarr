@@ -1,6 +1,7 @@
 from enaml.layout.api import vbox, hbox
 from enaml.widgets.api import (
-    Window, Container, PushButton, CheckBox, SpinBox, Label, ComboBox
+    Window, Container, PushButton, CheckBox, SpinBox, Label, ComboBox,
+    RadioButton
 )
 from enaml.stdlib.fields import FloatField, IntField
 
@@ -13,7 +14,7 @@ enamldef MDAInterface(Window):
             items << controller.methods
             index := controller.selected_method_idx
         SpinBox: number_components:
-            enabled << (controller.number_components > 0)
+            enabled << (controller.dimensionality > 0)
             minimum = 1
             maximum << controller.dimensionality
             value := controller.number_to_derive
@@ -27,5 +28,6 @@ enamldef MDAInterface(Window):
                 enabled << controller.has_peaks
         #: go button
         PushButton: go:
+            text = 'Execute'
             clicked :: controller.execute()
                 

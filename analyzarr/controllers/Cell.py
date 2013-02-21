@@ -20,7 +20,7 @@ class CellController(BaseImageController):
                 self.chest.getNode('/','cell_description')
             except:
                 return            
-            self.numfiles = self.chest.root.cell_description.nrows
+            self.numfiles = int(self.chest.root.cell_description.nrows)
             if self.numfiles > 0:
                 self.init_plot()
                 print "initialized plot for data in %s" % data_path

@@ -1,6 +1,22 @@
 from chaco.api import ArrayPlotData, BasePlotContainer, Plot
 from traits.api import Instance, Bool, Int, List, String, on_trait_change
 from Base import ControllerBase
+import tables as tb
+# how much to compress the data
+from analyzarr.data_structure import filters
+
+import numpy as np
+
+try:
+    import analyzarr.lib.mda.mda_rpy as mda
+except:
+    try:
+        import analyzarr.lib.mda.mda_sklearn as mda        
+        print "rpy not available; falling back to sklearn."
+    except:
+        raise NotImplementedError("No MDA methods functional")
+
+from enaml.application import Application
 
 class MDAController(ControllerBase):
     # the image data for the factor plot (including any scatter data and
@@ -14,7 +30,7 @@ class MDAController(ControllerBase):
     on_peaks = Bool(False)
     has_peaks = Bool(False)
     number_to_derive = Int(69)
-    dimensionality = Int(1)
+    dimensionality = Int(100000000)
     component_index = Int(0)
     _selected_peak = Int(0)
     selected_method_idx = Int(0)
@@ -29,9 +45,13 @@ class MDAController(ControllerBase):
         if treasure_chest is not None:
             self.chest = treasure_chest
             self.data_path = data_path
-            self.numfiles = self.chest.root.mda_description.nrows
-            if self.numfiles > 0:
-                self.init_plots()
+            # do we have any peaks?
+            try:
+                self.chest.getNode('/','cell_peaks')
+                self.has_peaks = (self.chest.root.cell_peaks.nrows > 0)
+            except:
+                pass
+            
 
     # TODO: need to rethink how to set_data for these things, since we have so
     #    many different places to put data.
@@ -54,11 +74,17 @@ class MDAController(ControllerBase):
     def set_target(self,target='images'):
         if target == 'peaks':
             self.on_peaks = True
+            # dimensionality is the number of entries in our peak table
+            self.dimensionality = int(self.chest.root.cell_peaks.nrows)
         else:
             self.on_peaks = False
+            # dimensionality is the number of cell images
+            self.dimensionality = int(self.chest.root.cell_description.nrows)
     
     def execute(self):
         method = self.methods[self.selected_method_idx]
+        if self.dimensionality < self.number_to_derive:
+            self.number_to_derive = self.dimensionality
         if method == 'PCA':
             self.PCA(n_components=self.number_to_derive)
         elif method == 'ICA':
@@ -66,11 +92,15 @@ class MDAController(ControllerBase):
         # close the control panel
         
         # now update the UI
+        
+        # close the dialog window
+        Application.instance().end_session(self._session_id)
+        # show the results windows
 
     def render_active_factor_image(self):
-        # return average cell image (will be overlaid with peak info)
         if self.on_peaks:
             factors = self.chest.root.mda_results[context]['peak_factors']
+            # return average cell image (will be overlaid with peak info)
             self.factor_plotdata.set_data('imagedata', 
                                           self.chest.root.cells.average[:])
             values = \
@@ -187,12 +217,13 @@ class MDAController(ControllerBase):
             # but we remove the file index and filename fields, they're irrelevant.
             factor_dtype = self.chest.root.cell_peaks.dtype.descr[2:]
             table_description = np.zeros((0,), dtype=factor_dtype)
-            fs = self.chest.createTable(self.context, 'peak_factors',
+            fs = self.chest.createTable('/'+self.context, 'peak_factors',
                          description=table_description)
             for name_idx in xrange(len(names)):
-            
+                pass
         else:
-            fs = self.chest.createCArray(self.context, 'image_factors',
+            score_table_title='image_scores'
+            fs = self.chest.createCArray('/'+self.context, 'image_factors',
                                      tb.Atom.from_dtype(factors.dtype),
                                      factors.shape,
                                      filters=filters
@@ -200,33 +231,31 @@ class MDAController(ControllerBase):
             fs[:] = factors
         # scores go into a table, with one row per input image (or cell), and 
         # one column per component
-        names = ['c%i' % x for x in xrange(self.numpeaks)]
-        # flatten that from a list of lists to a simple list
-        names = [item for sublist in names for item in sublist]
+        names = ['c%i' %x for x in xrange(self.number_to_derive)]
         # make tuples of each column name and 'f8' for the data type
-        dtypes = zip(names, ['f8', ] * numcomponents)
+        dtypes = zip(names, ['f8', ] * self.number_to_derive)
         # prepend the index column
         dtypes = [('filename', '|S30'), ('file_idx', 'i4')] + dtypes
         desc = np.recarray((0,), dtype=dtypes)        
-        ss = self.chest.createTable(self.context, score_table_title, 
+        ss = self.chest.createTable('/'+self.context, score_table_title, 
                                     description=desc)
         # arrange data to populate the table
-        data = np.zeros((num_components), dtype=dtypes)
-        data['filename']=self.chest.cell_peaks['filename']
-        data['file_idx']=self.chest.cell_peaks['file_idx']
-        for col in xrange(num_components):
+        data = np.zeros((self.number_to_derive), dtype=dtypes)
+        data['filename']=self.chest.root.cell_description.col('filename')
+        data['file_idx']=self.chest.root.cell_description.col('file_idx')
+        for col in xrange(self.number_to_derive):
             data[names[col]] = scores[:, col]
         # get the table and append the data to it
-        self.chest.getNode(self.context+'/score_table_title').append(data)
-        self.chest.getNode(self.context+'/score_table_title').flush()
+        self.chest.getNode('/'+self.context+'/'+score_table_title).append(data)
+        self.chest.getNode('/'+self.context+'/'+score_table_title).flush()
         if eigenvalues is not None:
-            ev = self.chest.createCArray(self.context, 'Eigenvalues',
+            ev = self.chest.createCArray('/'+self.context, 'Eigenvalues',
                                      tb.Atom.from_dtype(eigenvalues.dtype),
                                      eigenvalues.shape,
                                      filters=filters
                                      )
             ev[:] = eigenvalues
-        self.chest.flush()        
+        self.chest.flush()
 
     ######
     #  Analysis methods each create their own member under the group of MDA
@@ -273,19 +302,19 @@ class MDAController(ControllerBase):
                                                     factors, scores)
         self.store_MDA_results(factors, scores, eigenvalues)
 
-    def _reshape_MDA_results(self, data, factors, scores):
+    def _reshape_MDA_results(self, datashape, factors, scores):
         # we need to reshape the factors and scores to make sense.
         # for images, the factors are themselves images, while the scores are
         # line plots with one column per component.
         if self.get_active_data_type() is "image":
-            factors = factors.reshape((-1, data.shape[-2], data.shape[-1]))
+            factors = factors.reshape((-1, datashape[-2], datashape[-1]))
             factors.squeeze()
-            scores.reshape((data.shape[0], -1))
+            scores.reshape((datashape[0], -1))
         # for SIs, the factors are spectra, while the scores are images.
         elif ((self.get_active_data_type() is "spectrum") or
                 (self.get_active_data_type() is "peaks")):
-            factors = factors.reshape((data.shape[0], -1))
-            scores = scores.reshape((-1, data.shape[-2], data.shape[-1]))
+            factors = factors.reshape((datashape[0], -1))
+            scores = scores.reshape((-1, datashape[-2], datashape[-1]))
             scores.squeeze()
         return factors, scores
 
@@ -306,6 +335,6 @@ class MDAController(ControllerBase):
         self.chest.flush()
         # context is a pytables group.  It has attributes for informational
         #   data, as well as being the container for any outputs.
-        self.context = "/mda_results/%s" % (datestr)
-        self.chest.createGroup(context)
-        self.chest.root.mda_results[context].setAttr('method', MDA_type)
+        self.context = "mda_results/%s" % (datestr)
+        self.chest.createGroup('/mda_results', datestr)
+        #self.chest.getNode('/mda_results/'+datestr).setAttr('method', MDA_type)

@@ -148,14 +148,12 @@ enamldef MyMenuBar(MenuBar): menu:
 
 enamldef ImagePlotButtons(Container): image_buttons:
     attr controller
-    attr cell_controller
     constraints = [
         vbox(characteristic_box,
-        hbox(save, prev_image, next_image, crop),
+        hbox(save, prev_image, next_image),
             ),
         prev_image.width == save.width,
         next_image.width == save.width,
-        crop.width == save.width,
     ]
     hug_height='required'
     SaveFileDialog: save_dialog:
@@ -175,12 +173,6 @@ enamldef ImagePlotButtons(Container): image_buttons:
         tool_tip = "View next image in stack"
         clicked :: controller.increase_selected_index()
         enabled << controller._can_change_idx
-    PushButton: crop:
-        text = "Crop cells"
-        tool_tip = "Open the cell cropping interface"
-        #clicked :: controller._show_crop_ui=True
-        clicked :: controller.open_crop_UI()
-        enabled << controller._can_crop_cells
     GroupBox: characteristic_box:
         constraints = [hbox(characteristic,
                         peak_id, show_shift,
@@ -212,10 +204,9 @@ enamldef ImagePlotButtons(Container): image_buttons:
 enamldef CellPlotButtons(Container): cell_buttons:
     attr controller
     constraints = [
-        hbox(save, prev_image, next_image, characterize),
+        hbox(save, prev_image, next_image),
         prev_image.width == save.width,
         next_image.width == save.width,
-        characterize.width == save.width,
         ]
     hug_height='required'
     SaveFileDialog: save_dialog:
@@ -235,11 +226,6 @@ enamldef CellPlotButtons(Container): cell_buttons:
         tool_tip = "View next image in stack"
         clicked :: controller.increase_selected_index()
         enabled << controller._can_change_idx
-    PushButton: characterize:
-        text = "Characterize Peaks"
-        tool_tip = "Locate and characterize peaks in the cell stack"
-        clicked :: controller.characterize(10)
-        enabled << controller._can_characterize
 
 enamldef ViewToolBar(ToolBar):
     attr controller
@@ -253,6 +239,27 @@ enamldef ViewToolBar(ToolBar):
         checkable = True
         checked := controller.show_cell_view
         toggled :: print "toggled cell view"
+        
+enamldef ToolsToolBar(ToolBar):
+    #: this controller is the HighSeasAdventure controller
+    attr controller
+    Action: crop:
+        text = "Crop cells"
+        tool_tip = "Open the cell cropping interface"
+        triggered :: controller.open_crop_UI()
+        enabled << (controller.image_controller.numfiles>0)
+    Action: characterize:
+        text = "Characterize Peaks"
+        tool_tip = "Locate and characterize peaks in the cell stack"
+        triggered :: controller.cell_controller.characterize(10)
+        enabled << (controller.cell_controller.numfiles>0)
+    Action: mda:
+        text = "MDA"
+        tool_tip = "Perform some sort of multivariate data analysis"
+        triggered :: controller.open_MDA_UI()
+        enabled << (controller.cell_controller.numfiles>0)
+
+    
 """
     Action: show_scores:
         text = "Scores"
@@ -293,14 +300,12 @@ enamldef ScoreViewDockPane(DockPane): scoredockpane:
 
 enamldef ImageViewDockPane(DockPane): imagedockpane:
     attr controller
-    attr cell_controller
     Container:
         EnableCanvas: canvas:
             component << imagedockpane.controller.plot
             
         ImagePlotButtons: buttons:
             controller << imagedockpane.controller
-            cell_controller << imagedockpane.cell_controller
 
 enamldef Main(MainWindow): main:
     attr controller
@@ -311,9 +316,11 @@ enamldef Main(MainWindow): main:
     ViewToolBar: view_buttons:
         controller << main.controller
         dock_area = 'left'
+    ToolsToolBar:
+        controller << main.controller
+        dock_area = 'left'
     ImageViewDockPane: image_view:
         controller << main.controller.image_controller
-        cell_controller << main.controller.cell_controller
         title << "Image view"
         dock_area = 'left'
         visible := main.controller.show_image_view
@@ -323,25 +330,3 @@ enamldef Main(MainWindow): main:
         dock_area = 'right'
         #: floating = True
         visible := main.controller.show_cell_view
-
-"""
-    ImageViewDockPane: score_view:
-        title << "Score view"
-        dock_area = 'left'
-        #: allowed_dock_areas = ['left', 'right']
-        visible := main.controller.show_score_view
-    ImageViewDockPane: factor_view:
-        title << "Factor view"
-        dock_area = 'right'
-        visible := main.controller.show_factor_view
-"""
-
-"""
-    Container:
-        constraints = [vbox(html, tbar, spacing=0)]
-        Html:
-            id: html
-            source = '<h1><center>Hello World!</center></h1>'
-        MyToolBar:
-            id: tbar
-"""

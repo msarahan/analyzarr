@@ -16,8 +16,16 @@ from traits.api import HasTraits, Bool, Instance
 from MappableImage import MappableImageController
 from Cell import CellController
 from CellCrop import CellCropController
+from MDA import MDAController
 
 from analyzarr import file_import
+
+import enaml
+with enaml.imports():
+    from ui.ucc import CellCropperInterface
+    from ui.MDA_popup import MDAInterface
+from enaml.application import Application
+from enaml.stdlib.sessions import simple_session
  
 # the UI controller
 class HighSeasAdventure(HasTraits):
@@ -28,7 +36,6 @@ class HighSeasAdventure(HasTraits):
 
     image_controller = Instance(MappableImageController)
     cell_controller = Instance(CellController)
-    crop_controller = Instance(CellCropController)
 
     # TODO: need method for opening files
 
@@ -53,8 +60,6 @@ class HighSeasAdventure(HasTraits):
                                                     treasure_chest=chest)
         self.cell_controller = CellController(parent=self, 
                                               treasure_chest=chest)
-        self.crop_controller = CellCropController(parent=self, 
-                                                  treasure_chest=chest)
         self.chest = chest        
 
     def open_treasure_chest(self, filename):
@@ -65,8 +70,6 @@ class HighSeasAdventure(HasTraits):
                                                     treasure_chest=chest)
         self.cell_controller = CellController(parent=self, 
                                               treasure_chest=chest)
-        self.crop_controller = CellCropController(parent=self, 
-                                                  treasure_chest=chest)
         self.chest = chest
 
     def import_files(self, file_list):
@@ -75,6 +78,22 @@ class HighSeasAdventure(HasTraits):
                                                     treasure_chest=self.chest)
         self.cell_controller = CellController(parent=self,
                                               treasure_chest=self.chest)
-        self.crop_controller = CellCropController(parent=self,
-                                                  treasure_chest=self.chest)
 
+    def open_crop_UI(self):
+        crop_controller = CellCropController(parent=self,
+                                                  treasure_chest=self.chest)
+        cell_cropper = simple_session('cropper', 'Cell cropper', CellCropperInterface, 
+                                      controller=crop_controller)
+        Application.instance().add_factories([cell_cropper])
+        session_id = Application.instance().start_session('cropper')
+        crop_controller._session_id = session_id
+        
+    def open_MDA_UI(self):
+        mda_controller = MDAController(parent=self, 
+                                             treasure_chest=self.chest)
+        mda_dialog = simple_session('mda', 'MDA dialog', MDAInterface, 
+                                      controller=mda_controller)
+        Application.instance().add_factories([mda_dialog])
+        session_id = Application.instance().start_session('mda')
+        mda_controller._session_id = session_id
+        
