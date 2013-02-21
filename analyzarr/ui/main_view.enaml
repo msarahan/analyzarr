@@ -227,18 +227,78 @@ enamldef CellPlotButtons(Container): cell_buttons:
         clicked :: controller.increase_selected_index()
         enabled << controller._can_change_idx
 
+enamldef FactorPlotButtons(Container): factor_buttons:
+    attr controller
+    constraints = [
+        hbox(save, prev_image, next_image),
+        prev_image.width == save.width,
+        next_image.width == save.width,
+        ]
+    hug_height='required'
+    SaveFileDialog: save_dialog:
+        controller = cell_buttons.controller
+    PushButton: save:
+        text = "Save"
+        tool_tip = "Save current plot"
+        enabled << controller._can_save
+        clicked :: save_dialog.open()
+    PushButton: prev_image:
+        text = "<"
+        tool_tip = "View previous factor"
+        clicked :: controller.decrease_selected_component()
+        enabled << controller._can_change_idx
+    PushButton: next_image:
+        text = ">"
+        tool_tip = "View next factor"
+        clicked :: controller.increase_selected_component()
+        enabled << controller._can_change_idx
+
+enamldef ScorePlotButtons(Container): score_buttons:
+    attr controller
+    constraints = [
+        hbox(save, prev_image, next_image),
+        prev_image.width == save.width,
+        next_image.width == save.width,
+        ]
+    hug_height='required'
+    SaveFileDialog: save_dialog:
+        #: TODO: save dialog should get plot, not controller.
+        controller = cell_buttons.controller
+    PushButton: save:
+        text = "Save"
+        tool_tip = "Save current plot"
+        enabled << controller._can_save
+        clicked :: save_dialog.open()
+    PushButton: prev_image:
+        text = "<"
+        tool_tip = "View previous image in stack"
+        clicked :: controller.decrease_selected_index()
+        enabled << controller._can_change_idx
+    PushButton: next_image:
+        text = ">"
+        tool_tip = "View next image in stack"
+        clicked :: controller.increase_selected_index()
+        enabled << controller._can_change_idx
+
 enamldef ViewToolBar(ToolBar):
     attr controller
     Action:
         text = "Images"
         checkable = True
         checked := controller.show_image_view
-        toggled :: print "toggled image view"
     Action:
         text = "Cells"
         checkable = True
         checked := controller.show_cell_view
-        toggled :: print "toggled cell view"
+    Action:
+        text = "Factors"
+        checkable = True
+        checked := controller.show_factor_view
+    Action:
+        text = "Scores"
+        checkable = True
+        checked := controller.show_score_view      
+        
         
 enamldef ToolsToolBar(ToolBar):
     #: this controller is the HighSeasAdventure controller
@@ -258,20 +318,6 @@ enamldef ToolsToolBar(ToolBar):
         tool_tip = "Perform some sort of multivariate data analysis"
         triggered :: controller.open_MDA_UI()
         enabled << (controller.cell_controller.numfiles>0)
-
-    
-"""
-    Action: show_scores:
-        text = "Scores"
-        checkable = True
-        checked := controller.show_score_view
-        toggled :: print "toggled score view"
-    Action: show_factors:
-        text = "Factors"
-        checkable = True
-        checked := controller.show_factor_view
-        toggled :: print "toggled factor view"
-"""
     
 enamldef CellViewDockPane(DockPane): celldockpane:
     attr controller

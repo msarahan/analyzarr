@@ -51,7 +51,18 @@ class MDAController(ControllerBase):
                 self.has_peaks = (self.chest.root.cell_peaks.nrows > 0)
             except:
                 pass
-            
+    
+        def increase_selected_component(self):
+            if self.component_index == (self.dimensionality - 1):
+                self.component_index = 0
+            else:
+                self.component_index += 1
+    
+        def decrease_selected_component(self):
+            if self.component_index == 0:
+                self.component_index = int(self.dimensionality - 1)
+            else:
+                self.component_index -= 1    
 
     # TODO: need to rethink how to set_data for these things, since we have so
     #    many different places to put data.
@@ -274,7 +285,7 @@ class MDAController(ControllerBase):
         #   - whitening applied
         # store the mean of each column - we use this for reconstruction later
 
-    def ICA(self, n_components, whiten=False, max_iter=10):
+    def ICA(self, n_components, whiten=False, max_iter=10, differentiate=False):
         from scipy import integrate
         self._create_new_context("ICA")
         # reshape the data:
@@ -289,15 +300,19 @@ class MDAController(ControllerBase):
         Pre-processes the data to be ready for ICA.  Namely:
           differentiates the data (integrated ICA)
         """
-        diffdata = data.copy()
-        deriv_kernel = np.array([-1, 0, 0, 0, 0, 0, 1])
-        for i in xrange(data.shape[1]):
-            diffdata[:, i] = np.convolve(data[:, i], deriv_kernel)[3:-3]
-        factors, scores = mda.ICA(diffdata, n_components=n_components)
-
-        # integration undoes the differentiation done in the ICA data prep.
-        factors = np.array([integrate.cumtrapz(factors[:, i])
-                            for i in xrange(factors.shape[1])]).T
+        if differentiate:
+            diffdata = data.T.copy()
+            deriv_kernel = np.array([-1, 0, 0, 0, 0, 0, 1])
+            for i in xrange(data.shape[1]):
+                diffdata[:, i] = np.convolve(data[:, i], deriv_kernel)[3:-3]
+            factors, scores = mda.ICA(diffdata, n_components=n_components)
+            # integration undoes the differentiation done in the ICA data pre
+            factors = np.array([integrate.cumtrapz(factors[:, i])
+                                for i in xrange(factors.shape[1])]).T
+            # TODO: pad by one row for the row than has been discarded by differentiation/integtration            
+        else:
+            factors, scores = mda.ICA(data, n_components=n_components)
+        
         factors, scores = self._reshape_MDA_results(active_data_shape, 
                                                     factors, scores)
         self.store_MDA_results(factors, scores, eigenvalues)
