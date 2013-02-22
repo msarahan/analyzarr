@@ -333,7 +333,7 @@ enamldef FactorViewDockPane(DockPane): factordockpane:
     Container:
         EnableCanvas: canvas:
             component << factordockpane.controller.factor_plot
-        FactorViewButtons: buttons:
+        FactorPlotButtons: buttons:
             controller << factordockpane.controller
 
 enamldef ScoreViewDockPane(DockPane): scoredockpane:
@@ -341,7 +341,7 @@ enamldef ScoreViewDockPane(DockPane): scoredockpane:
     Container:
         EnableCanvas: canvas:
             component << scoredockpane.controller.score_plot
-        ScoreViewButtons: buttons:
+        ScorePlotButtons: buttons:
             controller << scoredockpane.controller
 
 enamldef ImageViewDockPane(DockPane): imagedockpane:
@@ -376,3 +376,13 @@ enamldef Main(MainWindow): main:
         dock_area = 'right'
         #: floating = True
         visible := main.controller.show_cell_view
+    FactorViewDockPane: factor_view:
+        controller << main.controller.mda_controller
+        title << "Factor view"
+        dock_area = 'right'
+        visible := main.controller.show_factor_view
+    ScoreViewDockPane: score_view:
+        controller << main.controller.mda_controller
+        title << "Score view"
+        dock_area = 'left'
+        visible := main.controller.show_score_view

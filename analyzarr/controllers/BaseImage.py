@@ -51,7 +51,8 @@ class BaseImageController(ControllerBase):
         return data
 
     def get_active_name(self):
-        return self.nodes[self.selected_index].name
+        nodes = self.chest.listNodes('/rawdata')
+        return nodes[self.selected_index].name
     
     @on_trait_change("selected_index")
     def update_image(self):

@@ -5,10 +5,9 @@ from BaseImage import BaseImageController
 from chaco.default_colormaps import gray
 from chaco.api import ArrayPlotData, BasePlotContainer, Plot
 
-from analyzarr import peak_char as pc
-from analyzarr import cv_funcs
-from analyzarr.file_import import filters
-from analyzarr import data_structure
+from analyzarr.lib.cv import peak_char as pc
+from analyzarr.lib.cv import cv_funcs
+from analyzarr.lib.io.data_structure import CellsTable, filters
 
 import numpy as np
 import tables as tb
@@ -67,6 +66,7 @@ class CellCropController(BaseImageController):
                     )
         self.template_plot.img_plot('imagedata', title = "Template")
         self.template_plot.aspect_ratio=1 #square templates
+        self.template_filename = self.get_active_name()
         self._get_max_positions()
 
     @on_trait_change("selected_index, ShowCC")
@@ -95,6 +95,7 @@ class CellCropController(BaseImageController):
                         self.template_left:self.template_left + self.template_size
                     ]
                     )
+        self.template_filename = self.get_active_name()
         if self.numpeaks_total>0:
             print "clearing peaks"
             self.peaks={}
@@ -227,8 +228,7 @@ class CellCropController(BaseImageController):
             except:
                 pass
             # recreate it
-            self.chest.createTable('/', 'cell_description', 
-                                   data_structure.CellsTable)
+            self.chest.createTable('/', 'cell_description', CellsTable)
             # remove all existing entries in the data group
             for node in self.chest.listNodes('/cells'):
                 self.chest.removeNode('/cells/' + node.name)
@@ -273,6 +273,10 @@ class CellCropController(BaseImageController):
                                         filters = filters,
                                         )
                 cell_array[:] = data
+                self.chest.setNodeAttr('/cell_description', 'threshold', (self.thresh_lower, self.thresh_upper))
+                self.chest.setNodeAttr('/cell_description', 'template_position', (self.template_left, self.template_top))
+                self.chest.setNodeAttr('/cell_description', 'template_filename', self.template_filename)
+                                       
                 self.chest.root.cell_description.flush()
                 self.chest.flush()
         average_data /= self.numfiles

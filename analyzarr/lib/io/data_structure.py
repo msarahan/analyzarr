@@ -17,8 +17,9 @@ filters = tables.Filters(complib='blosc', complevel=8)
 
 class MdaResultsTable(tables.IsDescription):
     idx = tables.Int64Col(pos=0)
-    # YYYY-MM-DD HH:MM
-    date = tables.StringCol(16)
+    # the MDA type and the date it was run - an identifier for each run.
+    # XXX_YYYY-MM-DD HH:MM
+    context = tables.StringCol(24)
     # type of MDA
     mda_type = tables.StringCol(10)
     # description of where data came from (as a path in the file, for example:

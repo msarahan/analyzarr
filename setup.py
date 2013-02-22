@@ -37,8 +37,8 @@ install_req = ['scipy', 'numpy', 'traits', 'chaco', 'enaml',
 numpy_include_dir = np.get_include()
 
 peak_finder_cython = Extension(
-    'analyzarr.one_dim_findpeaks', 
-    sources=['analyzarr/one_dim_findpeaks.pyx'],
+    'analyzarr.lib.cv.one_dim_findpeaks', 
+    sources=['analyzarr/lib/cv/one_dim_findpeaks.pyx'],
     include_dirs=[numpy_include_dir],
     )
     
@@ -50,6 +50,7 @@ setup(
     version = version,
     packages = ['analyzarr', 'analyzarr.lib', 'analyzarr.lib.mda',
                 'analyzarr.lib.io', 'analyzarr.lib.io.libs',
+                'analyzarr.lib.cv',
                 'analyzarr.ui', 'analyzarr.controllers'],
     package_data = {
         'analyzarr' : [ '*.enaml', 'ui/*.enaml',],

@@ -34,11 +34,6 @@ class ControllerBase(HasRenderer):
         else:
             self.selected_index -= 1
 
-    # TODO: this is for defining MDA's kind of data it's handling.  It might
-    #   eventually be used for spectroscopy data.
-    def get_active_data_type(self):
-        return "image"
-
     def _get_image_data(self, datatype, slab=[]):
         """
         Gets some slab of data from the HDF5 file

@@ -25,8 +25,7 @@ def ICA(data, n_components, whiten = False, max_iter = 10):
     estimator = decomposition.FastICA(n_components = n_components, 
                                             whiten = whiten, 
                                             max_iter = max_iter)
-    estimator.fit(data)
-    factors = est.transform(data)
+    factors = estimator.fit(data).transform(data)
     scores = estimator.get_mixing_matrix()
     return factors, scores
 

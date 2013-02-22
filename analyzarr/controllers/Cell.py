@@ -3,7 +3,7 @@ from BaseImage import BaseImageController
 from traits.api import Bool, Int, on_trait_change
 import numpy as np
 
-from analyzarr import peak_char as pc
+import analyzarr.lib.cv.peak_char as pc
 
 #from chaco.default_colormaps import gray
 #from chaco.api import ArrayPlotData, BasePlotContainer, Plot

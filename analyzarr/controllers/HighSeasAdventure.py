@@ -16,9 +16,10 @@ from traits.api import HasTraits, Bool, Instance
 from MappableImage import MappableImageController
 from Cell import CellController
 from CellCrop import CellCropController
-from MDA import MDAController
+from MDA_view import MDAViewController
+from MDA_execute import MDAExecutionController
 
-from analyzarr import file_import
+from analyzarr.lib.io import file_import
 
 import enaml
 with enaml.imports():
@@ -36,19 +37,24 @@ class HighSeasAdventure(HasTraits):
 
     image_controller = Instance(MappableImageController)
     cell_controller = Instance(CellController)
-
-    # TODO: need method for opening files
-
+    mda_controller = Instance(MDAViewController)
+    
     def __init__(self, *args, **kw):
         super(HighSeasAdventure, self).__init__(*args, **kw)
         self.image_controller = MappableImageController(parent=self)
         self.cell_controller = CellController(parent=self)
-        self.crop_controller = CellCropController(parent=self)
+        self.mda_controller = MDAViewController(parent=self)
         self.chest = None
 
     def update_cell_data(self):
         self.cell_controller = CellController(parent=self, 
                                               treasure_chest=self.chest)
+
+    def update_mda_data(self):
+        self.mda_controller = MDAViewController(parent=self, 
+                                              treasure_chest=self.chest)
+        self.show_factor_view = True
+        self.show_score_view = True
         
     def update_image_data(self):
         self.image_controller.data_updated()
@@ -89,7 +95,7 @@ class HighSeasAdventure(HasTraits):
         crop_controller._session_id = session_id
         
     def open_MDA_UI(self):
-        mda_controller = MDAController(parent=self, 
+        mda_controller = MDAExecutionController(parent=self, 
                                              treasure_chest=self.chest)
         mda_dialog = simple_session('mda', 'MDA dialog', MDAInterface, 
                                       controller=mda_controller)
