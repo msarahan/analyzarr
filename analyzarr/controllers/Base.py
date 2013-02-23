@@ -18,6 +18,12 @@ class ControllerBase(HasRenderer):
             self.chest = treasure_chest
             self.nodes = self.chest.listNodes(data_path)
 
+    def get_plot(self, plot_id):
+        if hasattr(self, plot_id):
+            return getattr(self, plot_id)
+        else:
+            raise NameError('No such plot: %s' % plot_id)
+
     # used by the cell cropper
     def set_active_index(self, idx):
         self.selected_index = idx

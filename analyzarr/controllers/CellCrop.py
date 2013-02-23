@@ -51,8 +51,7 @@ class CellCropController(BaseImageController):
     def init_plot(self):
         self.plotdata.set_data('imagedata', self.get_active_image())
         self.plot = self.get_scatter_overlay_plot(array_plot_data=self.plotdata,
-                title="%s of %s: " % (self.selected_index + 1,
-                                      self.numfiles) + self.get_active_name(),
+                title=self.get_active_name(),
                 tool='colorbar',
                     )
         # pick an initial template with default parameters
@@ -81,8 +80,7 @@ class CellCropController(BaseImageController):
                                       np.arange(CC.shape[0]))
         else:            
             self.plotdata.set_data("imagedata", self.get_active_image())
-            self.set_plot_title("%s of %s: " % (self.selected_index + 1,
-                                          self.numfiles) + self.get_active_name())
+            self.set_plot_title(self.get_active_name())
             grid_data_source = self._base_plot.range2d.sources[0]
             grid_data_source.set_data(np.arange(self.get_active_image().shape[1]), 
                                       np.arange(self.get_active_image().shape[0]))

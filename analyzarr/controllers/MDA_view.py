@@ -126,7 +126,14 @@ class MDAViewController(BaseImageController):
         self.score_plotdata.set_data('color', color)
         self.score_plot = self.get_scatter_overlay_plot(self.score_plotdata, tool="colorbar")
 
-    @on_trait_change("selected_index, component_index")
+    @on_trait_change("selected_index, component_index, characteristic, _show_shift,\
+                         shift_scale")
     def update_image(self):
         self.render_active_factor_image(self.context)
         self.render_active_score_image(self.context)
+        
+    def open_factor_save_UI(self):
+        self.open_save_UI(plot_id = 'factor_plot')
+    
+    def open_score_save_UI(self):
+        self.open_save_UI(plot_id = 'score_plot')
