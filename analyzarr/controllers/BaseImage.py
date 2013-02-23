@@ -60,8 +60,18 @@ class BaseImageController(ControllerBase):
     
     @on_trait_change("selected_index")
     def update_image(self):
-        self.plotdata.set_data("imagedata", self.get_active_image())
+        # get the old image for the sake of comparing image sizes
+        old_data = self.plotdata.get_data('imagedata')
+        active_image = self.get_active_image()
+        self.plotdata.set_data("imagedata", active_image)
         self.set_plot_title(self.get_active_name())
+        if old_data.shape != active_image.shape:
+            grid_data_source = self._base_plot.range2d.sources[0]
+            grid_data_source.set_data(np.arange(active_image.shape[1]), 
+                                  np.arange(active_image.shape[0]))
+            self.plot = self.get_simple_image_plot(array_plot_data = self.plotdata,
+                    title = self.get_active_name())
+            self.plot.aspect_ratio=(float(active_image.shape[1])/active_image.shape[0])
 
     def open_save_UI(self, plot_id='plot'):
         save_controller = SaveFileController(plot=self.get_plot(plot_id))

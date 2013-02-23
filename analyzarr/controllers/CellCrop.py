@@ -74,12 +74,24 @@ class CellCropController(BaseImageController):
             CC = cv_funcs.xcorr(self.template_data.get_data('imagedata'),
                                      self.get_active_image())
             self.plotdata.set_data("imagedata",CC)
+            self.plot = self.get_scatter_overlay_plot(array_plot_data=self.plotdata,
+                        title=self.get_active_name(),
+                        tool='colorbar',
+                        )
+            self.plot.aspect_ratio = (float(CC.shape[1])/ 
+                                                  CC.shape[0])                                    
             self.set_plot_title("Cross correlation of " + self.get_active_name())
             grid_data_source = self._base_plot.range2d.sources[0]
             grid_data_source.set_data(np.arange(CC.shape[1]), 
                                       np.arange(CC.shape[0]))
-        else:            
+        else:                       
             self.plotdata.set_data("imagedata", self.get_active_image())
+            self.plot = self.get_scatter_overlay_plot(array_plot_data=self.plotdata,
+                        title=self.get_active_name(),
+                        tool='colorbar',
+                        )
+            self.plot.aspect_ratio = (float(self.get_active_image().shape[1])/ 
+                                      self.get_active_image().shape[0])             
             self.set_plot_title(self.get_active_name())
             grid_data_source = self._base_plot.range2d.sources[0]
             grid_data_source.set_data(np.arange(self.get_active_image().shape[1]), 
@@ -177,6 +189,9 @@ class CellCropController(BaseImageController):
 
     @on_trait_change('peaks, selected_index')
     def update_scatter_plot(self):
+        data = self.plotdata.get_data('imagedata')
+        aspect_ratio = (float(data.shape[1])/ 
+                                  data.shape[0])        
         if self.get_active_name() in self.peaks:
             self.plotdata.set_data("index",self.peaks[self.get_active_name()][:,0])
             self.plotdata.set_data("value",self.peaks[self.get_active_name()][:,1])
@@ -274,6 +289,7 @@ class CellCropController(BaseImageController):
                 self.chest.setNodeAttr('/cell_description', 'threshold', (self.thresh_lower, self.thresh_upper))
                 self.chest.setNodeAttr('/cell_description', 'template_position', (self.template_left, self.template_top))
                 self.chest.setNodeAttr('/cell_description', 'template_filename', self.template_filename)
+                self.chest.setNodeAttr('/cell_description', 'template_size', (self.template_size))
                                        
                 self.chest.root.cell_description.flush()
                 self.chest.flush()
