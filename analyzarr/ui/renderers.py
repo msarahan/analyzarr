@@ -204,9 +204,9 @@ class HasRenderer(HasTraits):
         scatter_plot, colorbar = _render_scatter_overlay(image_plot, 
                                     array_plot_data,
                                     tool=tool,)
-        image_overlay_container = OverlayPlotContainer(image_plot, scatter_plot)
+        image_container = OverlayPlotContainer(image_plot, scatter_plot)
         if colorbar is not None:
-            image_container = HPlotContainer(image_overlay_container, colorbar)
+            image_container = HPlotContainer(image_container, colorbar)
             if self.thresh is not None:
                 scatter_renderer = scatter_plot.plots['scatter_plot'][0]
                 scatter_renderer.color_data.metadata['selections'] = self.thresh
