@@ -50,12 +50,13 @@ class MDAExecutionController(HasTraits):
     def set_target(self,target='images'):
         if target == 'peaks':
             self.on_peaks = True
-            # dimensionality is the number of entries in our peak table
-            self.dimensionality = int(self.chest.root.cell_peaks.nrows)
+            # dimensionality is the number of columns in our peak table
+            self.dimensionality = int(5*self.chest.getNodeAttr('/cell_peaks','number_of_peaks'))
         else:
             self.on_peaks = False
-            # dimensionality is the number of cell images
-            self.dimensionality = int(self.chest.root.cell_description.nrows)
+            # dimensionality is the size of each cell, flattened
+            cell_size = self.chest.getNodeAttr('/cell_peaks','number_of_peaks')
+            self.dimensionality = int(cell_size**2)
     
     def execute(self):
         method = self.methods[self.selected_method_idx]
@@ -185,9 +186,14 @@ class MDAExecutionController(HasTraits):
         ss = self.chest.createTable('/mda_results/'+self.context, score_table_title, 
                                     description=desc)
         # arrange data to populate the table
-        data = np.zeros((self.chest.root.cell_peaks.nrows), dtype=dtypes)
-        data['filename']=self.chest.root.cell_peaks.col('filename')
-        data['file_idx']=self.chest.root.cell_peaks.col('file_idx')
+        if self.on_peaks:
+            data = np.zeros((self.chest.root.cell_peaks.nrows), dtype=dtypes)
+            data['filename']=self.chest.root.cell_peaks.col('filename')
+            data['file_idx']=self.chest.root.cell_peaks.col('file_idx')
+        else:
+            data = np.zeros((self.chest.root.cell_description.nrows), dtype=dtypes)
+            data['filename']=self.chest.root.cell_description.col('filename')
+            data['file_idx']=self.chest.root.cell_description.col('file_idx')            
         for col in xrange(self.number_to_derive):
             data[names[col]] = scores[:, col]
         # get the table and append the data to it
