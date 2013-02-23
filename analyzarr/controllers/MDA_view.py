@@ -111,11 +111,11 @@ class MDAViewController(BaseImageController):
         self.score_plotdata.set_data('imagedata', self.get_active_image())
         values = self.chest.root.cell_description.readWhere(
                 'filename == "%s"' % self.get_active_name(),
-                field='x_coordinate',)
+                field='y_coordinate',)
     
         indices = self.chest.root.cell_description.readWhere(
                 'filename == "%s"' % self.get_active_name(),
-                field='y_coordinate',)
+                field='x_coordinate',)
         if self.chest.getNodeAttr('/mda_results/'+context, 'on_peaks'):
             scores = self.chest.getNode('/mda_results/'+context+'/peak_scores')          
         else:
