@@ -3,8 +3,6 @@ from traits.api import Bool, List, Int, Float, on_trait_change
 import numpy as np
 
 class MappableImageController(BaseImageController):
-    _show_crop_ui = Bool(False)
-    _can_crop_cells = Bool(False)
     _can_map_peaks = Bool(False)
     _is_mapping_peaks = Bool(False)
     _characteristics = List(["Height", "Orientation", "Eccentricity"])

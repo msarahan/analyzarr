@@ -25,7 +25,6 @@ def open_treasure_chest(filename):
     return h5file
 
 def import_files(h5file, file_string):
-
     # match supported file input types - check extension
     if '*' in file_string:
         from glob import glob
