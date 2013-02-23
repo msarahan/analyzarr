@@ -230,10 +230,12 @@ enamldef CellPlotButtons(Container): cell_buttons:
 enamldef FactorPlotButtons(Container): factor_buttons:
     attr controller
     constraints = [
+        vbox(characteristic_box,
         hbox(save, prev_image, next_image),
+            ),
         prev_image.width == save.width,
         next_image.width == save.width,
-        ]
+    ]
     hug_height='required'
     SaveFileDialog: save_dialog:
         controller = cell_buttons.controller
@@ -252,6 +254,23 @@ enamldef FactorPlotButtons(Container): factor_buttons:
         tool_tip = "View next factor"
         clicked :: controller.increase_selected_component()
         enabled << controller._can_change_idx
+    GroupBox: characteristic_box:
+        constraints = [hbox(characteristic, show_shift,
+                        scale_label, shift_scale),]
+        hug_height='required'
+        title = "Characteristic Map:"
+        #:visible << controller._can_map_peaks
+        ComboBox: characteristic:
+            items << controller._characteristics
+            index := controller._characteristic 
+            enabled <<  controller._can_map_peaks
+        CheckBox: show_shift:
+            text = "Show shifts"
+            checked := controller._show_shift
+        Label: scale_label:
+            text = "Shift scale"
+        FloatField: shift_scale:
+            value := controller.shift_scale
 
 enamldef ScorePlotButtons(Container): score_buttons:
     attr controller

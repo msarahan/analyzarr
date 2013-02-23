@@ -153,13 +153,17 @@ class CellController(BaseImageController):
                                'cell_peaks', description=desc)        
         # for each file in the cell_data group, run analysis.
         nodes = self.chest.listNodes('/cells')
-        node_names = [node.name for node in nodes if node.name not in ['template', 'average']]
+        # exclude some nodes
+        node_names = [node.name for node in nodes if node.name not in ['template']]
         for node in node_names:
-            numcells = nodes[node_names.index(node)].shape[0]
-            data = np.zeros((numcells),dtype=dtypes)
+            cell_data = nodes[node_names.index(node)][:]
+            cell_data = cell_data.reshape((-1, cell_data.shape[-2], 
+                                           cell_data.shape[-1]))            
+            data = np.zeros((cell_data.shape[0]),dtype=dtypes)
             data['filename'] = node
-            data['file_idx'] = np.arange(numcells)
-            attribs = pc.peak_attribs_stack(nodes[node_names.index(node)][:],
+            data['file_idx'] = np.arange(cell_data.shape[0])            
+            # reshape possibly 2D arrays (average fits this)
+            attribs = pc.peak_attribs_stack(cell_data,
                             peak_width=peak_width, subpixel=subpixel,
                             target_locations=target_locations,
                             target_neighborhood=target_neighborhood,
@@ -170,6 +174,7 @@ class CellController(BaseImageController):
                 data[names[name_idx]] = attribs[:, name_idx]
             # add the data to the table
             self.chest.root.cell_peaks.append(data)
+            self.chest.root.cell_peaks.flush()
         # add an attribute for the total number of peaks recorded
         self.chest.root.cell_peaks.setAttr('number_of_peaks', self.numpeaks)
         self.chest.root.cell_peaks.flush()
@@ -204,7 +209,7 @@ class CellController(BaseImageController):
         """
         if len(chars) > 0:
             if len(indices) is 0:
-                indices = range(self.chest.root.cell_peaks.number_of_peaks)
+                indices = range(self.chest.getNodeAttr('/cell_peaks','number_of_peaks'))
             # the columns we get are the combination of the chars with the
             #   indices we want.
             cols = [['%s%i' % (c, i) for i in indices] for c in chars]

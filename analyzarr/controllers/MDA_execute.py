@@ -38,7 +38,7 @@ class MDAExecutionController(HasTraits):
             # do we have any peaks?
             try:
                 self.chest.getNode('/','cell_peaks')
-                self.has_peaks = (self.chest.root.cell_peaks.nrows > 0)
+                self.has_peaks = bool((self.chest.root.cell_peaks.nrows > 0))
             except:
                 pass
 
@@ -65,18 +65,62 @@ class MDAExecutionController(HasTraits):
             self.PCA(n_components=self.number_to_derive)
         elif method == 'ICA':
             self.ICA(n_components=self.number_to_derive)
+        self.chest.setNodeAttr('/mda_results/'+self.context, 
+                               'dimensionality', self.number_to_derive)
         # close the dialog window
         Application.instance().end_session(self._session_id)
         # show the results windows
         self.parent.update_mda_data()
 
+    def get_peak_data(self, chars=[], indices=[]):
+        """
+        Get peak data from the table of peak data.
+
+        Input:
+        chars - a list of characteristic names (as string letters).
+            For example, ['dx', 'dy', 'h'] selects x and y deviation from 
+            average peak position and the peak height.
+            
+            Possible options include:
+            x - the x position of a peak in a cell
+            y - the y position of a peak in a cell
+            dx - the difference between the x position of the peak in this cell
+                 and the x position of the same peak in the average cell
+            dy - the difference between the y position of the peak in this cell
+                 and the y position of the same peak in the average cell
+            h - the height of the peak
+            o - if a peak is not perfectly symmetric, the orientation of the peak.
+            e - the eccentricity of a peak.  i.e. how egg-shaped is it?
+            
+        indices - peak indices (integers) to select from.  Use this if you want to compare
+            only a few peaks in the cell structure to compare.
+            None selects all peaks.
+        """
+        if len(chars) > 0:
+            if len(indices) is 0:
+                indices = range(self.chest.root.cell_peaks.number_of_peaks)
+            # the columns we get are the combination of the chars with the
+            #   indices we want.
+            cols = [['%s%i' % (c, i) for i in indices] for c in chars]
+        else:
+            chars = ['dx', 'dy', 'h', 'o', 'e']
+            if len(indices) is 0:
+                indices = range(self.chest.getNodeAttr('/cell_peaks','number_of_peaks'))
+            # the columns we get are the combination of the chars with the
+            #   indices we want.
+            cols = [['%s%i' % (c, i) for c in chars] for i in indices]
+        # make the cols a simple list, rather than a list of lists
+        cols = [item for sublist in cols for item in sublist]
+        # get the data from the table
+        peak_data = self.chest.root.cell_peaks[:]
+        # return an ndarray with only the selected columns
+        return np.array(peak_data[cols]).view(float).reshape(len(cols), -1)
+
     def get_input_data(self):
         if self.on_peaks:
             # query the peak table for all fields EXCEPT the filename and file index
             # TODO: should we also exclude peak coordinates (keep only the shift?)
-            cols = self.chest.root.cell_peaks.colnames[2:]
-            data = self.chest.root.cell_peaks[:][cols]
-            data = data.view((np.float64, len(data.dtype.names)))
+            data = self.get_peak_data().T
             active_data_shape = data.shape
         else:
             active_data = self.parent.cell_controller.get_cell_set()
@@ -95,9 +139,32 @@ class MDAExecutionController(HasTraits):
             fs = self.chest.createTable('/mda_results/'+self.context, 'peak_factors',
                          description=table_description)
             self.chest.setNodeAttr('/mda_results/'+self.context, 'on_peaks', True)
-            for name_idx in xrange(len(names)):
-                # TODO: need to copy in data to table
-                pass
+            data = np.zeros((self.number_to_derive), dtype=factor_dtype)
+            row = fs.row
+            # record the factors
+            indices = range(self.chest.getNodeAttr('/cell_peaks','number_of_peaks'))
+            chars = ['dx', 'dy', 'h', 'o', 'e']
+            # the columns we get are the combination of the chars with the
+            #   indices we want.
+            cols = [['%s%i' % (c, i) for c in chars] for i in indices]            
+            # flatten that from a list of lists to a simple list
+            cols = [item for sublist in cols for item in sublist]            
+            for col in xrange(len(cols)):
+                data[cols[col]] = factors[:, col]
+            # record the x and y coordinates
+            coordinate_data_indices = [['%s%i' % (c, i) for c in ['x', 'y']] 
+                                        for i in indices]
+            # flatten that from a list of lists to a simple list
+            coordinate_data_indices = [item for sublist in coordinate_data_indices for item in sublist]
+            # get the row for the average cell from the cell_peaks table.
+            #   we use this for recording the X and Y coordinates of peaks,
+            #   which we do not feed into MDA itself.
+            peak_record = self.chest.root.cell_peaks.readWhere(
+                'filename == "average"')[0]        
+            for idx in coordinate_data_indices:
+                data[idx] = peak_record[idx]
+            fs.append(data)
+            fs.flush()
         else:
             score_table_title='image_scores'
             fs = self.chest.createCArray('/mda_results/'+self.context, 'image_factors',
@@ -118,9 +185,9 @@ class MDAExecutionController(HasTraits):
         ss = self.chest.createTable('/mda_results/'+self.context, score_table_title, 
                                     description=desc)
         # arrange data to populate the table
-        data = np.zeros((self.number_to_derive), dtype=dtypes)
-        data['filename']=self.chest.root.cell_description.col('filename')
-        data['file_idx']=self.chest.root.cell_description.col('file_idx')
+        data = np.zeros((self.chest.root.cell_peaks.nrows), dtype=dtypes)
+        data['filename']=self.chest.root.cell_peaks.col('filename')
+        data['file_idx']=self.chest.root.cell_peaks.col('file_idx')
         for col in xrange(self.number_to_derive):
             data[names[col]] = scores[:, col]
         # get the table and append the data to it
@@ -188,17 +255,13 @@ class MDAExecutionController(HasTraits):
         # we need to reshape the factors and scores to make sense.
         # for images, the factors are themselves images, while the scores are
         # line plots with one column per component.
-        if self.get_active_data_type() is "image":
+        if self.get_active_data_type() is "image" and not self.on_peaks:
             factors = factors.reshape((-1, datashape[-2], datashape[-1]))
-            factors.squeeze()
-            scores.reshape((datashape[0], -1))
         # for SIs, the factors are spectra, while the scores are images.
         elif ((self.get_active_data_type() is "spectrum") or
                 (self.get_active_data_type() is "peaks")):
-            factors = factors.reshape((datashape[0], -1))
             scores = scores.reshape((-1, datashape[-2], datashape[-1]))
-            scores.squeeze()
-        return factors, scores
+        return factors.squeeze(), scores.squeeze()
 
     def _create_new_context(self, MDA_type):
         import time
