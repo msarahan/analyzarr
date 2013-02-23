@@ -72,7 +72,7 @@ def import_image(h5file, flist, output_filename=None):
 
 def import_tiff(h5file, flist):
     # for tiff, we use Christoph Gohlke's reader
-    from analyzarr.lib.io.tifffile import imread
+    from analyzarr.lib.io.libs.tifffile import imread
     data_record = h5file.root.image_description.row
     # any kind of jpg, png can be lumped together
     for f in flist:
