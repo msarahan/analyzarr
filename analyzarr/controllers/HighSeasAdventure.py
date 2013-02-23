@@ -23,8 +23,8 @@ from analyzarr.lib.io import file_import
 
 import enaml
 with enaml.imports():
-    from ui.ucc import CellCropperInterface
-    from ui.MDA_popup import MDAInterface
+    from analyzarr.ui.ucc import CellCropperInterface
+    from analyzarr.ui.MDA_popup import MDAInterface
 from enaml.application import Application
 from enaml.stdlib.sessions import simple_session
  

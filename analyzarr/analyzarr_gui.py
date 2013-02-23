@@ -16,7 +16,7 @@ def main():
     from enaml.stdlib.sessions import simple_session
     from enaml.qt.qt_application import QtApplication
     with enaml.imports():
-        from ui.main_view import Main
+        from analyzarr.ui.main_view import Main
     from controllers.HighSeasAdventure import HighSeasAdventure
     
     controller = HighSeasAdventure()

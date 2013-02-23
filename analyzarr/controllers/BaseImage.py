@@ -8,7 +8,7 @@ from save_plot import SaveFileController
 
 import enaml
 with enaml.imports():
-    from ui.save_plot import SavePlotDialog
+    from analyzarr.ui.save_plot import SavePlotDialog
 from enaml.application import Application
 from enaml.stdlib.sessions import simple_session
 

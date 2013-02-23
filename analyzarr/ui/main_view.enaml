@@ -31,7 +31,7 @@ from enaml.stdlib.fields import FloatField, IntField
 
 import enaml
 with enaml.imports():
-    from ui.ucc import CellCropperInterface
+    from ucc import CellCropperInterface
 
 def open_callback(dlg):
     if dlg.result=='accepted': 
