@@ -180,10 +180,12 @@ enamldef ImagePlotButtons(Container): image_buttons:
         CheckBox: show_shift:
             text = "Show shifts"
             checked := controller._show_shift
+            enabled <<  controller._can_map_peaks
         Label: scale_label:
             text = "Shift scale"
         FloatField: shift_scale:
             value := controller.shift_scale
+            enabled <<  controller._can_map_peaks
         #: TODO: implement parser for math expressions
         #:Field:
         #:    text := controller._peak_expression
