@@ -1,0 +1,57 @@
+from enaml.layout.api import vbox, hbox, vertical, horizontal
+from enaml.widgets.api import (
+    Container, PushButton, EnableCanvas, CheckBox, FileDialog,
+    Label, ComboBox, Field, GroupBox, Window
+)
+
+from enaml.stdlib.fields import FloatField, IntField
+
+def save_callback(dlg):
+    if dlg.result=='accepted':
+        dlg.controller.save_plot(dlg.path)
+
+enamldef SaveFileDialog(FileDialog):
+    attr controller
+    title = "WHARR TO STORE YOUR MAP?"
+    mode = "save_file"
+    callback=save_callback
+    
+enamldef SavePlotDialog(Window): save_plot_dialog:
+    attr controller
+    SaveFileDialog: save_dialog:
+        controller = save_plot_dialog.controller
+    Container:
+        constraints = [
+            vbox(
+                hbox(title_label, plot_title_field,),
+                hbox(width_label,width, 
+                    height_label, height, 
+                    dpi_label, dpi),
+            save,
+            ),
+            height.width == width.width,
+            dpi.width == width.width,
+        ]
+        Label: title_label:
+            text << "Plot title"
+        Field: plot_title_field:
+            text := controller.plot_title
+        Label: width_label:
+            text = "Plot width"
+        IntField: width:
+            value := controller.plot_width
+        Label: height_label:
+            text = "Plot height"
+        IntField: height:
+            value := controller.plot_height
+        Label: dpi_label:
+            text = "DPI"
+        IntField: dpi:
+            value := controller.dpi
+        PushButton: save:
+            text='Save plot'
+            clicked :: save_dialog.open()
+    
+    
+
+    

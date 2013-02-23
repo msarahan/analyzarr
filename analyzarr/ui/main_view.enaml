@@ -45,17 +45,6 @@ def new_callback(dlg):
     if dlg.result=='accepted':
         dlg.controller.new_treasure_chest(dlg.path)
 
-def save_callback(dlg):
-    if dlg.result=='accepted':
-        dlg.controller.save_plot(dlg.path)
-
-enamldef SaveFileDialog(FileDialog):
-    attr controller
-    title = "WHARR TO STORE YOUR MAP?"
-    mode = "save_file"
-    callback=save_callback
-    destroy_on_close=False
-
 enamldef NewChestDialog(FileDialog):
     attr controller
     title = "WHARR TO BURY YE TREASURE?"
@@ -150,24 +139,24 @@ enamldef ImagePlotButtons(Container): image_buttons:
     attr controller
     constraints = [
         vbox(characteristic_box,
-        hbox(save, prev_image, next_image),
+        hbox(save, prev_image, position, next_image),
             ),
         prev_image.width == save.width,
         next_image.width == save.width,
     ]
     hug_height='required'
-    SaveFileDialog: save_dialog:
-        controller = image_buttons.controller
     PushButton: save:
         text = "Save"
         tool_tip = "Save current plot"
         enabled << controller._can_save
-        clicked :: save_dialog.open()
+        clicked :: controller.open_save_UI()
     PushButton: prev_image:
         text = "<"
         tool_tip = "View previous image in stack"
         clicked :: controller.decrease_selected_index()
         enabled << controller._can_change_idx
+    Label: position:
+        text << "%i/%i" %(controller.selected_index+1, controller.numfiles)
     PushButton: next_image:
         text = ">"
         tool_tip = "View next image in stack"
@@ -204,23 +193,23 @@ enamldef ImagePlotButtons(Container): image_buttons:
 enamldef CellPlotButtons(Container): cell_buttons:
     attr controller
     constraints = [
-        hbox(save, prev_image, next_image),
+        hbox(save, prev_image, position, next_image),
         prev_image.width == save.width,
         next_image.width == save.width,
         ]
     hug_height='required'
-    SaveFileDialog: save_dialog:
-        controller = cell_buttons.controller
     PushButton: save:
         text = "Save"
         tool_tip = "Save current plot"
         enabled << controller._can_save
-        clicked :: save_dialog.open()
+        clicked :: controller.open_save_UI()
     PushButton: prev_image:
         text = "<"
         tool_tip = "View previous image in stack"
         clicked :: controller.decrease_selected_index()
         enabled << controller._can_change_idx
+    Label: position:
+        text << "%i/%i" %(controller.selected_index+1, controller.numfiles)
     PushButton: next_image:
         text = ">"
         tool_tip = "View next image in stack"
@@ -231,24 +220,25 @@ enamldef FactorPlotButtons(Container): factor_buttons:
     attr controller
     constraints = [
         vbox(characteristic_box,
-        hbox(save, prev_image, next_image),
+        hbox(save, prev_image, position, next_image),
             ),
         prev_image.width == save.width,
         next_image.width == save.width,
     ]
     hug_height='required'
-    SaveFileDialog: save_dialog:
-        controller = cell_buttons.controller
     PushButton: save:
         text = "Save"
         tool_tip = "Save current plot"
         enabled << controller._can_save
-        clicked :: save_dialog.open()
+        clicked :: controller.open_factor_save_UI()
     PushButton: prev_image:
         text = "<"
         tool_tip = "View previous factor"
         clicked :: controller.decrease_selected_component()
         enabled << controller._can_change_idx
+    Label: position:
+        text << "%i/%i" %(controller.component_index+1, controller.dimensionality)
+        #:text = 'barf'
     PushButton: next_image:
         text = ">"
         tool_tip = "View next factor"
@@ -275,24 +265,23 @@ enamldef FactorPlotButtons(Container): factor_buttons:
 enamldef ScorePlotButtons(Container): score_buttons:
     attr controller
     constraints = [
-        hbox(save, prev_image, next_image),
+        hbox(save, prev_image, position, next_image),
         prev_image.width == save.width,
         next_image.width == save.width,
         ]
     hug_height='required'
-    SaveFileDialog: save_dialog:
-        #: TODO: save dialog should get plot, not controller.
-        controller = cell_buttons.controller
     PushButton: save:
         text = "Save"
         tool_tip = "Save current plot"
         enabled << controller._can_save
-        clicked :: save_dialog.open()
+        clicked :: controller.open_score_save_UI()
     PushButton: prev_image:
         text = "<"
         tool_tip = "View previous image in stack"
         clicked :: controller.decrease_selected_index()
         enabled << controller._can_change_idx
+    Label: position:
+        text << "%i/%i" %(controller.selected_index+1, controller.numfiles)
     PushButton: next_image:
         text = ">"
         tool_tip = "View next image in stack"

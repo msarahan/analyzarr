@@ -4,6 +4,14 @@ from chaco.api import ArrayPlotData, BasePlotContainer, Plot
 from traits.api import Instance, on_trait_change
 import numpy as np
 
+from save_plot import SaveFileController
+
+import enaml
+with enaml.imports():
+    from ui.save_plot import SavePlotDialog
+from enaml.application import Application
+from enaml.stdlib.sessions import simple_session
+
 class BaseImageController(ControllerBase):
     plot = Instance(BasePlotContainer)
     plotdata = Instance(ArrayPlotData)
@@ -18,12 +26,8 @@ class BaseImageController(ControllerBase):
     def init_plot(self):
         self.plotdata.set_data('imagedata', self.get_active_image())
         self.plot = self.get_simple_image_plot(array_plot_data = self.plotdata,
-                title="%s of %s: " % (self.selected_index + 1,
-                                      self.numfiles) + self.get_active_name()
+                title = self.get_active_name()
                 )
-        
-    def save_plot(self, filename):
-        self._save_plot(self.plot, filename)
 
     def data_updated(self):
         # reinitialize data
@@ -57,5 +61,12 @@ class BaseImageController(ControllerBase):
     @on_trait_change("selected_index")
     def update_image(self):
         self.plotdata.set_data("imagedata", self.get_active_image())
-        self.set_plot_title("%s of %s: " % (self.selected_index + 1,
-                                          self.numfiles) + self.get_active_name())
+        self.set_plot_title(self.get_active_name())
+
+    def open_save_UI(self, plot_id='plot'):
+        save_controller = SaveFileController(plot=self.get_plot(plot_id))
+        save_dialog = simple_session('save', 'Save dialog', SavePlotDialog, 
+                                      controller=save_controller)
+        Application.instance().add_factories([save_dialog])
+        session_id = Application.instance().start_session('save')
+        save_controller._session_id = session_id
