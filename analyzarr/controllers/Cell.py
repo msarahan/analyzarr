@@ -105,9 +105,12 @@ class CellController(BaseImageController):
         end_idx=0
         tmp_size = self.chest.root.cells.template.shape[0]
         for node in nodes:
-            if node.name is not 'template':
-                end_idx = start_idx + node.shape[0]
-                data[start_idx:end_idx,:,:] = node[:]
+            node_data = node[:]
+            node_data = node_data.reshape((-1, node_data.shape[-2], 
+                                           node_data.shape[-1]))
+            if node.name not in ['template', 'average']:
+                end_idx = start_idx + node_data.shape[0]
+                data[start_idx:end_idx,:,:] = node_data
                 start_idx = end_idx
         return data
         
