@@ -93,6 +93,9 @@ class MDAViewController(BaseImageController):
                 vectors = np.hstack((x_comp,y_comp))
                 vectors *= self.shift_scale
                 self.factor_plotdata.set_data('vectors',vectors)            
+            else:
+                if 'vectors' in self.factor_plotdata.arrays:
+                    self.factor_plotdata.del_data('vectors')
             self.factor_plot = self.get_scatter_quiver_plot(self.factor_plotdata,
                                                           tool='inspector')
             self._can_map_peaks=True
