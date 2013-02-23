@@ -7,7 +7,7 @@ from chaco.tools.api import PanTool, ZoomTool, RangeSelection, \
 from chaco.api import Plot, ArrayPlotData, jet, gray, \
      ColorBar, ColormappedSelectionOverlay, LinearMapper, \
      HPlotContainer, OverlayPlotContainer, BasePlotContainer, \
-     DataLabel, ScatterInspectorOverlay, PlotGraphicsContext
+     DataLabel, ScatterInspectorOverlay
 from chaco.tools.cursor_tool import CursorTool, BaseCursorTool
 
 from chaco.data_range_1d import DataRange1D
@@ -204,9 +204,9 @@ class HasRenderer(HasTraits):
         scatter_plot, colorbar = _render_scatter_overlay(image_plot, 
                                     array_plot_data,
                                     tool=tool,)
-        image_container = OverlayPlotContainer(image_plot, scatter_plot)
+        image_overlay_container = OverlayPlotContainer(image_plot, scatter_plot)
         if colorbar is not None:
-            image_container = HPlotContainer(image_container, colorbar)
+            image_container = HPlotContainer(image_overlay_container, colorbar)
             if self.thresh is not None:
                 scatter_renderer = scatter_plot.plots['scatter_plot'][0]
                 scatter_renderer.color_data.metadata['selections'] = self.thresh
@@ -244,6 +244,9 @@ class HasRenderer(HasTraits):
     
     def set_plot_title(self, title):
         self._base_plot.title=title
+
+    def get_plot_title(self):
+        return self._base_plot.title
         
     # TODO: are we going to need to delete labels somehow?
     def plot_labels(self, labels):
@@ -265,12 +268,3 @@ class HasRenderer(HasTraits):
                 self._base_plot.overlays.append(self._labels[label])
             else:
                 pass
-            
-    def _save_plot(self, plot, filename, width=800, height=600, dpi=72):
-        original_outer_bounds = plot.outer_bounds
-        plot.outer_bounds = [width, height]
-        plot.do_layout(force=True)
-        gc = PlotGraphicsContext((width, height), dpi=dpi)
-        gc.render_component(plot)
-        gc.save(filename)
-        plot.outer_bounds = original_outer_bounds    
