@@ -1,5 +1,5 @@
 from chaco.api import ArrayPlotData, BasePlotContainer, Plot
-from traits.api import Instance, Bool, Int, List, String, on_trait_change, HasTraits
+from traits.api import Instance, Bool, Int, List, String, on_trait_change, HasTraits, Range
 import tables as tb
 # how much to compress the data
 from analyzarr.lib.io.data_structure import filters
@@ -20,7 +20,7 @@ from enaml.application import Application
 class MDAExecutionController(HasTraits):
     on_peaks = Bool(False)
     has_peaks = Bool(False)
-    number_to_derive = Int(69)
+    number_to_derive = Range(1, 'dimensionality', 69)
     dimensionality = Int(100000000)
     component_index = Int(0)
     _selected_peak = Int(0)
@@ -51,17 +51,15 @@ class MDAExecutionController(HasTraits):
         if target == 'peaks':
             self.on_peaks = True
             # dimensionality is the number of columns in our peak table
-            self.dimensionality = int(5*self.chest.getNodeAttr('/cell_peaks','number_of_peaks'))
+            self.dimensionality = int(5*self.chest.getNodeAttr('/cell_peaks','number_of_peaks'))          
         else:
             self.on_peaks = False
             # dimensionality is the size of each cell, flattened
-            cell_size = self.chest.getNodeAttr('/cell_peaks','number_of_peaks')
+            cell_size = self.chest.getNodeAttr('/cell_description','template_size')
             self.dimensionality = int(cell_size**2)
     
     def execute(self):
         method = self.methods[self.selected_method_idx]
-        if self.dimensionality < self.number_to_derive:
-            self.number_to_derive = self.dimensionality
         if method == 'PCA':
             self.PCA(n_components=self.number_to_derive)
         elif method == 'ICA':
@@ -272,7 +270,7 @@ class MDAExecutionController(HasTraits):
     def _create_new_context(self, MDA_type):
         import time
         # first add an entry to our table of analyses performed
-        datestr = MDA_type + time.strftime("_%Y-%m-%d %H:%M", time.localtime())
+        datestr = MDA_type + time.strftime("_%Y-%m-%d %H:%M:%S", time.localtime())
         data_record = self.chest.root.mda_description.row
         data_record['context'] = datestr
         data_record['mda_type'] = MDA_type
