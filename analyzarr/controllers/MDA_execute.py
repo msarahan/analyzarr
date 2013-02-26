@@ -115,7 +115,7 @@ class MDAExecutionController(HasTraits):
         # return an ndarray with only the selected columns
         return np.array(peak_data[cols]).view(float).reshape(len(cols), -1)
 
-    def get_input_data(self):
+    def get_input_data(self, standardize=True, normalize=False):
         if self.on_peaks:
             # query the peak table for all fields EXCEPT the filename and file index
             # TODO: should we also exclude peak coordinates (keep only the shift?)
@@ -124,8 +124,21 @@ class MDAExecutionController(HasTraits):
         else:
             active_data = self.parent.cell_controller.get_cell_set()
             active_data_shape = active_data.shape
-            data = active_data.reshape((active_data.shape[0], -1))
+            data = active_data.reshape((active_data.shape[0],-1))
+        if standardize:
+            data = self.standardize(data)
+        elif normalize:
+            data = self.normalize(data)
         return data, active_data_shape
+
+    def standardize(self, data):
+        data = data-data.mean(axis=0)
+        return data/data.std(axis=0)
+    
+    def normalize(self, data):
+        data = data-data.min(axis=0)
+        data = (data/data.max(axis=0))-0.5
+        return data, colmin, colmax
 
     def store_MDA_results(self, factors, scores, eigenvalues=None):
         if self.on_peaks:
@@ -239,7 +252,7 @@ class MDAExecutionController(HasTraits):
           differentiates the data (integrated ICA)
         """
         if differentiate:
-            diffdata = data.T.copy()
+            diffdata = data.copy()
             deriv_kernel = np.array([-1, 0, 0, 0, 0, 0, 1])
             for i in xrange(data.shape[1]):
                 diffdata[:, i] = np.convolve(data[:, i], deriv_kernel)[3:-3]
@@ -249,11 +262,21 @@ class MDAExecutionController(HasTraits):
                                 for i in xrange(factors.shape[1])]).T
             # TODO: pad by one row for the row than has been discarded by differentiation/integtration            
         else:
+            if not self.on_peaks:
+                data=data.T
             factors, scores = mda.ICA(data, n_components=n_components)
+            if self.on_peaks:
+                factors, scores = self._reshape_MDA_results(active_data_shape, 
+                                                            scores, factors)
+                factors = factors.T
+                scores = scores.T
+            else:
+                factors, scores = self._reshape_MDA_results(active_data_shape, 
+                                                            factors, scores)                
+                
         
-        factors, scores = self._reshape_MDA_results(active_data_shape, 
-                                                    factors, scores)
-        self.store_MDA_results(factors, scores, eigenvalues)
+
+        self.store_MDA_results(factors, scores)
 
     def _reshape_MDA_results(self, datashape, factors, scores):
         # we need to reshape the factors and scores to make sense.
