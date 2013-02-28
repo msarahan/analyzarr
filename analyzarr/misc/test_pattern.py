@@ -57,11 +57,11 @@ while positionY < (test_array.shape[0]-data.shape[0]):
         data = gaussian(191, (frame_size/2), (frame_size/2), (peak_size/4)+1, 
                 (peak_size/4)+(peak_size/4*(positionY-test_array.shape[0]/2)/(test_array.shape[0]/4))+1)(xg, yg)
         print "cycle 2: skewed dimension width = %.1f"%((peak_size/4)+(peak_size/4*(positionY-test_array.shape[0]/2)/float(test_array.shape[0]/4))+1)
-    elif positionY < test_array.shape[0]*3/4:
+    elif positionY < test_array.shape[0]:
         # test rotation of skewed peak
         data = gaussian(191, (frame_size/2)+1, (frame_size/2)+1, (peak_size/8)+1, 
                 (peak_size/4)+1)(xg, yg)
-        rotation = (positionY-test_array.shape[0]/2)/float(test_array.shape[0]/4)*90
+        rotation = (positionY-test_array.shape[0]/2)/float(test_array.shape[0]/2)*180
         # apply affine rotation matrix - go from 0 to 90 degrees, depending on our Y position        
         data = rotate(data, rotation, reshape=False)
         #plt.imshow(data)
