@@ -448,7 +448,10 @@ def orientation(moments):
     elif mu11p<0 and diff<0:
         supp=-np.pi/2
     else: supp=0
-    return 0.5*np.arctan(2*mu11p/(mu20p-mu02p))+supp
+    if mu02p == mu20p:
+        return 0
+    else:
+        return 0.5*np.arctan(2*mu11p/(mu20p-mu02p))+supp
 
 def eccentricity(moments):
     try:
