@@ -85,6 +85,9 @@ enamldef MyMenuBar(MenuBar): menu:
         Action:
             text = 'Import Files'
             triggered :: import_dialog.open()
+        Action:
+            text = 'Test data'
+            triggered :: menu.controller.load_test_data()
 """            
     Menu:
         title = '&Edit'

@@ -20,6 +20,9 @@ from MDA_view import MDAViewController
 from MDA_execute import MDAExecutionController
 
 from analyzarr.lib.io import file_import
+from analyzarr.testing.test_pattern import get_test_pattern
+
+from scipy.misc import imsave
 
 import enaml
 with enaml.imports():
@@ -89,6 +92,18 @@ class HighSeasAdventure(HasTraits):
                                                     treasure_chest=self.chest)
         self.cell_controller = CellController(parent=self,
                                               treasure_chest=self.chest)
+
+    def load_test_data(self):
+        # create the test pattern
+        tp = get_test_pattern()
+        # save it as a file, for user's reference, and because we have
+        #    to load files into chests (TODO: fix this to be more generic?)
+        imsave('tp.png', tp)
+        # create a new project
+        self.new_treasure_chest('test_pattern')
+        # import the newly saved test pattern file
+        self.import_files(['tp.png'])
+        # delete the file for cleanliness?
 
     def open_crop_UI(self):
         crop_controller = CellCropController(parent=self,
