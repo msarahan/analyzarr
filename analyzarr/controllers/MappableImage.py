@@ -113,7 +113,8 @@ class MappableImageController(BaseImageController):
                                        ),
                                    )
 
+        #TODO: might want to implement the selection tool here.
         self.plot = self.get_scatter_quiver_plot(self.plotdata,
-                                                      tool='inspector')
+                                                      tool=None)
         self.set_plot_title(self.get_characteristic_plot_title())
         self._is_mapping_peaks=True
