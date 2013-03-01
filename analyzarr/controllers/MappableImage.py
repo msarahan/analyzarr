@@ -5,12 +5,13 @@ import numpy as np
 class MappableImageController(BaseImageController):
     _can_map_peaks = Bool(False)
     _is_mapping_peaks = Bool(False)
-    _characteristics = List(["Height", "Orientation", "Eccentricity"])
+    _characteristics = List(["None","Height", "Orientation", "Eccentricity"])
     _characteristic = Int(0)
     _selected_peak = Int(0)
     _peak_ids = List([])
-    _show_shift = Bool(False)
-    shift_scale = Float(1.0)
+    _vectors = List(['None','Shifts', 'Skew'])
+    _vector = Int(0)
+    vector_scale = Float(1.0)
 
     def __init__(self, parent, treasure_chest=None, data_path='/rawdata', *args, **kw):
         super(MappableImageController, self).__init__(parent, treasure_chest, data_path,
@@ -27,6 +28,9 @@ class MappableImageController(BaseImageController):
     
     def get_characteristic_name(self):
         return self._characteristics[self._characteristic]
+
+    def get_vector_name(self):
+        return self._vectors[self._vector]
     
     @on_trait_change('selected_index')
     def update_peak_map_choices(self):
@@ -57,11 +61,19 @@ class MappableImageController(BaseImageController):
             pass
     
     def get_characteristic_plot_title(self):
-        return self.get_active_name() + ', %s from peak %i' % (
-            self.get_characteristic_name(), self._selected_peak)
+        name = ""
+        if self.get_characteristic_name() != "None":
+            name = ", "+self.get_characteristic_name()
+            if self.get_vector_name() !="None":
+                name += " and %s"%self.get_vector_name()
+            name += " from peak %i" %self._selected_peak
+        elif self.get_vector_name() != "None":
+            name = ", "+ self.get_vector_name()
+            name += " from peak %i" %self._selected_peak
+        return self.get_active_name() + name
     
-    @on_trait_change('_peak_ids, _characteristic, _selected_peak, _show_shift, \
-                        selected_index, shift_scale')
+    @on_trait_change('_peak_ids, _characteristic, _selected_peak, _vector, \
+                        selected_index, vector_scale')
     def update_image(self):
         super(MappableImageController, self).update_image()
         try:
@@ -88,32 +100,48 @@ class MappableImageController(BaseImageController):
         self.plotdata.set_data('value', values)
         self.plotdata.set_data('index', indices)
         
-        if self._show_shift:
-            x_comp = self.chest.root.cell_peaks.readWhere(
+        if self.get_vector_name() != "None":
+            field = ''
+            if self.get_vector_name() == 'Shifts':
+                field = 'd'
+            elif self.get_vector_name() == 'Skew':
+                field = 's'
+            if field != '':
+                x_comp = self.chest.root.cell_peaks.readWhere(
                                     'filename == "%s"' % self.get_active_name(),
-                                    field='dx%i'%self._selected_peak,
+                                    field='%sx%i' % (field,self._selected_peak),
                                     ).reshape((-1,1))
-            y_comp = self.chest.root.cell_peaks.readWhere(
+                y_comp = self.chest.root.cell_peaks.readWhere(
                                      'filename == "%s"' % self.get_active_name(),
-                                     field='dy%i'%self._selected_peak,
+                                     field='%sy%i' % (field, self._selected_peak),
                                      ).reshape((-1,1))
-            vectors = np.hstack((x_comp,y_comp))
-            vectors *= self.shift_scale
-            self.plotdata.set_data('vectors',vectors)
+                vectors = np.hstack((x_comp,y_comp))
+                vectors *= self.vector_scale
+                self.plotdata.set_data('vectors',vectors)
+            else:
+                print "%s field not recognized for vector plots."%field
+                if 'vectors' in self.plotdata.arrays:
+                    self.plotdata.del_data('vectors')
+                
         else:
             if 'vectors' in self.plotdata.arrays:
                 self.plotdata.del_data('vectors')
                 # clear vector data
-        prefix = self._characteristics[self._characteristic][0].lower()
-        column = prefix + str(self._selected_peak)
-        self.plotdata.set_data('color', 
+        if self.get_characteristic_name() != "None":
+            prefix = self._characteristics[self._characteristic][0].lower()
+            column = prefix + str(self._selected_peak)
+            self.plotdata.set_data('color', 
                                self.chest.root.cell_peaks.readWhere(
                                    'filename == "%s"' % self.get_active_name(),
                                    field=column,
                                        ),
                                    )
+        else:
+            if 'color' in self.plotdata.arrays:
+                self.plotdata.del_data('color')
 
+        #TODO: might want to implement the selection tool here.
         self.plot = self.get_scatter_quiver_plot(self.plotdata,
-                                                      tool='inspector')
+                                                      tool=None)
         self.set_plot_title(self.get_characteristic_plot_title())
         self._is_mapping_peaks=True

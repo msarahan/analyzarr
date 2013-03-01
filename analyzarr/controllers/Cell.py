@@ -128,8 +128,8 @@ class CellController(BaseImageController):
         return self.chest.root.cell_description.nrows
         
     # TODO: automatically determine the peak width from an average image
-    def characterize(self, peak_width, subpixel=True,
-                     target_locations=None, target_neighborhood=20, 
+    def characterize(self, peak_width, target_locations=None, 
+                     target_neighborhood=20, 
                      medfilt_radius=5):
         # disable the UI while we're running
         self._toggle_UI(False)
@@ -143,15 +143,15 @@ class CellController(BaseImageController):
         #   also determines the number of peaks, which in turn determines
         #   the table columns.
         target_locations = pc.two_dim_findpeaks(self._get_average_image(),
-                                                subpixel=True)[:,:2]
+                                                )[:,:2]
         self.numpeaks = int(target_locations.shape[0])
         # generate a list of column names
-        names = [('x%i, y%i, dx%i, dy%i, h%i, o%i, e%i' % ((x,)*7)).split(', ') 
+        names = [('x%i, y%i, dx%i, dy%i, h%i, o%i, e%i, sx%i, sy%i' % ((x,)*9)).split(', ') 
                  for x in xrange(self.numpeaks)]
         # flatten that from a list of lists to a simple list
         names = [item for sublist in names for item in sublist]
         # make tuples of each column name and 'f8' for the data type
-        dtypes = zip(names, ['f8', ] * self.numpeaks*7)
+        dtypes = zip(names, ['f8', ] * self.numpeaks*9)
         # prepend the index column
         dtypes = [('filename', '|S30'), ('file_idx', 'i4')] + dtypes
         desc = np.recarray((0,), dtype=dtypes)
@@ -172,7 +172,7 @@ class CellController(BaseImageController):
             data['file_idx'] = np.arange(cell_data.shape[0])            
             # reshape possibly 2D arrays (average fits this)
             attribs = pc.peak_attribs_stack(cell_data,
-                            peak_width=peak_width, subpixel=subpixel,
+                            peak_width=peak_width, 
                             target_locations=target_locations,
                             target_neighborhood=target_neighborhood,
                             medfilt_radius=medfilt_radius)
@@ -186,6 +186,7 @@ class CellController(BaseImageController):
         # add an attribute for the total number of peaks recorded
         self.chest.root.cell_peaks.setAttr('number_of_peaks', self.numpeaks)
         self.chest.root.cell_peaks.flush()
+        self.chest.flush()
         self.update_data_labels()
         self.parent.image_controller.update_peak_map_choices()
         

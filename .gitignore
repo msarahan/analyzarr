@@ -6,6 +6,10 @@ syntax: glob
 *.wpu
 *.chest
 *.enamlc
+*.c
+*.so
+*.png
+*.chest
 bin/*
 doc/.build/*
 doc/user_guide/_build/*

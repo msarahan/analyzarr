@@ -67,19 +67,7 @@ def _render_scatter_overlay(base_plot, array_plot_data,
     scatter_plot = Plot(array_plot_data, aspect_ratio = base_plot.aspect_ratio, 
                 default_origin="top left")
     
-    # the simple case - no color data
-    if "color" not in array_plot_data.arrays:
-        scatter_plot.plot(("index", "value"),
-                      type="scatter",
-                      name="scatter_plot",
-                      marker = marker,
-                      fill_alpha = fill_alpha,
-                      marker_size = marker_size,
-                      )
-        colorbar = None
-    # slightly more involved: colors mapped to some value
-    # with a threshold control that links to transparency
-    else:
+    if "color" in array_plot_data.arrays:
         scatter_plot.plot(("index", "value", "color"),
                       type="cmap_scatter",
                       name="scatter_plot",
@@ -106,6 +94,8 @@ def _render_scatter_overlay(base_plot, array_plot_data,
                                                     fade_alpha=0.35, 
                                                     selection_type="range")
             scatter_renderer.overlays.append(selection)
+    else:
+        return base_plot, None
     if tool=='inspector':
         # Attach the inspector and its overlay
         scatter_renderer = scatter_plot.plots['scatter_plot'][0]

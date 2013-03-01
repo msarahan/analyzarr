@@ -141,8 +141,9 @@ enamldef MyMenuBar(MenuBar): menu:
 enamldef ImagePlotButtons(Container): image_buttons:
     attr controller
     constraints = [
-        vbox(characteristic_box,
-        hbox(save, prev_image, position, next_image),
+        vbox(
+            hbox(peak_selection, characteristic_box, vector_box),
+            hbox(save, prev_image, position, next_image),
             ),
         prev_image.width == save.width,
         next_image.width == save.width,
@@ -165,29 +166,35 @@ enamldef ImagePlotButtons(Container): image_buttons:
         tool_tip = "View next image in stack"
         clicked :: controller.increase_selected_index()
         enabled << controller._can_change_idx
-    GroupBox: characteristic_box:
-        constraints = [hbox(characteristic,
-                        peak_id, show_shift,
-                        scale_label, shift_scale),]
+    GroupBox: peak_selection:
+        constraints = [hbox(peak_id),]
         hug_height='required'
-        title = "Characteristic Map:"
-        #:visible << controller._can_map_peaks
-        ComboBox: characteristic:
-            items << controller._characteristics
-            index := controller._characteristic 
-            enabled <<  controller._can_map_peaks
+        title = "Peak ID:"
         ComboBox: peak_id:
             items << controller._peak_ids
             index := controller._selected_peak
             enabled <<  controller._can_map_peaks
-        CheckBox: show_shift:
-            text = "Show shifts"
-            checked := controller._show_shift
-            enabled <<  controller._can_map_peaks
-        Label: scale_label:
-            text = "Shift scale"
-        FloatField: shift_scale:
-            value := controller.shift_scale
+    GroupBox: characteristic_box:
+        constraints = [hbox(characteristic),]
+        hug_height='required'
+        title = "Color Map:"
+        #:visible << controller._can_map_peaks
+        ComboBox: characteristic:
+            items << controller._characteristics
+            index := controller._characteristic 
+            enabled << controller._can_map_peaks
+    GroupBox: vector_box:
+        constraints = [hbox(vector, vector_label, vector_scale),]
+        hug_height='required'
+        title = "Vector Map:"
+        ComboBox: vector:
+            items << controller._vectors
+            index := controller._vector
+            enabled << controller._can_map_peaks
+        Label: vector_label:
+            text = "Vector scale"
+        FloatField: vector_scale:
+            value := controller.vector_scale
             enabled <<  controller._can_map_peaks
         #: TODO: implement parser for math expressions
         #:Field:

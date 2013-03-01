@@ -117,13 +117,18 @@ class MDAExecutionController(HasTraits):
 
     def get_input_data(self, standardize=True, normalize=False):
         if self.on_peaks:
-            # query the peak table for all fields EXCEPT the filename and file index
-            # TODO: should we also exclude peak coordinates (keep only the shift?)
-            data = self.get_peak_data().T
+            # query the peak table for all fields EXCEPT the filename, file 
+            #   index and peak location (we use shifts only)
+            # data has peak characteristics in columns; each cell is a row.
+            data = self.get_peak_data()
             active_data_shape = data.shape
         else:
             active_data = self.parent.cell_controller.get_cell_set()
             active_data_shape = active_data.shape
+            # data shape is:
+            #  rows = number of cells
+            #  columns = number of pixels in each image
+            #    for example, a 64x64 image would be 64x64 = 4096
             data = active_data.reshape((active_data.shape[0],-1))
         if standardize:
             data = self.standardize(data)
@@ -260,22 +265,19 @@ class MDAExecutionController(HasTraits):
             # integration undoes the differentiation done in the ICA data pre
             factors = np.array([integrate.cumtrapz(factors[:, i])
                                 for i in xrange(factors.shape[1])]).T
-            # TODO: pad by one row for the row than has been discarded by differentiation/integtration            
+            # TODO: pad by one row for the row than has been discarded by differentiation/integtration
         else:
             if not self.on_peaks:
-                data=data.T
+                data=data
             factors, scores = mda.ICA(data, n_components=n_components)
             if self.on_peaks:
                 factors, scores = self._reshape_MDA_results(active_data_shape, 
                                                             scores, factors)
-                factors = factors.T
-                scores = scores.T
+                factors = factors
+                scores = scores
             else:
                 factors, scores = self._reshape_MDA_results(active_data_shape, 
-                                                            factors, scores)                
-                
-        
-
+                                                            factors, scores)
         self.store_MDA_results(factors, scores)
 
     def _reshape_MDA_results(self, datashape, factors, scores):
@@ -301,9 +303,6 @@ class MDAExecutionController(HasTraits):
         #data_record['treatments'] = self.data_controller.summarize
         data_record.append()
         self.chest.root.mda_description.flush()
-        # context is a pytables group.  It has attributes for informational
-        #   data, as well as being the container for any outputs.
         self.chest.createGroup('/mda_results', datestr)
         self.context = datestr
         self.chest.flush()
-        #self.chest.getNode('/mda_results/'+datestr).setAttr('method', MDA_type)
