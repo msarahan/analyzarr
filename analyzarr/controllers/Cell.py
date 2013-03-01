@@ -76,7 +76,10 @@ class CellController(BaseImageController):
 
         # return the cell data - the index is the index of this cell
         #    among only its indexed cells - not the universal index!
-        return self.nodes[selected_image][cell_record['file_idx'], :, :]
+        if len(self.nodes[selected_image].shape)==2:
+            return self.nodes[selected_image][:]
+        else:
+            return self.nodes[selected_image][cell_record['file_idx'], :, :]
 
     def get_cell_parent(self):
         # Find this cell in the cell description table.  We use this to look
@@ -157,8 +160,10 @@ class CellController(BaseImageController):
         # for each file in the cell_data group, run analysis.
         nodes = self.chest.listNodes('/cells')
         # exclude some nodes
-        node_names = [node.name for node in nodes if node.name not in ['template']]
+        node_names = [node.name for node in nodes]
         for node in node_names:
+            if node == 'template':
+                continue
             cell_data = nodes[node_names.index(node)][:]
             cell_data = cell_data.reshape((-1, cell_data.shape[-2], 
                                            cell_data.shape[-1]))            
