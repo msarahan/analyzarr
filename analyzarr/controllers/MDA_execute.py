@@ -51,7 +51,7 @@ class MDAExecutionController(HasTraits):
         if target == 'peaks':
             self.on_peaks = True
             # dimensionality is the number of columns in our peak table
-            self.dimensionality = int(5*self.chest.getNodeAttr('/cell_peaks','number_of_peaks'))          
+            self.dimensionality = int(7*self.chest.getNodeAttr('/cell_peaks','number_of_peaks'))          
         else:
             self.on_peaks = False
             # dimensionality is the size of each cell, flattened
@@ -90,6 +90,8 @@ class MDAExecutionController(HasTraits):
             h - the height of the peak
             o - if a peak is not perfectly symmetric, the orientation of the peak.
             e - the eccentricity of a peak.  i.e. how egg-shaped is it?
+            sx - the skew in the X direction
+            sy - the skew in the Y direction
             
         indices - peak indices (integers) to select from.  Use this if you want to compare
             only a few peaks in the cell structure to compare.
@@ -102,7 +104,7 @@ class MDAExecutionController(HasTraits):
             #   indices we want.
             cols = [['%s%i' % (c, i) for i in indices] for c in chars]
         else:
-            chars = ['dx', 'dy', 'h', 'o', 'e']
+            chars = ['dx', 'dy', 'h', 'o', 'e', 'sx', 'sy']
             if len(indices) is 0:
                 indices = range(self.chest.getNodeAttr('/cell_peaks','number_of_peaks'))
             # the columns we get are the combination of the chars with the
@@ -113,7 +115,7 @@ class MDAExecutionController(HasTraits):
         # get the data from the table
         peak_data = self.chest.root.cell_peaks[:]
         # return an ndarray with only the selected columns
-        return np.array(peak_data[cols]).view(float).reshape(len(cols), -1)
+        return np.array(peak_data[cols]).view(float).reshape(-1, len(cols))
 
     def get_input_data(self, standardize=True, normalize=False):
         if self.on_peaks:
@@ -160,7 +162,7 @@ class MDAExecutionController(HasTraits):
             row = fs.row
             # record the factors
             indices = range(self.chest.getNodeAttr('/cell_peaks','number_of_peaks'))
-            chars = ['dx', 'dy', 'h', 'o', 'e']
+            chars = ['dx', 'dy', 'h', 'o', 'e', 'sx', 'sy']
             # the columns we get are the combination of the chars with the
             #   indices we want.
             cols = [['%s%i' % (c, i) for c in chars] for i in indices]            
@@ -231,6 +233,11 @@ class MDAExecutionController(HasTraits):
     def PCA(self, n_components=None):
         self._create_new_context("PCA")
         data, active_data_shape = self.get_input_data()
+        if data.shape[0] < data.shape[1]:
+            # TODO: should have a popup window or something here.
+            print "You have more variables (%s) than observations (%s).  Go get more data, \
+or remove some variables.  For images, you can subsample." % (data.shape[1], data.shape[0])
+            return
         factors, scores , eigenvalues = mda.PCA(data, n_components=n_components)
         factors, scores = self._reshape_MDA_results(active_data_shape, factors, scores)
         self.store_MDA_results(factors, scores, eigenvalues)
@@ -252,6 +259,11 @@ class MDAExecutionController(HasTraits):
         #     are pixels where spectra were gathered.
         # for images, the cell idx is dim 0
         data, active_data_shape = self.get_input_data()
+        if data.shape[0] < data.shape[1]:
+            # TODO: should have a popup window or something here.
+            print "You have more variables (%s) than observations (%s).  Go get more data, \
+or remove some variables.  For images, you can subsample." % (data.shape[1], data.shape[0])
+            return
         """
         Pre-processes the data to be ready for ICA.  Namely:
           differentiates the data (integrated ICA)
@@ -267,9 +279,11 @@ class MDAExecutionController(HasTraits):
                                 for i in xrange(factors.shape[1])]).T
             # TODO: pad by one row for the row than has been discarded by differentiation/integtration
         else:
-            if not self.on_peaks:
-                data=data
             factors, scores = mda.ICA(data, n_components=n_components)
+            print "factors: "
+            print factors.shape
+            print "scores: "
+            print scores.shape
             if self.on_peaks:
                 factors, scores = self._reshape_MDA_results(active_data_shape, 
                                                             scores, factors)

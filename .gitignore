@@ -16,3 +16,4 @@ doc/user_guide/_build/*
 doc/user_guide/.build/
 build/*
 dist/*
+analyzarr.egg-info/*

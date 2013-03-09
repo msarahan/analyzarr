@@ -127,7 +127,7 @@ class MDAViewController(BaseImageController):
         self.score_plotdata.set_data('index', values)
         self.score_plotdata.set_data('value', indices)
         self.score_plotdata.set_data('color', color)
-        self.score_plot = self.get_scatter_overlay_plot(self.score_plotdata, tool="colorbar")
+        self.score_plot = self.get_scatter_overlay_plot(self.score_plotdata, tool=None)
 
     @on_trait_change("selected_index, component_index, characteristic, _show_shift,\
                          shift_scale")

@@ -28,7 +28,7 @@ def ICA(data, n_components, whiten = False, max_iter = 10):
     estimator.fit(data)
     factors = estimator.transform(data)
     scores = estimator.get_mixing_matrix()
-    return factors.T, scores
+    return factors, scores
 
 def NMF(data, n_components, beta = 5.0, tol = 5e-3, sparseness = 'components'):
     estimator = decomposition.NMF(n_components = n_components, beta = beta,
