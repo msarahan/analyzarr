@@ -147,6 +147,8 @@ enamldef ImagePlotButtons(Container): image_buttons:
             ),
         prev_image.width == save.width,
         next_image.width == save.width,
+        characteristic_box.width == 2*peak_selection.width,
+        vector_box.width == characteristic_box.width,
     ]
     hug_height='required'
     PushButton: save:
@@ -184,7 +186,8 @@ enamldef ImagePlotButtons(Container): image_buttons:
             index := controller._characteristic 
             enabled << controller._can_map_peaks
     GroupBox: vector_box:
-        constraints = [hbox(vector, vector_label, vector_scale),]
+        constraints = [hbox(vector, vector_label, vector_scale),
+                    vector_scale.width == 0.5*vector.width,]
         hug_height='required'
         title = "Vector Map:"
         ComboBox: vector:
@@ -231,11 +234,13 @@ enamldef CellPlotButtons(Container): cell_buttons:
 enamldef FactorPlotButtons(Container): factor_buttons:
     attr controller
     constraints = [
-        vbox(characteristic_box,
-        hbox(save, prev_image, position, next_image),
+        vbox(
+             hbox(characteristic_box, vector_box),
+             hbox(save, prev_image, position, next_image),
             ),
         prev_image.width == save.width,
         next_image.width == save.width,
+        characteristic_box.width == vector_box.width,
     ]
     hug_height='required'
     PushButton: save:
@@ -257,22 +262,28 @@ enamldef FactorPlotButtons(Container): factor_buttons:
         clicked :: controller.increase_selected_component()
         enabled << controller._can_change_idx
     GroupBox: characteristic_box:
-        constraints = [hbox(characteristic, show_shift,
-                        scale_label, shift_scale),]
+        constraints = [hbox(characteristic),]
         hug_height='required'
-        title = "Characteristic Map:"
+        title = "Color Map:"
         #:visible << controller._can_map_peaks
         ComboBox: characteristic:
             items << controller._characteristics
             index := controller._characteristic 
+            enabled << controller._can_map_peaks
+    GroupBox: vector_box:
+        constraints = [hbox(vector, vector_label, vector_scale),
+                    vector_scale.width == 0.5*vector.width,]
+        hug_height='required'
+        title = "Vector Map:"
+        ComboBox: vector:
+            items << controller._vectors
+            index := controller._vector
+            enabled << controller._can_map_peaks
+        Label: vector_label:
+            text = "Vector scale"
+        FloatField: vector_scale:
+            value := controller.vector_scale
             enabled <<  controller._can_map_peaks
-        CheckBox: show_shift:
-            text = "Show shifts"
-            checked := controller._show_shift
-        Label: scale_label:
-            text = "Shift scale"
-        FloatField: shift_scale:
-            value := controller.shift_scale
 
 enamldef ScorePlotButtons(Container): score_buttons:
     attr controller

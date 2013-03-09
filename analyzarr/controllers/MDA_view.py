@@ -23,10 +23,11 @@ class MDAViewController(BaseImageController):
     context = String('')
     _selected_context = Int(-1)
     dimensionality = Int(1)
-    _characteristics = List(["Height", "Orientation", "Eccentricity"])
+    _characteristics = List(["None", "Height", "Orientation", "Eccentricity"])
     _characteristic = Int(0)    
-    _show_shift = Bool(False)
-    shift_scale = Float(1.0)   
+    _vectors = List(["None", "Shifts", "Skew"])
+    _vector = Int(0)
+    vector_scale = Float(1.0)   
     _can_map_peaks = Bool(False)
 
     def __init__(self, treasure_chest=None, data_path='/rawdata',
@@ -64,6 +65,12 @@ class MDAViewController(BaseImageController):
         else:
             self.component_index -= 1    
 
+    def get_characteristic_name(self):
+        return self._characteristics[self._characteristic]
+
+    def get_vector_name(self):
+        return self._vectors[self._vector]
+
     def render_active_factor_image(self, context):
         if self.chest.getNodeAttr('/mda_results/'+context, 'on_peaks'):
             factors = self.chest.getNode('/mda_results/'+context+'/peak_factors')
@@ -76,28 +83,46 @@ class MDAViewController(BaseImageController):
             numpeaks = self.chest.root.cell_peaks.getAttr('number_of_peaks')
             index_keys = ['x%i' % i for i in xrange(numpeaks)]
             value_keys = ['y%i' % i for i in xrange(numpeaks)]
-            color_prefix = self._characteristics[self._characteristic][0].lower()
-            color_keys = ['%s%i' % (color_prefix, i) for i in xrange(numpeaks)]
+
             values = np.array(component[value_keys]).view(float)
             indices = np.array(component[index_keys]).view(float)
-            color = np.array(component[color_keys]).view(float)
+
             self.factor_plotdata.set_data('value', values)
             self.factor_plotdata.set_data('index', indices)
-            self.factor_plotdata.set_data('color', color)
-            
-            if self._show_shift:
-                shift_x_keys = ['dx%i' % i for i in xrange(numpeaks)]
-                shift_y_keys = ['dy%i' % i for i in xrange(numpeaks)]
-                x_comp = np.array(component[shift_x_keys]).view(float).reshape((-1,1))
-                y_comp = np.array(component[shift_y_keys]).view(float).reshape((-1,1))
-                vectors = np.hstack((x_comp,y_comp))
-                vectors *= self.shift_scale
-                self.factor_plotdata.set_data('vectors',vectors)            
+
+            if self.get_vector_name() != "None":
+                field = ''
+                if self.get_vector_name() == 'Shifts':
+                    field = 'd'
+                elif self.get_vector_name() == 'Skew':
+                    field = 's'
+                if field != '':
+                    vector_x_keys = ['%sx%i' % (field, i) for i in xrange(numpeaks)]
+                    vector_y_keys = ['%sy%i' % (field, i) for i in xrange(numpeaks)]
+                    vector_x = np.array(component[vector_x_keys]).view(float).reshape((-1,1))
+                    vector_y = np.array(component[vector_y_keys]).view(float).reshape((-1,1))
+                    vectors = np.hstack((vector_x,vector_y))
+                    vectors *= self.vector_scale
+                    self.factor_plotdata.set_data('vectors',vectors)
+                else:
+                    print "%s field not recognized for vector plots."%field
+                    if 'vectors' in self.plotdata.arrays:
+                        self.factor_plotdata.del_data('vectors')
+                
             else:
-                if 'vectors' in self.factor_plotdata.arrays:
-                    self.factor_plotdata.del_data('vectors')
+                if 'vectors' in self.plotdata.arrays:
+                    self.plotdata.del_data('vectors')
+                # clear vector data
+            if self.get_characteristic_name() != "None":
+                color_prefix = self._characteristics[self._characteristic][0].lower()
+                color_keys = ['%s%i' % (color_prefix, i) for i in xrange(numpeaks)]
+                color = np.array(component[color_keys]).view(float)
+                self.factor_plotdata.set_data('color', color)
+            else:
+                if 'color' in self.plotdata.arrays:
+                    self.plotdata.del_data('color')
             self.factor_plot = self.get_scatter_quiver_plot(self.factor_plotdata,
-                                                          tool='inspector')
+                                                          tool=None)
             self._can_map_peaks=True
         else:
             factors = self.chest.getNode('/mda_results/'+context+'/image_factors')
@@ -127,10 +152,10 @@ class MDAViewController(BaseImageController):
         self.score_plotdata.set_data('index', values)
         self.score_plotdata.set_data('value', indices)
         self.score_plotdata.set_data('color', color)
-        self.score_plot = self.get_scatter_overlay_plot(self.score_plotdata, tool=None)
+        self.score_plot = self.get_scatter_overlay_plot(self.score_plotdata, title=self.get_active_name(),
+                                                        tool=None)
 
-    @on_trait_change("selected_index, component_index, characteristic, _show_shift,\
-                         shift_scale")
+    @on_trait_change("selected_index, component_index, _characteristic, _vector, vector_scale")
     def update_image(self):
         self.render_active_factor_image(self.context)
         self.render_active_score_image(self.context)
