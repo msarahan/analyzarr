@@ -60,6 +60,8 @@ class BaseImageController(ControllerBase):
     
     @on_trait_change("selected_index")
     def update_image(self):
+        if self.chest is None:
+            return
         # get the old image for the sake of comparing image sizes
         old_data = self.plotdata.get_data('imagedata')
         active_image = self.get_active_image()

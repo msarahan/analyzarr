@@ -184,7 +184,7 @@ class CellController(BaseImageController):
             self.chest.root.cell_peaks.append(data)
             self.chest.root.cell_peaks.flush()
         # add an attribute for the total number of peaks recorded
-        self.chest.root.cell_peaks.setAttr('number_of_peaks', self.numpeaks)
+        self.chest.setNodeAttr('/cell_peaks','number_of_peaks', self.numpeaks)
         self.chest.root.cell_peaks.flush()
         self.chest.flush()
         self.update_data_labels()

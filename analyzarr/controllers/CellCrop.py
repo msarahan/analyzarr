@@ -277,6 +277,7 @@ class CellCropController(BaseImageController):
                     # crop the cells from the given locations
                     data[i,:,:]=active_image[peaks[i, 1]:peaks[i, 1] + tmp_sz,
                                       peaks[i, 0]:peaks[i, 0] + tmp_sz]
+                self.chest.root.cell_description.flush()
                 average_data += np.average(data, axis=0)
                 # insert the data (one 3d array per file)
                 cell_array = self.chest.createCArray(self.chest.root.cells,

@@ -64,6 +64,8 @@ class HighSeasAdventure(HasTraits):
         self.crop_controller.data_updated()
 
     def new_treasure_chest(self, filename):
+        if self.chest is not None:
+            self.chest.close()
         # first, clear any existing controllers
         self.image_controller = MappableImageController(parent=self)
         self.cell_controller = CellController(parent=self)
@@ -84,6 +86,7 @@ class HighSeasAdventure(HasTraits):
                                                     treasure_chest=chest)
         self.cell_controller = CellController(parent=self, 
                                               treasure_chest=chest)
+        self.mda_controller = MDAViewController(parent=self, treasure_chest=chest)
         self.chest = chest
 
     def import_files(self, file_list):
