@@ -1,13 +1,13 @@
 from BaseImage import BaseImageController
-from traits.api import Bool, List, Int, Float, on_trait_change
+from traits.api import Bool, List, Int, Float, Range, on_trait_change
 import numpy as np
 
 class MappableImageController(BaseImageController):
     _can_map_peaks = Bool(False)
     _is_mapping_peaks = Bool(False)
     _characteristics = List(["None","Height", "Orientation", "Eccentricity"])
-    _characteristic = Int(0)
-    _selected_peak = Int(0)
+    _characteristic = Range(0,3)
+    _selected_peak = Range(0,100)
     _peak_ids = List([])
     _vectors = List(['None','Shifts', 'Skew'])
     _vector = Int(0)
@@ -50,8 +50,8 @@ class MappableImageController(BaseImageController):
                 return
             try:
                 #TODO: need to figure out pytables attributes
-                self._peak_ids = [str(idx) for idx in 
-                              range(peak_table.getAttr('number_of_peaks'))]
+                numpeaks = self.chest.getNodeAttr('/cell_peaks','number_of_peaks')
+                self._peak_ids = [str(idx) for idx in range(numpeaks)]
             except:
                 return
             self._can_map_peaks=True
@@ -75,6 +75,8 @@ class MappableImageController(BaseImageController):
     @on_trait_change('_peak_ids, _characteristic, _selected_peak, _vector, \
                         selected_index, vector_scale')
     def update_image(self):
+        if self.chest is None:
+            return
         super(MappableImageController, self).update_image()
         try:
             self.chest.getNode('/','cell_peaks')
