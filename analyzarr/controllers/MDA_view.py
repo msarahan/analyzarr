@@ -19,9 +19,8 @@ class MDAViewController(BaseImageController):
     score_plot = Instance(BasePlotContainer)
     component_index = Int(0)
     _selected_peak = Int(0)
-    contexts = Array()
-    context = String('')
-    _selected_context = Int(-1)
+    _contexts = List([])
+    _context = Int(-1)
     dimensionality = Int(1)
     _characteristics = List(["None", "Height", "Orientation", "Eccentricity"])
     _characteristic = Int(0)    
@@ -41,16 +40,21 @@ class MDAViewController(BaseImageController):
             self.data_path = data_path
             # populate the list of available contexts (if any)
             if self.chest.root.mda_description.nrows>0:
-                self.contexts = self.chest.root.mda_description.col('context')
-                self.context = str(self.contexts[self._selected_context])
-                self.dimensionality = self.chest.getNodeAttr('/mda_results/'+self.context, 
+                self._contexts = self.chest.root.mda_description.col('context').tolist()
+                context = self.get_context_name()
+                self.dimensionality = self.chest.getNodeAttr('/mda_results/'+context, 
                                                              'dimensionality')
-                self.update_image()
-    
-    def _selected_context_changed(self):
-        self.context = str(self.contexts[self._selected_context])
+                self.update_factor_image()
+                self.update_score_image()
+
+    @on_trait_change('_context')
+    def context_changed(self):
+        context = self.get_context_name()
         self.dimensionality = self.chest.getNodeAttr('/mda_results/'+context, 
                                                      'dimensionality')
+        self.render_active_factor_image(context)
+        self.render_active_score_image(context)
+        
         
     def increase_selected_component(self):
         # TODO: need to measure dimensionality somehow (node attribute, or array size?)
@@ -64,6 +68,9 @@ class MDAViewController(BaseImageController):
             self.component_index = int(self.dimensionality - 1)
         else:
             self.component_index -= 1    
+
+    def get_context_name(self):
+        return str(self._contexts[self._context])
 
     def get_characteristic_name(self):
         return self._characteristics[self._characteristic]
@@ -155,10 +162,15 @@ class MDAViewController(BaseImageController):
         self.score_plot = self.get_scatter_overlay_plot(self.score_plotdata, title=self.get_active_name(),
                                                         tool=None)
 
-    @on_trait_change("selected_index, component_index, _characteristic, _vector, vector_scale")
-    def update_image(self):
-        self.render_active_factor_image(self.context)
-        self.render_active_score_image(self.context)
+    @on_trait_change("component_index, _characteristic, _vector, vector_scale")
+    def update_factor_image(self):
+        context = self.get_context_name()
+        self.render_active_factor_image(context)
+
+    @on_trait_change("selected_index, component_index")
+    def update_score_image(self):
+        context = self.get_context_name()
+        self.render_active_score_image(context)
         
     def open_factor_save_UI(self):
         self.open_save_UI(plot_id = 'factor_plot')

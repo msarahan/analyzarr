@@ -141,59 +141,69 @@ enamldef MyMenuBar(MenuBar): menu:
 enamldef ImagePlotButtons(Container): image_buttons:
     attr controller
     constraints = [
-        vbox(
-            hbox(peak_selection, characteristic_box, vector_box),
-            hbox(save, prev_image, position, next_image),
-            ),
-        prev_image.width == save.width,
-        next_image.width == save.width,
-        characteristic_box.width == 2*peak_selection.width,
-        vector_box.width == characteristic_box.width,
+            hbox(image_box, peak_selection, characteristic_box, vector_box),
+        #:characteristic_box.width == 2*peak_selection.width,
+        #:vector_box.width == characteristic_box.width,
     ]
     hug_height='required'
-    PushButton: save:
-        text = "Save"
-        tool_tip = "Save current plot"
-        enabled << controller._can_save
-        clicked :: controller.open_save_UI()
-    PushButton: prev_image:
-        text = "<"
-        tool_tip = "View previous image in stack"
-        clicked :: controller.decrease_selected_index()
-        enabled << controller._can_change_idx
-    Label: position:
-        text << "%i/%i" %(controller.selected_index+1, controller.numfiles)
-    PushButton: next_image:
-        text = ">"
-        tool_tip = "View next image in stack"
-        clicked :: controller.increase_selected_index()
-        enabled << controller._can_change_idx
+    GroupBox: image_box:
+        constraints = [hbox(save, prev_image, position, next_image),
+        prev_image.width == save.width,
+        next_image.width == save.width,]
+        title="Image:"
+        hug_height='required'
+        hug_width='medium'
+        PushButton: save:
+            text = "Save"
+            tool_tip = "Save current plot"
+            enabled << controller._can_save
+            clicked :: controller.open_save_UI()
+            hug_width='strong'
+        PushButton: prev_image:
+            text = "<"
+            tool_tip = "View previous image in stack"
+            clicked :: controller.decrease_selected_index()
+            enabled << controller._can_change_idx
+        Label: position:
+            text << "%i/%i" %(controller.selected_index+1, controller.numfiles)
+            hug_width='strong'
+        PushButton: next_image:
+            text = ">"
+            tool_tip = "View next image in stack"
+            clicked :: controller.increase_selected_index()
+            enabled << controller._can_change_idx
     GroupBox: peak_selection:
         constraints = [hbox(peak_id),]
         hug_height='required'
+        hug_width='medium'
         title = "Peak ID:"
         ComboBox: peak_id:
             items << controller._peak_ids
             index := controller._selected_peak
             enabled <<  controller._can_map_peaks
+            hug_width = 'medium'
     GroupBox: characteristic_box:
         constraints = [hbox(characteristic),]
         hug_height='required'
         title = "Color Map:"
+        hug_width = 'medium'
         #:visible << controller._can_map_peaks
         ComboBox: characteristic:
             items << controller._characteristics
             index := controller._characteristic 
             enabled << controller._can_map_peaks
+            hug_width = 'medium'
     GroupBox: vector_box:
         constraints = [hbox(vector, vector_label, vector_scale),
                     vector_scale.width == 0.5*vector.width,]
         hug_height='required'
         title = "Vector Map:"
+        hug_width='medium'
         ComboBox: vector:
             items << controller._vectors
             index := controller._vector
             enabled << controller._can_map_peaks
+            hug_width = 'strong'
         Label: vector_label:
             text = "Vector scale"
         FloatField: vector_scale:
@@ -208,79 +218,95 @@ enamldef ImagePlotButtons(Container): image_buttons:
 enamldef CellPlotButtons(Container): cell_buttons:
     attr controller
     constraints = [
-        hbox(save, prev_image, position, next_image),
-        prev_image.width == save.width,
-        next_image.width == save.width,
+        hbox(image_box),
         ]
     hug_height='required'
-    PushButton: save:
-        text = "Save"
-        tool_tip = "Save current plot"
-        enabled << controller._can_save
-        clicked :: controller.open_save_UI()
-    PushButton: prev_image:
-        text = "<"
-        tool_tip = "View previous image in stack"
-        clicked :: controller.decrease_selected_index()
-        enabled << controller._can_change_idx
-    Label: position:
-        text << "%i/%i" %(controller.selected_index+1, controller.numfiles)
-    PushButton: next_image:
-        text = ">"
-        tool_tip = "View next image in stack"
-        clicked :: controller.increase_selected_index()
-        enabled << controller._can_change_idx
+    GroupBox: image_box:
+        constraints = [hbox(save, prev_image, position, next_image),
+        prev_image.width == save.width,
+        next_image.width == save.width,]
+        title="Image:"
+        hug_height='required'
+        hug_width='medium'
+        PushButton: save:
+            text = "Save"
+            tool_tip = "Save current plot"
+            enabled << controller._can_save
+            clicked :: controller.open_save_UI()
+            hug_width='strong'
+        PushButton: prev_image:
+            text = "<"
+            tool_tip = "View previous image in stack"
+            clicked :: controller.decrease_selected_index()
+            enabled << controller._can_change_idx
+        Label: position:
+            text << "%i/%i" %(controller.selected_index+1, controller.numfiles)
+            hug_width='strong'
+        PushButton: next_image:
+            text = ">"
+            tool_tip = "View next image in stack"
+            clicked :: controller.increase_selected_index()
+            enabled << controller._can_change_idx
 
 enamldef FactorPlotButtons(Container): factor_buttons:
     attr controller
     constraints = [
-        vbox(
-             hbox(characteristic_box, vector_box),
-             hbox(save, prev_image, position, next_image),
-            ),
-        prev_image.width == save.width,
-        next_image.width == save.width,
-        characteristic_box.width == vector_box.width,
+             hbox(component_box, characteristic_box, vector_box)
+        #:characteristic_box.width == vector_box.width,
     ]
     hug_height='required'
-    PushButton: save:
-        text = "Save"
-        tool_tip = "Save current plot"
-        enabled << controller._can_save
-        clicked :: controller.open_factor_save_UI()
-    PushButton: prev_image:
-        text = "<"
-        tool_tip = "View previous factor"
-        clicked :: controller.decrease_selected_component()
-        enabled << controller._can_change_idx
-    Label: position:
-        text << "%i/%i" %(controller.component_index+1, controller.dimensionality)
-        #:text = 'barf'
-    PushButton: next_image:
-        text = ">"
-        tool_tip = "View next factor"
-        clicked :: controller.increase_selected_component()
-        enabled << controller._can_change_idx
+    hug_width='medium'
+    GroupBox: component_box:
+        constraints = [hbox(save, prev_image, position, next_image),
+        prev_image.width == save.width,
+        next_image.width == save.width,]
+        title="Component:"
+        hug_height='required'
+        hug_width='medium'
+        PushButton: save:
+            text = "Save"
+            tool_tip = "Save current plot"
+            enabled << controller._can_save
+            clicked :: controller.open_factor_save_UI()
+            hug_width='strong'
+        PushButton: prev_image:
+            text = "<"
+            tool_tip = "View previous factor"
+            clicked :: controller.decrease_selected_component()
+            enabled << controller._can_change_idx
+        Label: position:
+            text << "%i/%i" %(controller.component_index+1, controller.dimensionality)
+            hug_width='strong'
+            #:text = 'barf'
+        PushButton: next_image:
+            text = ">"
+            tool_tip = "View next factor"
+            clicked :: controller.increase_selected_component()
+            enabled << controller._can_change_idx
     GroupBox: characteristic_box:
         constraints = [hbox(characteristic),]
         hug_height='required'
         title = "Color Map:"
+        hug_width='medium'
         #:visible << controller._can_map_peaks
         ComboBox: characteristic:
             items << controller._characteristics
             index := controller._characteristic 
             enabled << controller._can_map_peaks
+            hug_width='medium'
     GroupBox: vector_box:
         constraints = [hbox(vector, vector_label, vector_scale),
                     vector_scale.width == 0.5*vector.width,]
-        hug_height='required'
+        hug_width='medium'
         title = "Vector Map:"
         ComboBox: vector:
             items << controller._vectors
             index := controller._vector
             enabled << controller._can_map_peaks
+            hug_width='strong'
         Label: vector_label:
             text = "Vector scale"
+            hug_width='strong'
         FloatField: vector_scale:
             value := controller.vector_scale
             enabled <<  controller._can_map_peaks
@@ -288,28 +314,47 @@ enamldef FactorPlotButtons(Container): factor_buttons:
 enamldef ScorePlotButtons(Container): score_buttons:
     attr controller
     constraints = [
-        hbox(save, prev_image, position, next_image),
-        prev_image.width == save.width,
-        next_image.width == save.width,
+        hbox(image_box, context_box),
         ]
     hug_height='required'
-    PushButton: save:
-        text = "Save"
-        tool_tip = "Save current plot"
-        enabled << controller._can_save
-        clicked :: controller.open_score_save_UI()
-    PushButton: prev_image:
-        text = "<"
-        tool_tip = "View previous image in stack"
-        clicked :: controller.decrease_selected_index()
-        enabled << controller._can_change_idx
-    Label: position:
-        text << "%i/%i" %(controller.selected_index+1, controller.numfiles)
-    PushButton: next_image:
-        text = ">"
-        tool_tip = "View next image in stack"
-        clicked :: controller.increase_selected_index()
-        enabled << controller._can_change_idx
+    GroupBox: image_box:
+        constraints = [hbox(save, prev_image, position, next_image),
+        prev_image.width == save.width,
+        next_image.width == save.width,]
+        title="Image:"
+        hug_height='required'
+        hug_width='medium'
+        PushButton: save:
+            text = "Save"
+            tool_tip = "Save current plot"
+            enabled << controller._can_save
+            clicked :: controller.open_score_save_UI()
+            hug_width='strong'
+        PushButton: prev_image:
+            text = "<"
+            tool_tip = "View previous image in stack"
+            clicked :: controller.decrease_selected_index()
+            enabled << controller._can_change_idx
+        Label: position:
+            text << "%i/%i" %(controller.selected_index+1, controller.numfiles)
+            hug_width='strong'
+        PushButton: next_image:
+            text = ">"
+            tool_tip = "View next image in stack"
+            clicked :: controller.increase_selected_index()
+            enabled << controller._can_change_idx
+       
+    GroupBox: context_box:
+        constraints = [hbox(contexts)]
+        title = "Context:"
+        #:hug_width='weak'
+        ComboBox: contexts:
+            items << controller._contexts
+            index := controller._context
+            enabled << len(controller._contexts)>0
+            tool_tip = "Which MDA run to display"
+            hug_width='medium'
+            resist_width='strong'
 
 enamldef ViewToolBar(ToolBar):
     attr controller
@@ -353,6 +398,7 @@ enamldef ToolsToolBar(ToolBar):
 enamldef CellViewDockPane(DockPane): celldockpane:
     attr controller
     Container:
+        hug_width = 'medium'
         EnableCanvas: canvas:
             component << celldockpane.controller.plot
         CellPlotButtons: buttons:
@@ -362,6 +408,7 @@ enamldef CellViewDockPane(DockPane): celldockpane:
 enamldef FactorViewDockPane(DockPane): factordockpane:
     attr controller
     Container:
+        hug_width = 'medium'
         EnableCanvas: canvas:
             component << factordockpane.controller.factor_plot
         FactorPlotButtons: buttons:
@@ -370,6 +417,7 @@ enamldef FactorViewDockPane(DockPane): factordockpane:
 enamldef ScoreViewDockPane(DockPane): scoredockpane:
     attr controller
     Container:
+        hug_width = 'medium'
         EnableCanvas: canvas:
             component << scoredockpane.controller.score_plot
         ScorePlotButtons: buttons:
@@ -378,6 +426,7 @@ enamldef ScoreViewDockPane(DockPane): scoredockpane:
 enamldef ImageViewDockPane(DockPane): imagedockpane:
     attr controller
     Container:
+        hug_width = 'medium'
         EnableCanvas: canvas:
             component << imagedockpane.controller.plot
             
