@@ -42,29 +42,32 @@ def get_test_pattern(pattern_size=(1024,1024), initial_position=(16,16),
     yOffset=0
 
     while positionY < (test_array.shape[0]-data.shape[0]):
+        random_offset = np.random.normal()
         # tweak data depending on position in image
         if positionY < test_array.shape[0]/4:
             # vary peak heights
-            data = gaussian(positionY/float(test_array.shape[0]/4)*255, (frame_size/2), 
-                        (frame_size/2), (peak_size/4)+1, 
+            height = (positionY)/float(test_array.shape[0]/4)*255 + random_offset
+            data = gaussian(height, (frame_size/2)+np.random.normal(), 
+                        (frame_size/2)+np.random.normal(), (peak_size/4)+1, 
                         (peak_size/4)+1)(xg, yg)
             print "cycle 1: height = %.1f"%(positionY/(float(test_array.shape[0]/4))*255)
         elif positionY < test_array.shape[0]/2:
             # skew the image more or less (eccentricity)
-            dimension_width = peak_size/8.0+(peak_size/8.0)*(positionY-test_array.shape[0]/4.0)/(test_array.shape[0]/4.0) + 1
-            data = gaussian(191, (frame_size/2), (frame_size/2), (peak_size/4)+1, 
+            dimension_width = peak_size/8.0+(peak_size/8.0)*(positionY-test_array.shape[0]/4.0)/(test_array.shape[0]/4.0) + 1 + random_offset
+            data = gaussian(191, (frame_size/2)+np.random.normal(), (frame_size/2)+np.random.normal(), (peak_size/4)+1, 
                             dimension_width)(xg, yg)
             print "cycle 2: skewed dimension width = %.1f"%(dimension_width)
         elif positionY < test_array.shape[0]:
             # test rotation of skewed peak
-            data = gaussian(191, (frame_size/2)+1, (frame_size/2)+1, (peak_size/5)+1, 
-                (peak_size/4)+1)(xg, yg)
-            rotation = (positionY-test_array.shape[0]/2)/float(test_array.shape[0]/2)*180
+            data = gaussian(191, (frame_size/2)+1+np.random.normal(), (frame_size/2)+1++np.random.normal(), 
+                            (peak_size/5)+1, 
+                            (peak_size/4)+1)(xg, yg)
+            rotation = (positionY-test_array.shape[0]/2)/float(test_array.shape[0]/2)*180+random_offset
             # apply affine rotation matrix - go from 0 to 90 degrees, depending on our Y position        
             data = rotate(data, rotation, reshape=False)
             print "cycle 3: data rotation angle = %.1f"%(rotation)
         else:
-            data = gaussian(191, (frame_size/2), (frame_size/2), 
+            data = gaussian(191, (frame_size/2)+np.random.normal(), (frame_size/2) +np.random.normal(), 
                             (peak_size/4)+1, (peak_size/4)+1)(xg, yg)        
         while positionX < (test_array.shape[1]-data.shape[1]):
             test_array[positionY:positionY+data.shape[0]+yOffset, 
