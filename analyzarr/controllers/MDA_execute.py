@@ -31,14 +31,14 @@ class MDAExecutionController(HasTraits):
 
     def __init__(self, treasure_chest=None, data_path='/rawdata',
                  *args, **kw):
-        super(MDAExecutionController, self).__init__(*args, **kw)
+        super(MDAExecutionController, self).__init__(treasure_chest=treasure_chest, data_path=data_path, *args, **kw)
         if treasure_chest is not None:
             self.chest = treasure_chest
             self.data_path = data_path
             # do we have any peaks?
             try:
                 self.chest.getNode('/','cell_peaks')
-                self.has_peaks = bool((self.chest.root.cell_peaks.nrows > 0))
+                self.has_peaks = bool(self.chest.root.cell_peaks.nrows > 0)
             except:
                 pass
 
