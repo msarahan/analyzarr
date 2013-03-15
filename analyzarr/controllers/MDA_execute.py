@@ -66,6 +66,7 @@ class MDAExecutionController(HasTraits):
             self.ICA(n_components=self.number_to_derive)
         self.chest.setNodeAttr('/mda_results/'+self.context, 
                                'dimensionality', self.number_to_derive)
+        self.chest.flush()
         # close the dialog window
         Application.instance().end_session(self._session_id)
         # show the results windows
