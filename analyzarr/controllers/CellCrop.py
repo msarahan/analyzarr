@@ -256,7 +256,6 @@ class CellCropController(BaseImageController):
         template_array[:] = template_data
         # TODO: set attribute that tells where the template came from
         row = self.chest.root.cell_description.row
-        average_data = np.zeros(template_data.shape, dtype=template_data.dtype)
         for idx in xrange(self.numfiles):
             # filter the peaks that are outside the selected threshold
             self.set_active_index(idx)
@@ -278,7 +277,6 @@ class CellCropController(BaseImageController):
                     data[i,:,:]=active_image[peaks[i, 1]:peaks[i, 1] + tmp_sz,
                                       peaks[i, 0]:peaks[i, 0] + tmp_sz]
                 self.chest.root.cell_description.flush()
-                average_data += np.average(data, axis=0)
                 # insert the data (one 3d array per file)
                 cell_array = self.chest.createCArray(self.chest.root.cells,
                                         self.get_active_name(),
@@ -294,7 +292,7 @@ class CellCropController(BaseImageController):
                                        
                 self.chest.root.cell_description.flush()
                 self.chest.flush()
-        average_data /= self.numfiles
+        average_data = np.average(data,axis=0).squeeze()
         average_array = self.chest.createCArray(self.chest.root.cells,
                                                  'average',
                                                  tb.Atom.from_dtype(average_data.dtype),
