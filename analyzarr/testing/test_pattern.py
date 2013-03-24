@@ -28,6 +28,10 @@ def get_test_pattern(pattern_size=(1024,1024), initial_position=(16,16),
 
     while positionY < (test_array.shape[1]-data.shape[1]):
         while positionX < (test_array.shape[1]-data.shape[0]):
+            data = gaussian(255, (frame_size/2)+np.random.normal()/10, 
+                            (frame_size/2)+np.random.normal()/10, 
+                            (peak_size/4)+1, 
+                            (peak_size/4)+1)(xg, yg)
             test_array[positionY:positionY+data.shape[0], 
                     positionX:positionX+data.shape[1]] += data
             positionX+=offset
