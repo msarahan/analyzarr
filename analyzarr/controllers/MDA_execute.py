@@ -5,13 +5,14 @@ import tables as tb
 from analyzarr.lib.io.data_structure import filters
 
 import numpy as np
+import sys
 
 try:
     import analyzarr.lib.mda.mda_rpy as mda
 except:
     try:
         import analyzarr.lib.mda.mda_sklearn as mda        
-        print "rpy not available; falling back to sklearn."
+        #print "rpy not available; falling back to sklearn."
     except:
         raise NotImplementedError("No MDA methods functional")
 
@@ -60,16 +61,20 @@ class MDAExecutionController(HasTraits):
     
     def execute(self):
         method = self.methods[self.selected_method_idx]
-        if method == 'PCA':
-            self.PCA(n_components=self.number_to_derive)
-        elif method == 'ICA':
-            self.ICA(n_components=self.number_to_derive)
-        self.chest.setNodeAttr('/mda_results/'+self.context, 
+        try:
+            if method == 'PCA':
+                self.PCA(n_components=self.number_to_derive)
+            elif method == 'ICA':
+                self.ICA(n_components=self.number_to_derive)
+            self.chest.setNodeAttr('/mda_results/'+self.context, 
                                'dimensionality', self.number_to_derive)
-        # close the dialog window
-        Application.instance().end_session(self._session_id)
-        # show the results windows
-        self.parent.update_mda_data()
+            # close the dialog window
+            Application.instance().end_session(self._session_id)
+            # show the results windows
+            self.parent.update_mda_data()
+        except RuntimeError:
+            print sys.exc_info()[0]
+            print "MDA not executed."
 
     def get_peak_data(self, chars=[], indices=[]):
         """
@@ -231,15 +236,15 @@ class MDAExecutionController(HasTraits):
     #  results in the chest.
     ######
     def PCA(self, n_components=None):
-        self._create_new_context("PCA")
         data, active_data_shape = self.get_input_data()
         if data.shape[0] < data.shape[1]:
             # TODO: should have a popup window or something here.
-            print "You have more variables (%s) than observations (%s).  Go get more data, \
-or remove some variables.  For images, you can subsample." % (data.shape[1], data.shape[0])
-            return
+            raise RuntimeWarning("You have more variables (%s) than \
+observations (%s).  Go get more data, \
+or remove some variables.  For images, you can subsample." % (data.shape[1], data.shape[0]))
         factors, scores , eigenvalues = mda.PCA(data, n_components=n_components)
         factors, scores = self._reshape_MDA_results(active_data_shape, factors, scores)
+        self._create_new_context("PCA")
         self.store_MDA_results(factors, scores, eigenvalues)
         # stash the results under the group of MDA results
         #   attribs:
@@ -250,7 +255,6 @@ or remove some variables.  For images, you can subsample." % (data.shape[1], dat
 
     def ICA(self, n_components, whiten=False, max_iter=10, differentiate=False):
         from scipy import integrate
-        self._create_new_context("ICA")
         # reshape the data:
         #   The goal is always to have the variables (pixels in an image,
         #     energy channels in a spectrum) always as columns in a 2D array.
@@ -261,9 +265,9 @@ or remove some variables.  For images, you can subsample." % (data.shape[1], dat
         data, active_data_shape = self.get_input_data()
         if data.shape[0] < data.shape[1]:
             # TODO: should have a popup window or something here.
-            print "You have more variables (%s) than observations (%s).  Go get more data, \
-or remove some variables.  For images, you can subsample." % (data.shape[1], data.shape[0])
-            return
+            raise RuntimeWarning("You have more variables (%s) than \
+observations (%s).  Go get more data, \
+or remove some variables.  For images, you can subsample." % (data.shape[1], data.shape[0]))
         """
         Pre-processes the data to be ready for ICA.  Namely:
           differentiates the data (integrated ICA)
@@ -292,6 +296,7 @@ or remove some variables.  For images, you can subsample." % (data.shape[1], dat
             else:
                 factors, scores = self._reshape_MDA_results(active_data_shape, 
                                                             factors, scores)
+        self._create_new_context("ICA")
         self.store_MDA_results(factors, scores)
 
     def _reshape_MDA_results(self, datashape, factors, scores):
