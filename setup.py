@@ -12,7 +12,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 """
 
 
-from distutils.core import setup
+from setuptools import setup
 
 import distutils.dir_util
 
@@ -31,7 +31,7 @@ import analyzarr.Release as Release
 if os.path.exists('build'):
     distutils.dir_util.remove_tree('build')
 
-install_req = ['scipy', 'numpy', 'traits', 'chaco', 'enaml', 
+install_req = ['scipy', 'numpy', 'traits', 'chaco>=4.2.1', 'enaml>=0.6',
                'cython', 'scikit_learn', ]
 
 numpy_include_dir = np.get_include()
@@ -55,7 +55,8 @@ setup(
     package_data = {
         'analyzarr' : [ '*.enaml', 'ui/*.enaml',],
         },
-    requires = install_req,
+    install_requires = install_req,
+    scripts = ['bin/analyzarr'],
     author = Release.authors['M_S'][0],
     author_email = Release.authors['M_S'][1],
     maintainer = 'Michael Sarahan',
