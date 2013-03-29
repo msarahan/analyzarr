@@ -17,8 +17,6 @@ from setuptools import setup
 import distutils.dir_util
 
 import os
-import sys
-import shutil
 
 from distutils.extension import Extension
 from Cython.Distutils import build_ext

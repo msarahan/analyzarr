@@ -10,6 +10,8 @@ import analyzarr.lib.cv.peak_char as pc
 
 class CellController(BaseImageController):
     _can_characterize = Bool(False)
+    _show_peak_ids = Bool(False)
+    _can_show_peak_ids = Bool(False)
     numpeaks = Int(0)
     
     def __init__(self, parent, treasure_chest=None, data_path='/cells', *args, **kw):
@@ -27,17 +29,27 @@ class CellController(BaseImageController):
                 self._toggle_UI(True)
                 self._can_change_idx = True
                 self.parent.show_cell_view=True
+                try:
+                    self.chest.getNode('/', 'cell_peaks')
+                    self.numpeaks = self.chest.getNodeAttr('/cell_peaks','number_of_peaks')
+                    self._can_show_peak_ids = True
+                except:
+                    # we haven't got any peaks to identify
+                    return
 
     def _toggle_UI(self, enable):
         self._can_save = enable
         self._can_characterize = enable
 
-    @on_trait_change("selected_index")
+    @on_trait_change("selected_index, _show_peak_ids")
     def update_data_labels(self):
         try:
             self.chest.getNode('/','cell_peaks')
         except:
+            print "No peak information to plot"
             return
+        if self._show_peak_ids:
+            print "showing labels"
         # labels is a dict consisting of data points as tuples
         labels = {}
         # this is the record in the cell_description table
@@ -55,7 +67,7 @@ class CellController(BaseImageController):
             label = '%i' %peak
             labels[label]=(x,y)
         self.plot_labels(labels)
-        self.show_labels()
+        self.show_labels(self._show_peak_ids)
         
     def get_active_image(self):
         # Find this cell in the cell description table.  We use this to look
@@ -187,7 +199,7 @@ class CellController(BaseImageController):
         self.chest.setNodeAttr('/cell_peaks','number_of_peaks', self.numpeaks)
         self.chest.root.cell_peaks.flush()
         self.chest.flush()
-        self.update_data_labels()
+        self._can_show_peak_ids = True
         self.parent.image_controller.update_peak_map_choices()
         
         self._toggle_UI(True)

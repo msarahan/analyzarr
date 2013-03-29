@@ -257,4 +257,5 @@ class HasRenderer(HasTraits):
             if show:
                 self._base_plot.overlays.append(self._labels[label])
             else:
+                #TODO: need to hide/remove the overlays here.
                 pass

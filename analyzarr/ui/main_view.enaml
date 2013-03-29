@@ -218,7 +218,7 @@ enamldef ImagePlotButtons(Container): image_buttons:
 enamldef CellPlotButtons(Container): cell_buttons:
     attr controller
     constraints = [
-        hbox(image_box),
+        hbox(image_box, id_box),
         ]
     hug_height='required'
     GroupBox: image_box:
@@ -247,7 +247,13 @@ enamldef CellPlotButtons(Container): cell_buttons:
             tool_tip = "View next image in stack"
             clicked :: controller.increase_selected_index()
             enabled << controller._can_change_idx
-
+    GroupBox: id_box:
+        title = "Peak IDs:"
+        CheckBox:
+            text = "Show"
+            enabled << controller._can_show_peak_ids
+            checked := controller._show_peak_ids
+            
 enamldef FactorPlotButtons(Container): factor_buttons:
     attr controller
     constraints = [
