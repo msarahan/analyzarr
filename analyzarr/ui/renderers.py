@@ -238,7 +238,6 @@ class HasRenderer(HasTraits):
     def get_plot_title(self):
         return self._base_plot.title
         
-    # TODO: are we going to need to delete labels somehow?
     def plot_labels(self, labels):
         for label in labels.keys():
             if label in self._labels:
@@ -253,9 +252,10 @@ class HasRenderer(HasTraits):
                                          point=data_point,
                                          label_text=label_text)
     def show_labels(self, show=True):
-        for label in self._labels.keys():
-            if show:
+        if show:
+            for label in self._labels.keys():
                 self._base_plot.overlays.append(self._labels[label])
-            else:
-                #TODO: need to hide/remove the overlays here.
-                pass
+        else:
+            self._base_plot.overlays = [self._base_plot.overlays[i] for i in xrange(len(self._base_plot.overlays)) 
+                                        if self._base_plot.overlays[i].__class__.__name__ != "DataLabel"]      
+        self._base_plot.request_redraw()
