@@ -5,14 +5,17 @@ import numpy as np
 
 import analyzarr.lib.cv.peak_char as pc
 
-#from chaco.default_colormaps import gray
-#from chaco.api import ArrayPlotData, BasePlotContainer, Plot
+from pyface.api import ProgressDialog
 
 class CellController(BaseImageController):
     _can_characterize = Bool(False)
     _show_peak_ids = Bool(False)
     _can_show_peak_ids = Bool(False)
+    _progress_value = Int(0)
+    _progress_max = Int(1)
     numpeaks = Int(0)
+    peak_width = Int(10)
+    _do_char=Bool(False)
     
     def __init__(self, parent, treasure_chest=None, data_path='/cells', *args, **kw):
         super(CellController, self).__init__(parent, treasure_chest, data_path,
@@ -138,9 +141,17 @@ class CellController(BaseImageController):
 
     def get_num_files(self):
         return self.chest.root.cell_description.nrows
+    
+    def toggle_char(self):
+        self._do_char = not self._do_char
         
+    @on_trait_change('_do_char')
+    def execute_characterize(self):
+        self.characterize()
+    
+    # TODO: execute this in a separate thread/process for responsiveness.
     # TODO: automatically determine the peak width from an average image
-    def characterize(self, peak_width, target_locations=None, 
+    def characterize(self, target_locations=None, 
                      target_neighborhood=20, 
                      medfilt_radius=5):
         # disable the UI while we're running
@@ -173,18 +184,23 @@ class CellController(BaseImageController):
         nodes = self.chest.listNodes('/cells')
         # exclude some nodes
         node_names = [node.name for node in nodes]
+        progress = ProgressDialog(title="Peak characterization progress", 
+                                  message="Characterizing peaks on %d images"%(len(node_names)-2),
+                                  max=len(node_names)-1, show_time=True, can_cancel=False)
+        progress.open()
+        file_progress=0
         for node in node_names:
             if node == 'template':
                 continue
             cell_data = nodes[node_names.index(node)][:]
             cell_data = cell_data.reshape((-1, cell_data.shape[-2], 
-                                           cell_data.shape[-1]))            
+                                           cell_data.shape[-1]))
             data = np.zeros((cell_data.shape[0]),dtype=dtypes)
             data['filename'] = node
             data['file_idx'] = np.arange(cell_data.shape[0])            
             # reshape possibly 2D arrays (average fits this)
-            attribs = pc.peak_attribs_stack(cell_data,
-                            peak_width=peak_width, 
+            attribs = self.peak_attribs_stack(cell_data,
+                            peak_width=self.peak_width, 
                             target_locations=target_locations,
                             target_neighborhood=target_neighborhood,
                             medfilt_radius=medfilt_radius)
@@ -195,14 +211,108 @@ class CellController(BaseImageController):
             # add the data to the table
             self.chest.root.cell_peaks.append(data)
             self.chest.root.cell_peaks.flush()
+            file_progress+=1
+            progress.update(file_progress)            
         # add an attribute for the total number of peaks recorded
         self.chest.setNodeAttr('/cell_peaks','number_of_peaks', self.numpeaks)
         self.chest.root.cell_peaks.flush()
         self.chest.flush()
         self._can_show_peak_ids = True
         self.parent.image_controller.update_peak_map_choices()
-        
+        self._progress_value = 0
         self._toggle_UI(True)
+
+    def peak_attribs_stack(self, stack, peak_width, target_locations=None,
+                           target_neighborhood=20, medfilt_radius=5):
+        """
+        Characterizes the peaks in a stack of images.
+    
+            Parameters:
+            ----------
+    
+            peak_width : int (required)
+                    expected peak width.  Too big, and you'll include other peaks
+                    in measurements.
+    
+            target_locations : numpy array (n x 2)
+                    array of n target locations.  If left as None, will create 
+                    target locations by locating peaks on the average image of the stack.
+                    default is None (peaks detected from average image)
+    
+            img_size : tuple, 2 elements
+                    (width, height) of images in image stack.
+    
+            target_neighborhood : int
+                    pixel neighborhood to limit peak search to.  Peaks outside the
+                    square defined by 2x this value around the peak will be excluded
+                    from any fitting.  
+    
+            medfilt_radius : int (optional)
+                    median filter window to apply to smooth the data
+                    (see scipy.signal.medfilt)
+                    if 0, no filter will be applied.
+                    default is set to 5
+    
+           Returns:
+           -------
+           2D  numpy array:
+            - One column per image
+            - 9 rows per peak located
+                0,1 - location
+                2,3 - difference between location and target location
+                4 - height
+                5 - orientation
+                6 - eccentricity
+                7,8 - skew X, Y, respectively
+    
+        """
+        if target_locations is None:
+            # get peak locations from the average image
+            avgImage=np.average(stack,axis=0)
+            target_locations=pc.two_dim_findpeaks(avgImage, peak_width=peak_width)
+    
+        # get all peaks on all images
+        peaks=pc.stack_coords(stack, peak_width=peak_width)
+        # two loops here - outer loop loops over images (i index)
+        # inner loop loops over target peak locations (j index)
+        peak_locations=np.array([[pc.best_match(peaks[:,:,i], 
+                                             target_locations[j,:2], 
+                                             target_neighborhood) \
+                                  for i in xrange(peaks.shape[2])] \
+                                 for j in xrange(target_locations.shape[0])])
+    
+        # pre-allocate result array.  7 rows for each peak, 1 column for each image
+        rlt = np.zeros((9*peak_locations.shape[0],stack.shape[0]))
+        rlt_tmp = np.zeros((peak_locations.shape[0],7))
+        
+        progress = ProgressDialog(title="Peak characterization progress", 
+                                  message="Characterizing peaks on %d cells"%stack.shape[0], 
+                                  max=stack.shape[0], show_time=True, can_cancel=False)
+        progress.open()        
+        
+        for i in xrange(stack.shape[0]):
+            progress.update(i+1)
+            print i
+            rlt_tmp=pc.peak_attribs_image(stack[i,:,:], 
+                                       target_locations=peak_locations[:,i,:], 
+                                       peak_width=peak_width, 
+                                       medfilt_radius=medfilt_radius, 
+                                       )
+            diff_coords=target_locations[:,:2]-rlt_tmp[:,:2]
+            for j in xrange(target_locations.shape[0]):
+                # peak position
+                rlt[ j*9   : j*9+2 ,i] = rlt_tmp[j,:2]
+                # difference in peak position relative to average
+                rlt[ j*9+2 : j*9+4 ,i] = diff_coords[j]
+                # height
+                rlt[ j*9+4         ,i]=rlt_tmp[j,2]
+                # orientation
+                rlt[ j*9+5         ,i]=rlt_tmp[j,3]
+                # eccentricity
+                rlt[ j*9+6         ,i]=rlt_tmp[j,4]
+                # skew (x and y)
+                rlt[ j*9+7 : j*9+9 ,i]=rlt_tmp[j,5:]
+        return rlt
 
     def get_peak_data(self, chars=[], indices=[]):
         """
@@ -223,6 +333,8 @@ class CellController(BaseImageController):
             h - the height of the peak
             o - if a peak is not perfectly symmetric, the orientation of the peak.
             e - the eccentricity of a peak.  i.e. how egg-shaped is it?
+            sx - the skew in the x-direction.  Skew is a measure of asymmetry.
+            sy - the skew in the y-direction.  Skew is a measure of asymmetry.
             
         indices - peak indices (integers) to select from.  Use this if you want to compare
             only a few peaks in the cell structure to compare.
@@ -235,7 +347,7 @@ class CellController(BaseImageController):
             #   indices we want.
             cols = [['%s%i' % (c, i) for i in indices] for c in chars]
         else:
-            chars = ['x', 'y', 'dx', 'dy', 'h', 'o', 'e']
+            chars = ['x', 'y', 'dx', 'dy', 'h', 'o', 'e', 'sx', 'sy']
             if len(indices) is 0:
                 indices = range(self.chest.root.cell_peaks.number_of_peaks)
             # the columns we get are the combination of the chars with the
