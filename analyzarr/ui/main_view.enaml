@@ -24,7 +24,7 @@ from enaml.layout.api import vbox, hbox, vertical, horizontal
 from enaml.widgets.api import (
     MainWindow, ToolBar, DockPane, MenuBar, Menu, Action, ActionGroup,
     Container, Html, PushButton, EnableCanvas, CheckBox, FileDialog,
-    Label, ComboBox, Field, GroupBox
+    Label, ComboBox, Field, GroupBox, ProgressBar
 )
 
 from enaml.stdlib.fields import FloatField, IntField
@@ -219,6 +219,7 @@ enamldef CellPlotButtons(Container): cell_buttons:
     attr controller
     constraints = [
         hbox(image_box, id_box),
+        #:hbox(image_box, id_box, char_progress_box),
         ]
     hug_height='required'
     GroupBox: image_box:
@@ -253,6 +254,12 @@ enamldef CellPlotButtons(Container): cell_buttons:
             text = "Show"
             enabled << controller._can_show_peak_ids
             checked := controller._show_peak_ids
+    #:GroupBox: char_progress_box:
+    #:    title = "Characterization Progress"
+    #:    ProgressBar:
+    #:        minimum = 0
+    #:        maximum << controller._progress_max
+    #:        value << controller._progress_value
             
 enamldef FactorPlotButtons(Container): factor_buttons:
     attr controller
@@ -393,7 +400,7 @@ enamldef ToolsToolBar(ToolBar):
     Action: characterize:
         text = "Characterize Peaks"
         tool_tip = "Locate and characterize peaks in the cell stack"
-        triggered :: controller.cell_controller.characterize(10)
+        triggered :: controller.cell_controller.toggle_char()
         enabled << (controller.cell_controller.numfiles>0)
     Action: mda:
         text = "MDA"

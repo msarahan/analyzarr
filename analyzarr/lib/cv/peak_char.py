@@ -208,45 +208,6 @@ def get_characteristics(moments):
     # 0 is a placeholder for the height.
     return np.array([xCenter, yCenter, 0, orientation, eccentricity, xSkew, ySkew])
 
-def stack_coords(stack,peak_width,maxpeakn=5000):
-    """
-    A rough location of all peaks in the image stack.  This can be fed into the
-    best_match function with a list of specific peak locations to find the best
-    matching peak location in each image.
-    """
-    depth=stack.shape[0]
-    coords=np.ones((maxpeakn,2,depth))*10000
-    for i in xrange(depth):
-        ctmp=two_dim_findpeaks(stack[i,:,:], peak_width=peak_width)
-        for row in xrange(ctmp.shape[0]):
-            coords[row,:,i]=ctmp[row,:2]
-    return coords
-
-def best_match(arr, target, neighborhood=None):
-    """
-    Attempts to find the best match (least distance) for target coordinates 
-    in array of coordinates arr. 
-
-    Usage:
-        best_match(arr, target)
-    """
-    arr_sub = arr[:]
-    arr_sub = arr - target
-    if neighborhood:
-        # mask any peaks outside the neighborhood
-        arr_sub = np.ma.masked_outside(arr_sub, -neighborhood, neighborhood)
-        # set the masked pixel values to 10000, so that they won't be the nearest peak.
-        arr_sub = np.ma.filled(arr_sub, 10000)
-    # locate the peak with the smallest euclidean distance to the target
-    match=np.argmin(np.sqrt(np.sum(
-        np.power(arr_sub,2),
-        axis=1)))
-    rlt=arr[match]
-    # TODO: this neighborhood warning doesn't work well.
-    #if neighborhood and np.sum(rlt)>2*neighborhood:
-    #    print "Warning! Didn't find a peak within your neighborhood! Watch for fishy peaks."
-    return rlt
-
 def peak_attribs_image(image, peak_width, target_locations=None, medfilt_radius=5):
     """
     Characterizes the peaks in an image.
@@ -316,99 +277,43 @@ def peak_attribs_image(image, peak_width, target_locations=None, medfilt_radius=
         rlt[loc,2]=height
     return rlt
 
-def peak_attribs_stack(stack, peak_width, target_locations=None,
-                       target_neighborhood=20, medfilt_radius=5):
+def stack_coords(stack,peak_width,maxpeakn=5000):
     """
-    Characterizes the peaks in a stack of images.
-
-        Parameters:
-        ----------
-
-        peak_width : int (required)
-                expected peak width.  Too big, and you'll include other peaks
-                in measurements.
-
-        target_locations : numpy array (n x 2)
-                array of n target locations.  If left as None, will create 
-                target locations by locating peaks on the average image of the stack.
-                default is None (peaks detected from average image)
-
-        img_size : tuple, 2 elements
-                (width, height) of images in image stack.
-
-        target_neighborhood : int
-                pixel neighborhood to limit peak search to.  Peaks outside the
-                square defined by 2x this value around the peak will be excluded
-                from any fitting.  
-
-        medfilt_radius : int (optional)
-                median filter window to apply to smooth the data
-                (see scipy.signal.medfilt)
-                if 0, no filter will be applied.
-                default is set to 5
-
-       Returns:
-       -------
-       2D  numpy array:
-        - One column per image
-        - 9 rows per peak located
-            0,1 - location
-            2,3 - difference between location and target location
-            4 - height
-            5 - orientation
-            6 - eccentricity
-            7,8 - skew X, Y, respectively
-
+    A rough location of all peaks in the image stack.  This can be fed into the
+    best_match function with a list of specific peak locations to find the best
+    matching peak location in each image.
     """
-
-    try:
-        import cv
-    except:
-        try:
-            import cv2.cv as cv
-        except:
-            print 'Module %s:' % sys.modules[__name__]
-            print 'OpenCV is not available, the peak characterization functions will not work.'
-            return None
-
-    if target_locations is None:
-        # get peak locations from the average image
-        avgImage=np.average(stack,axis=0)
-        target_locations=two_dim_findpeaks(avgImage, peak_width=peak_width)
-
-    # get all peaks on all images
-    peaks=stack_coords(stack, peak_width=peak_width)
-    # two loops here - outer loop loops over images (i index)
-    # inner loop loops over target peak locations (j index)
-    peak_locations=np.array([[best_match(peaks[:,:,i], 
-                                         target_locations[j,:2], 
-                                         target_neighborhood) \
-                              for i in xrange(peaks.shape[2])] \
-                             for j in xrange(target_locations.shape[0])])
-
-    # pre-allocate result array.  7 rows for each peak, 1 column for each image
-    rlt = np.zeros((9*peak_locations.shape[0],stack.shape[0]))
-    rlt_tmp = np.zeros((peak_locations.shape[0],7))
-    for i in xrange(stack.shape[0]):
-        rlt_tmp=peak_attribs_image(stack[i,:,:], 
-                                   target_locations=peak_locations[:,i,:], 
-                                   peak_width=peak_width, 
-                                   medfilt_radius=medfilt_radius, 
-                                   )
-        diff_coords=target_locations[:,:2]-rlt_tmp[:,:2]
-        for j in xrange(target_locations.shape[0]):
-            # peak position
-            rlt[ j*9   : j*9+2 ,i] = rlt_tmp[j,:2]
-            # difference in peak position relative to average
-            rlt[ j*9+2 : j*9+4 ,i] = diff_coords[j]
-            # height
-            rlt[ j*9+4         ,i]=rlt_tmp[j,2]
-            # orientation
-            rlt[ j*9+5         ,i]=rlt_tmp[j,3]
-            # eccentricity
-            rlt[ j*9+6         ,i]=rlt_tmp[j,4]
-            # skew (x and y)
-            rlt[ j*9+7 : j*9+9 ,i]=rlt_tmp[j,5:]
+    depth=stack.shape[0]
+    coords=np.ones((maxpeakn,2,depth))*10000
+    for i in xrange(depth):
+        ctmp=two_dim_findpeaks(stack[i,:,:], peak_width=peak_width)
+        for row in xrange(ctmp.shape[0]):
+            coords[row,:,i]=ctmp[row,:2]
+    return coords
+    
+def best_match(arr, target, neighborhood=None):
+    """
+    Attempts to find the best match (least distance) for target coordinates 
+    in array of coordinates arr. 
+    
+    Usage:
+    best_match(arr, target)
+    """
+    arr_sub = arr[:]
+    arr_sub = arr - target
+    if neighborhood:
+        # mask any peaks outside the neighborhood
+        arr_sub = np.ma.masked_outside(arr_sub, -neighborhood, neighborhood)
+        # set the masked pixel values to 10000, so that they won't be the nearest peak.
+        arr_sub = np.ma.filled(arr_sub, 10000)
+    # locate the peak with the smallest euclidean distance to the target
+    match=np.argmin(np.sqrt(np.sum(
+        np.power(arr_sub,2),
+        axis=1)))
+    rlt=arr[match]
+    # TODO: this neighborhood warning doesn't work well.
+    #if neighborhood and np.sum(rlt)>2*neighborhood:
+    #    print "Warning! Didn't find a peak within your neighborhood! Watch for fishy peaks."
     return rlt
 
 def normalize(arr,lower=0.0,upper=1.0):
