@@ -24,7 +24,7 @@ from enaml.layout.api import vbox, hbox, vertical, horizontal
 from enaml.widgets.api import (
     MainWindow, ToolBar, DockPane, MenuBar, Menu, Action, ActionGroup,
     Container, Html, PushButton, EnableCanvas, CheckBox, FileDialog,
-    Label, ComboBox, Field, GroupBox, ProgressBar
+    Label, ComboBox, Field, GroupBox, ProgressBar, FlowArea
 )
 
 from enaml.stdlib.fields import FloatField, IntField
@@ -183,7 +183,7 @@ enamldef ImagePlotButtons(Container): image_buttons:
             enabled <<  controller._can_map_peaks
             hug_width = 'medium'
     GroupBox: characteristic_box:
-        constraints = [hbox(characteristic),]
+        constraints = [hbox(characteristic, expression),]
         hug_height='required'
         title = "Color Map:"
         hug_width = 'medium'
@@ -193,6 +193,9 @@ enamldef ImagePlotButtons(Container): image_buttons:
             index := controller._characteristic 
             enabled << controller._can_map_peaks
             hug_width = 'medium'
+        Field: expression:
+            text := controller._peak_expression
+            enabled << controller._characteristics[characteristic.index] == "Expression"
     GroupBox: vector_box:
         constraints = [hbox(vector, vector_label, vector_scale),
                     vector_scale.width == 0.5*vector.width,]
@@ -209,10 +212,6 @@ enamldef ImagePlotButtons(Container): image_buttons:
         FloatField: vector_scale:
             value := controller.vector_scale
             enabled <<  controller._can_map_peaks
-        #: TODO: implement parser for math expressions
-        #:Field:
-        #:    text := controller._peak_expression
-        #:    enabled := cell_controller._can_edit_expression
         
 
 enamldef CellPlotButtons(Container): cell_buttons:

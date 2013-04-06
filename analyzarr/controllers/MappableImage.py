@@ -1,14 +1,16 @@
 from BaseImage import BaseImageController
-from traits.api import Bool, List, Int, Float, Range, on_trait_change
+from traits.api import Bool, List, Int, Float, Range, String, on_trait_change
 import numpy as np
+import tables as t
 
 class MappableImageController(BaseImageController):
     _can_map_peaks = Bool(False)
     _is_mapping_peaks = Bool(False)
-    _characteristics = List(["None","Height", "Orientation", "Eccentricity"])
-    _characteristic = Range(0,3)
+    _characteristics = List(["None","Height", "Orientation", "Eccentricity", "Expression"])
+    _characteristic = Int(0)
     _selected_peak = Range(0,100)
     _peak_ids = List([])
+    _peak_expression = String("")
     _vectors = List(['None','Shifts', 'Skew'])
     _vector = Int(0)
     vector_scale = Float(1.0)
@@ -73,7 +75,7 @@ class MappableImageController(BaseImageController):
         return self.get_active_name() + name
     
     @on_trait_change('_peak_ids, _characteristic, _selected_peak, _vector, \
-                        selected_index, vector_scale')
+                        selected_index, vector_scale, _peak_expression')
     def update_image(self):
         if self.chest is None:
             return
@@ -130,14 +132,14 @@ class MappableImageController(BaseImageController):
                 self.plotdata.del_data('vectors')
                 # clear vector data
         if self.get_characteristic_name() != "None":
-            prefix = self._characteristics[self._characteristic][0].lower()
-            column = prefix + str(self._selected_peak)
-            self.plotdata.set_data('color', 
-                               self.chest.root.cell_peaks.readWhere(
-                                   'filename == "%s"' % self.get_active_name(),
-                                   field=column,
-                                       ),
-                                   )
+            if self.get_characteristic_name() == "Expression":
+                expression = self._peak_expression
+            else:
+                prefix = self._characteristics[self._characteristic][0].lower()
+                expression = prefix + str(self._selected_peak)
+            if expression != "":
+                data = self.get_expression_data(expression)
+                self.plotdata.set_data('color', data)
         else:
             if 'color' in self.plotdata.arrays:
                 self.plotdata.del_data('color')
@@ -147,3 +149,13 @@ class MappableImageController(BaseImageController):
                                                       tool=None)
         self.set_plot_title(self.get_characteristic_plot_title())
         self._is_mapping_peaks=True
+
+    def get_expression_data(self, expression):
+        uv = self.chest.root.cell_peaks.colinstances
+        data = t.Expr(expression, uv).eval()
+        # pick out the indices for only the active image
+        indices = self.chest.root.cell_peaks.getWhereList(
+            "filename == '%s'" % self.get_active_name())
+        # access the array data for those indices
+        data=data[indices]
+        return data
