@@ -30,6 +30,8 @@ with enaml.imports():
     from analyzarr.ui.MDA_popup import MDAInterface
 from enaml.application import Application
 from enaml.stdlib.sessions import simple_session
+
+import os
  
 # the UI controller
 class HighSeasAdventure(HasTraits):
@@ -69,8 +71,11 @@ class HighSeasAdventure(HasTraits):
         # first, clear any existing controllers
         self.image_controller = MappableImageController(parent=self)
         self.cell_controller = CellController(parent=self)
-        self.mda_controller = MDAViewController(parent=self)        
+        self.mda_controller = MDAViewController(parent=self)
         # open a new chest
+        prefix, ext = os.path.splitext(filename)
+        if "chest" in ext:
+            filename = prefix
         chest = file_import.new_treasure_chest(filename)
         self.image_controller = MappableImageController(parent=self, 
                                                     treasure_chest=chest)
