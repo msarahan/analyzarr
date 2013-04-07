@@ -15,6 +15,7 @@ import sys
 
 import numpy as np
 from scipy.signal import medfilt
+from fit_gaussian import fitgaussian
 
 # try to use the faster Cython version.  If it's not available, fall back to the python definition below (~5x slower)
 try:
@@ -256,9 +257,10 @@ def peak_attribs_image(image, peak_width, target_locations=None, medfilt_radius=
     if target_locations is None:
         target_locations=two_dim_findpeaks(image, peak_width=peak_width)
     rlt=np.zeros((target_locations.shape[0],7))
-    r=peak_width/2
+    r=np.ceil(peak_width/2)
     imsize=image.shape[0]
-    roi=np.zeros((peak_width,peak_width))
+    roi=np.zeros((r*2,r*2))
+    #mask = 
     for loc in xrange(target_locations.shape[0]):
         c=target_locations[loc]
         bxmin=c[1]-r
@@ -271,9 +273,11 @@ def peak_attribs_image(image, peak_width, target_locations=None, medfilt_radius=
         if bymax>imsize: bymax=imsize; bymin=imsize-peak_width
         roi[:,:]=image[bymin:bymax,bxmin:bxmax]
         ms=cv.Moments(cv.fromarray(roi))
-        height=image[c[1],c[0]]
+        height, x, y, width_x, width_y = fitgaussian(roi)
+        #height=image[c[1],c[0]]
         rlt[loc] = get_characteristics(ms)
-        rlt[loc,:2] += target_locations[loc]
+        rlt[loc,:2] = (np.array([bymin,bxmin]) + np.array([y,x]))
+        #rlt[loc,:2] += target_locations[loc]
         rlt[loc,2]=height
     return rlt
 
@@ -323,6 +327,33 @@ def normalize(arr,lower=0.0,upper=1.0):
     arr += lower
     return arr
 
+# code from
+# http://stackoverflow.com/questions/8647024/how-to-apply-a-disc-shaped-mask-to-a-numpy-array
+def draw_mask(array_size, radius, target_locations):
+    array = np.zeros(array_size)
+    for loc in target_locations:
+        ay, ax = array_size[0], array_size[1]
+        ty, tx = loc[0], loc[1]
+        y,x = np.mgrid[-ty:ay-ty, -tx:ax-tx]
+        mask = x*x + y*y <= radius*radius
+        array[mask] = 1
+    return array
+
+def min_peak_distance(target_locations):
+    minimum = 3000
+    xx, yy = np.meshgrid(range(len(target_locations)), 
+                range(len(target_locations)))
+    for i in range(len(target_locations)):
+        for j in range(len(target_locations)):
+            ix = target_locations[i][1]
+            jx = target_locations[j][1]
+            iy = target_locations[i][0]
+            jy = target_locations[j][0]
+            distance = np.sqrt((ix-jx)**2 + (iy-jy)**2)
+            if distance == 0: continue
+            if distance < minimum: minimum = distance
+    return minimum
+    
 """
 # OpenCV does not derive 4th order moments.  
 # Stuck at skew until rewrite of moment derivation?

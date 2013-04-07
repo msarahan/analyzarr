@@ -6,6 +6,7 @@ import numpy as np
 import analyzarr.lib.cv.peak_char as pc
 
 from pyface.api import ProgressDialog
+from enaml.application import Application
 
 class CellController(BaseImageController):
     _can_characterize = Bool(False)
@@ -154,8 +155,11 @@ class CellController(BaseImageController):
     def characterize(self, target_locations=None, 
                      target_neighborhood=20, 
                      medfilt_radius=5):
+        print "Main thread?" 
+        print Application.instance().is_main_thread()
         # disable the UI while we're running
         self._toggle_UI(False)
+        print 
         try:
             # wipe out old results
             self.chest.removeNode('/cell_peaks')        
@@ -223,7 +227,8 @@ class CellController(BaseImageController):
         self._toggle_UI(True)
 
     def peak_attribs_stack(self, stack, peak_width, target_locations=None,
-                           target_neighborhood=20, medfilt_radius=5):
+                           target_neighborhood=20, medfilt_radius=5,
+                           mask = True):
         """
         Characterizes the peaks in a stack of images.
     
@@ -266,11 +271,20 @@ class CellController(BaseImageController):
                 7,8 - skew X, Y, respectively
     
         """
+        avgImage=np.average(stack,axis=0)
         if target_locations is None:
             # get peak locations from the average image
-            avgImage=np.average(stack,axis=0)
-            target_locations=pc.two_dim_findpeaks(avgImage, peak_width=peak_width)
+            # an initial value for the peak width of 10 pixels works
+            #   OK to find initial peaks.  We determine a proper value
+            #   soon.
+            target_locations=pc.two_dim_findpeaks(avgImage, 10)
     
+        if mask:
+            peak_width = 0.75*pc.min_peak_distance(target_locations)
+            mask = pc.draw_mask(avgImage.shape,
+                                peak_width/2,
+                                target_locations)            
+            stack *= mask
         # get all peaks on all images
         peaks=pc.stack_coords(stack, peak_width=peak_width)
         # two loops here - outer loop loops over images (i index)
@@ -279,7 +293,7 @@ class CellController(BaseImageController):
                                              target_locations[j,:2], 
                                              target_neighborhood) \
                                   for i in xrange(peaks.shape[2])] \
-                                 for j in xrange(target_locations.shape[0])])
+                                  for j in xrange(target_locations.shape[0])])
     
         # pre-allocate result array.  7 rows for each peak, 1 column for each image
         rlt = np.zeros((9*peak_locations.shape[0],stack.shape[0]))
@@ -292,7 +306,6 @@ class CellController(BaseImageController):
         
         for i in xrange(stack.shape[0]):
             progress.update(i+1)
-            print i
             rlt_tmp=pc.peak_attribs_image(stack[i,:,:], 
                                        target_locations=peak_locations[:,i,:], 
                                        peak_width=peak_width, 
