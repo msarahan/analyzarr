@@ -37,7 +37,8 @@ class BaseImageController(ControllerBase):
     # this is a 2D image for plotting purposes
     def get_active_image(self):
         nodes = self.chest.listNodes('/rawdata')
-        return nodes[self.selected_index][:]
+        if len(nodes) > 0:
+            return nodes[self.selected_index][:]
 
     # this is a potentially 3D image stack for feeding into analyses
     def get_active_image_set(self, names=None):
@@ -60,7 +61,7 @@ class BaseImageController(ControllerBase):
     
     @on_trait_change("selected_index")
     def update_image(self):
-        if self.chest is None:
+        if self.chest is None or self.numfiles<1:
             return
         # get the old image for the sake of comparing image sizes
         old_data = self.plotdata.get_data('imagedata')
