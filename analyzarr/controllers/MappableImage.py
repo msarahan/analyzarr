@@ -152,6 +152,7 @@ class MappableImageController(BaseImageController):
 
     def get_expression_data(self, expression):
         uv = self.chest.root.cell_peaks.colinstances
+        expression = self.remap_distance_expressions(expression)
         data = t.Expr(expression, uv).eval()
         # pick out the indices for only the active image
         indices = self.chest.root.cell_peaks.getWhereList(
@@ -159,3 +160,9 @@ class MappableImageController(BaseImageController):
         # access the array data for those indices
         data=data[indices]
         return data
+    
+    def remap_distance_expressions(self, expression):
+        import re
+        pattern = re.compile("dist\((\s*\d+\s*),(\s*\d+\s*)\)")
+        expression = pattern.sub(r"((x\1-x\2)**2+(y\1-y\2)**2)**0.5", expression)
+        return expression
