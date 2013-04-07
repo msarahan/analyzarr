@@ -304,11 +304,11 @@ class CellController(BaseImageController):
         
         progress = ProgressDialog(title="Peak characterization progress", 
                                   message="Characterizing peaks on %d cells"%stack.shape[0], 
-                                  max=stack.shape[0], show_time=True, can_cancel=False)
+                                  max=int(stack.shape[0]), show_time=True, can_cancel=False)
         progress.open()        
         
         for i in xrange(stack.shape[0]):
-            progress.update(i+1)
+            progress.update(int(i+1))
             rlt_tmp=pc.peak_attribs_image(stack[i,:,:], 
                                        target_locations=peak_locations[:,i,:], 
                                        peak_width=peak_width, 
