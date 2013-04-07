@@ -8,7 +8,7 @@ class MappableImageController(BaseImageController):
     _is_mapping_peaks = Bool(False)
     _characteristics = List(["None","Height", "Orientation", "Eccentricity", "Expression"])
     _characteristic = Int(0)
-    _selected_peak = Range(0,100)
+    _selected_peak = Int(0)
     _peak_ids = List([])
     _peak_expression = String("")
     _vectors = List(['None','Shifts', 'Skew'])
@@ -77,7 +77,7 @@ class MappableImageController(BaseImageController):
     @on_trait_change('_peak_ids, _characteristic, _selected_peak, _vector, \
                         selected_index, vector_scale, _peak_expression')
     def update_image(self):
-        if self.chest is None:
+        if self.chest is None or self.numfiles<1:
             return
         super(MappableImageController, self).update_image()
         try:

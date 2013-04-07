@@ -180,7 +180,7 @@ class CellController(BaseImageController):
         # make tuples of each column name and 'f8' for the data type
         dtypes = zip(names, ['f8', ] * self.numpeaks*9)
         # prepend the index column
-        dtypes = [('filename', '|S30'), ('file_idx', 'i4')] + dtypes
+        dtypes = [('filename', '|S250'), ('file_idx', 'i4')] + dtypes
         desc = np.recarray((0,), dtype=dtypes)
         self.chest.createTable(self.chest.root,
                                'cell_peaks', description=desc)        
@@ -278,9 +278,12 @@ class CellController(BaseImageController):
             #   OK to find initial peaks.  We determine a proper value
             #   soon.
             target_locations=pc.two_dim_findpeaks(avgImage, 10)
+        
+        peak_width = 0.75*pc.min_peak_distance(target_locations)
+        if peak_width < 10:
+            peak_width = 10        
     
         if mask:
-            peak_width = 0.75*pc.min_peak_distance(target_locations)
             mask = pc.draw_mask(avgImage.shape,
                                 peak_width/2,
                                 target_locations)            
