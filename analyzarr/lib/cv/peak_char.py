@@ -260,7 +260,6 @@ def peak_attribs_image(image, peak_width, target_locations=None, medfilt_radius=
     r=np.ceil(peak_width/2)
     imsize=image.shape[0]
     roi=np.zeros((r*2,r*2))
-    #mask = 
     for loc in xrange(target_locations.shape[0]):
         c=target_locations[loc]
         bxmin=c[1]-r
@@ -272,6 +271,11 @@ def peak_attribs_image(image, peak_width, target_locations=None, medfilt_radius=
         if bxmax>imsize: bxmax=imsize; bxmin=imsize-peak_width
         if bymax>imsize: bymax=imsize; bymin=imsize-peak_width
         roi[:,:]=image[bymin:bymax,bxmin:bxmax]
+        # skip frames with significant dead pixels (corners of
+        #    rotated images, perhaps
+        if np.average(roi)< 0.5*np.average(image):
+            rlt[loc,:2] = (c[1], c[0])
+            continue
         ms=cv.Moments(cv.fromarray(roi))
         height, x, y, width_x, width_y = fitgaussian(roi)
         #height=image[c[1],c[0]]
