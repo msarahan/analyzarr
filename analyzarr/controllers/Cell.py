@@ -155,11 +155,11 @@ class CellController(BaseImageController):
     def characterize(self, target_locations=None, 
                      target_neighborhood=20, 
                      medfilt_radius=5):
-        print "Main thread?" 
-        print Application.instance().is_main_thread()
+        #print "Main thread?" 
+        #print Application.instance().is_main_thread()
         # disable the UI while we're running
         self._toggle_UI(False)
-        print 
+        #print 
         try:
             # wipe out old results
             self.chest.removeNode('/cell_peaks')        
