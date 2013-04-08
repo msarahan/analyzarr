@@ -277,11 +277,14 @@ def peak_attribs_image(image, peak_width, target_locations=None, medfilt_radius=
             rlt[loc,:2] = (c[1], c[0])
             continue
         ms=cv.Moments(cv.fromarray(roi))
-        height, x, y, width_x, width_y = fitgaussian(roi)
-        #height=image[c[1],c[0]]
+        height=image[c[1],c[0]]
         rlt[loc] = get_characteristics(ms)
-        rlt[loc,:2] = (np.array([bymin,bxmin]) + np.array([y,x]))
-        #rlt[loc,:2] += target_locations[loc]
+        rlt[loc,:2] += target_locations[loc]
+        
+        # To use Gaussian fitting on the peaks for height and location, uncomment the following two lines.
+        #height, x, y, width_x, width_y = fitgaussian(roi)
+        #rlt[loc,:2] = (np.array([bymin,bxmin]) + np.array([y,x]))
+        
         rlt[loc,2]=height
     return rlt
 
