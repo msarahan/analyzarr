@@ -19,7 +19,7 @@
 
 name = 'analyzarr'
 
-version = '0.1'
+version = '0.1.1'
 
 description = "Hyperdimensional data analysis for pirates, by pirates"
 
@@ -36,24 +36,13 @@ download_url = 'http://www.github.com/msarahan/analyzarr'
 
 platforms = ['Linux','Mac OSX','Windows XP/2000/NT']
 
-keywords = ['EDX',
-            'EELS',
-            'EFTEM',
-            'EMSA',
-            'FEI',
-            'ICA',
+keywords = ['ICA',
             'PCA',
             'STEM',
             'TEM',
             'data analysis',
             'dm3',
-            'electron energy loss spectroscopy',
-            'electron microscopy',
-            'emi',
-            'energy dispersive x-rays',
             'hyperdimension',
-            'hyperspectral',
-            'hyperspectrum',
             'analyzarr',
             'machine learning',
             'microscopy',
@@ -63,9 +52,6 @@ keywords = ['EDX',
             'python',
             'quantification',
             'scipy',
-            'ser',
-            'spectroscopy',
-            'spectrum image',
             'computer vision',
             'peak characterization']
 
