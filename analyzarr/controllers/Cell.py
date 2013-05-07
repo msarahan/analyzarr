@@ -2,8 +2,10 @@ from BaseImage import BaseImageController
 
 from traits.api import Bool, Int, on_trait_change
 import numpy as np
+import tables as tb
 
 import analyzarr.lib.cv.peak_char as pc
+from analyzarr.lib.io.data_structure import filters
 
 from pyface.api import ProgressDialog
 from enaml.application import Application
@@ -17,6 +19,7 @@ class CellController(BaseImageController):
     numpeaks = Int(0)
     peak_width = Int(10)
     _do_char=Bool(False)
+    omitted=Bool(False)
     
     def __init__(self, parent, treasure_chest=None, data_path='/cells', *args, **kw):
         super(CellController, self).__init__(parent, treasure_chest, data_path,
@@ -72,6 +75,12 @@ class CellController(BaseImageController):
             labels[label]=(x,y)
         self.plot_labels(labels)
         self.show_labels(self._show_peak_ids)
+
+    @on_trait_change("selected_index")
+    def get_omitted_status(self):
+        self.omitted = self.chest.root.cell_description.read(
+                            start=self.selected_index, field="omit")
+        return self.omitted
         
     def get_active_image(self):
         # Find this cell in the cell description table.  We use this to look
@@ -111,26 +120,53 @@ class CellController(BaseImageController):
         # find the parent that this cell comes from
         return cell_record['filename']
         
+    def add_cell_data(self, data, name):
+        cell_array = self.chest.createCArray(self.chest.root.cells,
+                                             name,
+                                             tb.Atom.from_dtype(data.dtype),
+                                             data.shape,
+                                             filters = filters,
+                                             )
+        cell_array[:] = data
+        self.chest.flush()
+
+    def get_omitted_indices(self, node_name):
+        return self.chest.root.image_description.readWhere(
+            '(omit==True) & (filename == "%s")' % node_name, 
+            field='file_idx').tolist()
+        
     # TODO: is there any compelling reason that we need the whole stack at once?
-    def get_cell_set(self):
-        data = np.zeros((self.chest.root.cell_description.nrows,
-                         self.chest.root.cells.template.shape[1],
-                         self.chest.root.cells.template.shape[0]
-                         ),
-                        dtype = self.chest.root.cells.template.dtype,
-                        )
-        nodes = self.chest.listNodes('/cells')
-        start_idx = 0
-        end_idx=0
-        tmp_size = self.chest.root.cells.template.shape[0]
-        for node in nodes:
-            node_data = node[:]
-            node_data = node_data.reshape((-1, node_data.shape[-2], 
-                                           node_data.shape[-1]))
-            if node.name not in ['template', 'average']:
-                end_idx = start_idx + node_data.shape[0]
-                data[start_idx:end_idx,:,:] = node_data
-                start_idx = end_idx
+    def get_cell_set(self, node_name = None):
+        if node_name is not None:
+            data = self.nodes[self.nodes.index(node_name)][:]
+            data = data.reshape((-1, data.shape[-2], 
+                                 data.shape[-1]))
+            # cut out any exclusions
+            exclusions = self.get_omitted_indices(node_name)
+            data = np.delete(data, exclusions, 0)
+        else:
+            # omit exclusions from data and also template and average
+            data = np.zeros((self.chest.root.cell_description.nrows-len(exclusions)-2,
+                             self.chest.root.cells.template.shape[1],
+                             self.chest.root.cells.template.shape[0]
+                             ),
+                            dtype = self.chest.root.cells.template.dtype,
+                            )
+            nodes = self.chest.listNodes('/cells')
+            start_idx = 0
+            end_idx=0
+            tmp_size = self.chest.root.cells.template.shape[0]
+            for node in nodes:
+                node_data = node[:]
+                node_data = node_data.reshape((-1, node_data.shape[-2], 
+                                               node_data.shape[-1]))
+                # cut out any exclusions
+                exclusions = self.get_omitted_indices(node.name)
+                node_data = np.delete(node_data, exclusions, 0)
+                if node.name not in ['template', 'average']:
+                    end_idx = start_idx + node_data.shape[0]
+                    data[start_idx:end_idx,:,:] = node_data
+                    start_idx = end_idx
         return data
         
     def _get_average_image(self):
@@ -149,6 +185,11 @@ class CellController(BaseImageController):
     @on_trait_change('_do_char')
     def execute_characterize(self):
         self.characterize()
+    
+    def omit_selected_index(self):
+        cell_record = self.chest.root.cell_description.read(
+                    start=self.selected_index)[0]
+        self.omitted = not self.omitted
     
     # TODO: execute this in a separate thread/process for responsiveness.
     # TODO: automatically determine the peak width from an average image
@@ -196,9 +237,7 @@ class CellController(BaseImageController):
         for node in node_names:
             if node == 'template':
                 continue
-            cell_data = nodes[node_names.index(node)][:]
-            cell_data = cell_data.reshape((-1, cell_data.shape[-2], 
-                                           cell_data.shape[-1]))
+            cell_data = self.get_cell_set(node)
             data = np.zeros((cell_data.shape[0]),dtype=dtypes)
             data['filename'] = node
             data['file_idx'] = np.arange(cell_data.shape[0])            
