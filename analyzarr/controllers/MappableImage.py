@@ -84,23 +84,14 @@ class MappableImageController(BaseImageController):
             self.chest.getNode('/','cell_peaks')
         except:
             return
-        values = \
-                self.chest.root.cell_description.readWhere(
-                    'filename == "%s"' % self.get_active_name(),
-                    field='x_coordinate',) \
-                + \
-                self.chest.root.cell_peaks.readWhere(
-                    'filename == "%s"' % self.get_active_name(),
-                    field='y%i'%self._selected_peak,)
         
-        indices = \
-                self.chest.root.cell_description.readWhere(
-                    'filename == "%s"' % self.get_active_name(),
-                    field='y_coordinate',) \
-                + \
-                self.chest.root.cell_peaks.readWhere(
-                    'filename == "%s"' % self.get_active_name(),
-                    field='x%i'%self._selected_peak,)
+        values = self.get_expression_data("x_coordinate", 
+                                          table_loc="/cell_description") + \
+            self.get_expression_data("y%i"%self._selected_peak)
+        indices = self.get_expression_data("y_coordinate", 
+                                           table_loc="/cell_description") + \
+            self.get_expression_data("x%i"%self._selected_peak)
+        
         self.plotdata.set_data('value', values)
         self.plotdata.set_data('index', indices)
         
@@ -111,15 +102,10 @@ class MappableImageController(BaseImageController):
             elif self.get_vector_name() == 'Skew':
                 field = 's'
             if field != '':
-                x_comp = self.chest.root.cell_peaks.readWhere(
-                                    'filename == "%s"' % self.get_active_name(),
-                                    field='%sx%i' % (field,self._selected_peak),
-                                    ).reshape((-1,1))
-                y_comp = self.chest.root.cell_peaks.readWhere(
-                                     'filename == "%s"' % self.get_active_name(),
-                                     field='%sy%i' % (field, self._selected_peak),
-                                     ).reshape((-1,1))
-                vectors = np.hstack((x_comp,y_comp))
+                x_comp = self.get_expression_data("%sx%i"%(field,self._selected_peak))
+                y_comp = self.get_expression_data("%sy%i"%(field,self._selected_peak))
+
+                vectors = np.vstack((x_comp, y_comp)).T
                 vectors *= self.vector_scale
                 self.plotdata.set_data('vectors',vectors)
             else:
@@ -146,16 +132,17 @@ class MappableImageController(BaseImageController):
 
         #TODO: might want to implement the selection tool here.
         self.plot = self.get_scatter_quiver_plot(self.plotdata,
-                                                      tool=None)
+                                                      tools=["zoom","pan"])
         self.set_plot_title(self.get_characteristic_plot_title())
         self._is_mapping_peaks=True
 
-    def get_expression_data(self, expression):
-        uv = self.chest.root.cell_peaks.colinstances
+    def get_expression_data(self, expression, table_loc="/cell_peaks"):
+        target_table = self.chest.getNode(table_loc)
+        uv = target_table.colinstances
         expression = self.remap_distance_expressions(expression)
         data = t.Expr(expression, uv).eval()
         # pick out the indices for only the active image
-        indices = self.chest.root.cell_peaks.getWhereList(
+        indices = target_table.getWhereList(
             "filename == '%s'" % self.get_active_name())
         # access the array data for those indices
         data=data[indices]
