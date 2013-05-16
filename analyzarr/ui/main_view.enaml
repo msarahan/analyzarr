@@ -220,9 +220,10 @@ enamldef CellPlotButtons(Container): cell_buttons:
         ]
     hug_height='required'
     GroupBox: image_box:
-        constraints = [hbox(save, prev_image, position, next_image),
+        constraints = [hbox(save, prev_image, position, next_image, omit_cell),
         prev_image.width == save.width,
-        next_image.width == save.width,]
+        next_image.width == save.width,
+        omit_cell.width == save.width]
         title="Image:"
         hug_height='required'
         hug_width='medium'
@@ -245,6 +246,13 @@ enamldef CellPlotButtons(Container): cell_buttons:
             tool_tip = "View next image in stack"
             clicked :: controller.increase_selected_index()
             enabled << controller._can_change_idx
+        PushButton: omit_cell:
+            text = "Omit cell"
+            tool_tip = "Omit this cell from from any analyses, as well as any peaks associated with it."
+            clicked :: controller.omit_selected_index()
+            enabled << controller._can_change_idx
+            checkable = True
+            checked :: controller.omitted
     GroupBox: id_box:
         title = "Peak IDs:"
         CheckBox:

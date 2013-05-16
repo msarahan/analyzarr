@@ -49,6 +49,7 @@ class CellsTable(tables.IsDescription):
     # cell was cropped from.
     x_coordinate = tables.Float32Col(pos=3)
     y_coordinate = tables.Float32Col(pos=4)
+    omit = tables.BoolCol()
 
 
 class SpectrumDataTable(tables.IsDescription):

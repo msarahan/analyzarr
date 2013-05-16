@@ -55,6 +55,9 @@ class HighSeasAdventure(HasTraits):
     def update_cell_data(self):
         self.cell_controller = CellController(parent=self, 
                                               treasure_chest=self.chest)
+        
+    def add_cell_data(self, data, name):
+        self.cell_controller.add_cell_data(data,name)
 
     def update_mda_data(self):
         self.mda_controller = MDAViewController(parent=self, 

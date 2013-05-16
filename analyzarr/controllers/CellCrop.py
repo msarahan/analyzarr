@@ -7,7 +7,7 @@ from chaco.api import ArrayPlotData, BasePlotContainer, Plot
 
 from analyzarr.lib.cv import peak_char as pc
 from analyzarr.lib.cv import cv_funcs
-from analyzarr.lib.io.data_structure import CellsTable, filters
+from analyzarr.lib.io.data_structure import CellsTable
 
 import numpy as np
 import tables as tb
@@ -242,13 +242,7 @@ class CellCropController(BaseImageController):
                 self.chest.removeNode('/cells/' + node.name)
         # store the template
         template_data = self.template_data.get_data('imagedata')
-        template_array = self.chest.createCArray(self.chest.root.cells,
-                                             'template',
-                                             tb.Atom.from_dtype(template_data.dtype),
-                                             template_data.shape,
-                                             filters = filters,
-                                             )
-        template_array[:] = template_data
+        self.parent.add_cell_data(template_data, name="template")
         # TODO: set attribute that tells where the template came from
         row = self.chest.root.cell_description.row
         for idx in xrange(self.numfiles):
@@ -272,14 +266,8 @@ class CellCropController(BaseImageController):
                     data[i,:,:]=active_image[peaks[i, 1]:peaks[i, 1] + tmp_sz,
                                       peaks[i, 0]:peaks[i, 0] + tmp_sz]
                 self.chest.root.cell_description.flush()
+                self.parent.add_cell_data(data, name=self.get_active_name())
                 # insert the data (one 3d array per file)
-                cell_array = self.chest.createCArray(self.chest.root.cells,
-                                        self.get_active_name(),
-                                        tb.Atom.from_dtype(data.dtype),
-                                        data.shape,
-                                        filters = filters,
-                                        )
-                cell_array[:] = data
                 self.chest.setNodeAttr('/cell_description', 'threshold', (self.thresh_lower, self.thresh_upper))
                 self.chest.setNodeAttr('/cell_description', 'template_position', (self.template_left, self.template_top))
                 self.chest.setNodeAttr('/cell_description', 'template_filename', self.template_filename)
@@ -288,13 +276,6 @@ class CellCropController(BaseImageController):
                 self.chest.root.cell_description.flush()
                 self.chest.flush()
         average_data = np.average(data,axis=0).squeeze()
-        average_array = self.chest.createCArray(self.chest.root.cells,
-                                                 'average',
-                                                 tb.Atom.from_dtype(average_data.dtype),
-                                                 average_data.shape,
-                                                 filters = filters,
-                                                 )
-        average_array[:] = average_data
-        self.chest.flush()
+        self.parent.add_cell_data(average_data, name="average")
         self.parent.update_cell_data()
         Application.instance().end_session(self._session_id)
