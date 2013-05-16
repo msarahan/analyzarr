@@ -11,7 +11,7 @@ Redistribution and use in source and binary forms, with or without modification,
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
-from traits.api import HasTraits, Bool, Instance
+from traits.api import HasTraits, Bool, Instance, String
 
 from MappableImage import MappableImageController
 from Cell import CellController
@@ -39,6 +39,7 @@ class HighSeasAdventure(HasTraits):
     show_cell_view = Bool(False)
     show_score_view = Bool(False)
     show_factor_view = Bool(False)
+    title = String("")
 
     image_controller = Instance(MappableImageController)
     cell_controller = Instance(CellController)
@@ -81,7 +82,8 @@ class HighSeasAdventure(HasTraits):
                                                     treasure_chest=chest)
         self.cell_controller = CellController(parent=self, 
                                               treasure_chest=chest)
-        self.chest = chest        
+        self.chest = chest
+        self.title = " - %s" % os.path.split(filename)[1]
 
     def open_treasure_chest(self, filename):
         if self.chest is not None:
@@ -93,6 +95,7 @@ class HighSeasAdventure(HasTraits):
                                               treasure_chest=chest)
         self.mda_controller = MDAViewController(parent=self, treasure_chest=chest)
         self.chest = chest
+        self.title = " - %s" % os.path.split(filename)[1]
 
     def import_files(self, file_list):
         file_import.import_files(self.chest, file_list)
