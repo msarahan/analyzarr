@@ -129,7 +129,7 @@ class MDAViewController(BaseImageController):
                 if 'color' in self.plotdata.arrays:
                     self.plotdata.del_data('color')
             self.factor_plot = self.get_scatter_quiver_plot(self.factor_plotdata,
-                                                          tool=None)
+                                                          tools=['colorbar'])
             self._can_map_peaks=True
         else:
             factors = self.chest.getNode('/mda_results/'+context+'/image_factors')
@@ -160,7 +160,7 @@ class MDAViewController(BaseImageController):
         self.score_plotdata.set_data('value', indices)
         self.score_plotdata.set_data('color', color)
         self.score_plot = self.get_scatter_overlay_plot(self.score_plotdata, title=self.get_active_name(),
-                                                        tool=None)
+                                                        tools=["colorbar","zoom","pan"])
 
     @on_trait_change("component_index, _characteristic, _vector, vector_scale")
     def update_factor_image(self):
