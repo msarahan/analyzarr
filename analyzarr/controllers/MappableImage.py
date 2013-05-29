@@ -52,7 +52,7 @@ class MappableImageController(BaseImageController):
                 return
             try:
                 #TODO: need to figure out pytables attributes
-                numpeaks = self.chest.getNodeAttr('/cell_peaks','number_of_peaks')
+                numpeaks = self.get_numpeaks()
                 self._peak_ids = [str(idx) for idx in range(numpeaks)]
             except:
                 return
@@ -61,6 +61,9 @@ class MappableImageController(BaseImageController):
         else:
             # clear the image and disable the comboboxes
             pass
+    
+    def get_numpeaks(self):
+        self.chest.getNodeAttr('/cell_peaks','number_of_peaks')
     
     def get_characteristic_plot_title(self):
         name = ""
@@ -153,7 +156,7 @@ class MappableImageController(BaseImageController):
         data = t.Expr(expression, uv).eval()
         # pick out the indices for only the active image
         indices = target_table.getWhereList(
-            "filename == '%s'" % self.get_active_name())
+            '(omit==False) & (filename == "%s")' % self.get_active_name())
         # access the array data for those indices
         data=data[indices]
         return data

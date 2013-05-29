@@ -131,14 +131,15 @@ class CellController(BaseImageController):
         self.chest.flush()
 
     def get_omitted_indices(self, node_name):
-        return self.chest.root.image_description.readWhere(
+        return self.chest.root.cell_description.readWhere(
             '(omit==True) & (filename == "%s")' % node_name, 
             field='file_idx').tolist()
         
     # TODO: is there any compelling reason that we need the whole stack at once?
     def get_cell_set(self, node_name = None):
+        node_names = [node.name for node in self.nodes]
         if node_name is not None:
-            data = self.nodes[self.nodes.index(node_name)][:]
+            data = self.nodes[node_names.index(node_name)][:]
             data = data.reshape((-1, data.shape[-2], 
                                  data.shape[-1]))
             # cut out any exclusions
