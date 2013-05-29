@@ -16,7 +16,7 @@ from chaco.data_range_1d import DataRange1D
 
 import numpy as np
 
-def _render_plot(self, array_plot_data):
+def _render_plot(self, array_plot_data, tools=[]):
     """
     data is a numpy array to be plotted as a line plot.
     The first column of the data is used as x, the second is used as y.
@@ -25,12 +25,14 @@ def _render_plot(self, array_plot_data):
     plot.plot(("x","y"), type="line", name="base_plot")[0]
 
     # attach the pan and zoom tools
-    plot.tools.append(PanTool(plot,drag_button="right"))
-    zoom = ZoomTool(plot, tool_mode="box", always_on=False, aspect_ratio=plot.aspect_ratio)
-    plot.overlays.append(zoom)
+    if "pan" in tools:
+        plot.tools.append(PanTool(plot,drag_button="right"))
+    if "zoom" in tools:
+        zoom = ZoomTool(plot, tool_mode="box", always_on=False, aspect_ratio=plot.aspect_ratio)
+        plot.overlays.append(zoom)
     return plot
 
-def _render_image(array_plot_data, title=None):
+def _render_image(array_plot_data, title=None, tools=["zoom","pan"]):
     plot = Plot(array_plot_data, default_origin="top left")        
     plot.img_plot("imagedata", colormap=gray, name="base_plot")
     # todo: generalize title and aspect ratio
@@ -38,19 +40,21 @@ def _render_image(array_plot_data, title=None):
     data_array = array_plot_data.arrays['imagedata']
     plot.aspect_ratio=float(data_array.shape[1]) / float(data_array.shape[0])
     # attach the rectangle tool
-    plot.tools.append(PanTool(plot,drag_button="right"))
-    zoom = ZoomTool(plot, tool_mode="box", always_on=False, aspect_ratio=plot.aspect_ratio)
-    plot.overlays.append(zoom)
+    if "pan" in tools:
+        plot.tools.append(PanTool(plot,drag_button="right"))
+    if "zoom" in tools:
+        zoom = ZoomTool(plot, tool_mode="box", always_on=False, aspect_ratio=plot.aspect_ratio)
+        plot.overlays.append(zoom)
     return plot
 
-def _create_colorbar(colormap, tool=None):
+def _create_colorbar(colormap, tools=[]):
     colorbar = ColorBar(index_mapper=LinearMapper(range=colormap.range),
                             color_mapper=colormap,
                             orientation='v',
                             resizable='v',
                             width=30,
                             padding=20)
-    if tool=='colorbar':
+    if 'colorbar' in tools:
         colorbar.tools.append(RangeSelection(component=colorbar))
         colorbar.overlays.append(RangeSelectionOverlay(component=colorbar,
                                                    border_color="white",
@@ -60,9 +64,9 @@ def _create_colorbar(colormap, tool=None):
 
 def _render_scatter_overlay(base_plot, array_plot_data,
                             marker="circle", fill_alpha=0.5,
-                            marker_size=6, tool=None):
-    if 'index' not in array_plot_data.arrays:
-        return base_plot, None
+                            marker_size=6, tools=[]):
+    #if 'index' not in array_plot_data.arrays:
+        #return base_plot, None
     
     scatter_plot = Plot(array_plot_data, aspect_ratio = base_plot.aspect_ratio, 
                 default_origin="top left")
@@ -77,11 +81,11 @@ def _render_scatter_overlay(base_plot, array_plot_data,
                       marker_size = marker_size,
                       )
         scatter_renderer = scatter_plot.plots['scatter_plot'][0]
-        colorbar = _create_colorbar(scatter_plot.color_mapper, tool=tool)
+        colorbar = _create_colorbar(scatter_plot.color_mapper, tools=tools)
         colorbar.plot = scatter_renderer
         #colorbar.padding_top = scatter_renderer.padding_top
         #colorbar.padding_bottom = scatter_renderer.padding_bottom
-        if tool=='colorbar':
+        if 'colorbar' in tools:
             # this part is for making the colormapped points fade when they
             #  are not selected by the threshold.
             # The renderer is the actual class that does the rendering - 
@@ -95,8 +99,12 @@ def _render_scatter_overlay(base_plot, array_plot_data,
                                                     selection_type="range")
             scatter_renderer.overlays.append(selection)
     else:
-        return base_plot, None
-    if tool=='inspector':
+        colorbar = None
+    if "csr" in tools:
+        csr = CursorTool(scatter_plot, drag_button='left', color='red',
+                         line_width=2.0)
+        scatter_plot.overlays.append(csr)        
+    if 'inspector' in tools:
         # Attach the inspector and its overlay
         scatter_renderer = scatter_plot.plots['scatter_plot'][0]
         #scatter_plot.tools.append(PeakSelectionTool(scatter_renderer))
@@ -170,19 +178,21 @@ class HasRenderer(HasTraits):
         self.plot_container = plot_container
         return plot_container
 
-    def get_simple_image_plot(self, array_plot_data, title=''):
+    def get_simple_image_plot(self, array_plot_data, title='', tools=["zoom", "pan"]):
         image_plot = _render_image(array_plot_data=array_plot_data, 
-                                        title=title)
+                                        title=title, tools=tools)
         # container isn't necessary here, but we do it to keep it consistent
         #   with how the other plot types return data.
         image_container = OverlayPlotContainer(image_plot)
         self._base_plot = image_plot
+        if "csr" in tools:
+            self._csr = _base_plot.tools[0]
         self.image_container = image_container
         return image_container
 
     # TODO - add optional appearance tweaks
     def get_scatter_overlay_plot(self, array_plot_data, title='', 
-                                 tool=None):
+                                 tools=[]):
         """
         tool can be either:
         'colorbar' - the range selection colobar (for thresholding cells)
@@ -190,10 +200,10 @@ class HasRenderer(HasTraits):
         'inspector' - the peak-picking tool that uses clicks to select cells
             from the parent image
         """
-        image_plot = _render_image(array_plot_data, title)
+        image_plot = _render_image(array_plot_data, title, tools=tools)
         scatter_plot, colorbar = _render_scatter_overlay(image_plot, 
                                     array_plot_data,
-                                    tool=tool,)
+                                    tools=tools,)
         image_container = OverlayPlotContainer(image_plot, scatter_plot)
         if colorbar is not None:
             image_container = HPlotContainer(image_container, colorbar)
@@ -203,11 +213,14 @@ class HasRenderer(HasTraits):
                 scatter_renderer.color_data.metadata_changed={
                     'selections':self.thresh}
             self._colorbar = colorbar
-            if tool == 'colorbar':
-                self._colorbar_selection = colorbar.tools[0]
-        if tool == 'inspector':
+            if 'colorbar' in tools:
+                self._colorbar_selection = [colorbar.tools[i] for i in xrange(len(colorbar.tools)) 
+                            if "RangeSelection" in colorbar.tools[i].__repr__()][0]
+        if 'inspector' in tools:
             scatter_renderer = scatter_plot.plots['scatter_plot'][0]
-            
+        if "csr" in tools:
+            self._csr = [scatter_plot.tools[i] for i in xrange(len(scatter_plot.tools)) 
+                        if "CursorTool" in scatter_plot.tools[i].__repr__()][0]
         self._base_plot = image_plot
         self._scatter_plot = scatter_plot
         self.image_container = image_container
@@ -215,12 +228,12 @@ class HasRenderer(HasTraits):
             
     # TODO - add optional appearance tweaks
     def get_scatter_quiver_plot(self, array_plot_data, title='',
-                                tool=None):
+                                tools=[]):
         colorbar = None
         image_plot = _render_image(array_plot_data, title)
         scatter_plot, colorbar = _render_scatter_overlay(image_plot,
                                                          array_plot_data,
-                                                         tool=tool)
+                                                         tools=tools)
         quiver_plot = _render_quiver_overlay(image_plot, array_plot_data)
         image_container = OverlayPlotContainer(image_plot, scatter_plot,
                                                quiver_plot, )

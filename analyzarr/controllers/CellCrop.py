@@ -52,7 +52,7 @@ class CellCropController(BaseImageController):
         self.plotdata.set_data('imagedata', self.get_active_image())
         self.plot = self.get_scatter_overlay_plot(array_plot_data=self.plotdata,
                 title=self.get_active_name(),
-                tool='colorbar',
+                tools=['csr','colorbar','zoom','pan']
                     )
         # pick an initial template with default parameters
         self.template_data = ArrayPlotData()
@@ -109,11 +109,6 @@ class CellCropController(BaseImageController):
         if self.numpeaks_total>0:
             print "clearing peaks"
             self.peaks={}
-
-    def add_cursor_tool(self):    
-        self._csr = CursorTool(self._base_plot, drag_button='left', color='white',
-                                 line_width=2.0)
-        self._base_plot.overlays.append(self._csr)
     
     @on_trait_change('selected_index, template_size')
     def _get_max_positions(self):
@@ -126,8 +121,8 @@ class CellCropController(BaseImageController):
 
     @on_trait_change('template_left, template_top')
     def update_csr_position(self):
-        #if self.template_left>0:        
-            #self._csr.current_position=self.template_left,self.template_top
+        if self.template_left>0:        
+            self._csr.current_position=self.template_left,self.template_top
         pass
 
     @on_trait_change('_csr:current_position')

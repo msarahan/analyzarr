@@ -24,7 +24,7 @@ from enaml.layout.api import vbox, hbox, vertical, horizontal
 from enaml.widgets.api import (
     MainWindow, ToolBar, DockPane, MenuBar, Menu, Action, ActionGroup,
     Container, Html, PushButton, EnableCanvas, CheckBox, FileDialog,
-    Label, ComboBox, Field, GroupBox, ProgressBar, FlowArea
+    Label, ComboBox, Field, GroupBox, ProgressBar, FlowArea, FlowItem
 )
 
 from enaml.stdlib.fields import FloatField, IntField
@@ -140,79 +140,77 @@ enamldef MyMenuBar(MenuBar): menu:
 
 enamldef ImagePlotButtons(Container): image_buttons:
     attr controller
-    constraints = [
-            hbox(image_box, peak_selection, characteristic_box, vector_box),
-        #:characteristic_box.width == 2*peak_selection.width,
-        #:vector_box.width == characteristic_box.width,
-    ]
-    hug_height='required'
-    GroupBox: image_box:
-        constraints = [hbox(save, prev_image, position, next_image),
-        prev_image.width == save.width,
-        next_image.width == save.width,]
-        title="Image:"
-        hug_height='required'
-        hug_width='medium'
-        PushButton: save:
-            text = "Save"
-            tool_tip = "Save current plot"
-            enabled << controller._can_save
-            clicked :: controller.open_save_UI()
-            hug_width='strong'
-        PushButton: prev_image:
-            text = "<"
-            tool_tip = "View previous image in stack"
-            clicked :: controller.decrease_selected_index()
-            enabled << controller._can_change_idx
-        Label: position:
-            text << "%i/%i" %(controller.selected_index+1, controller.numfiles)
-            hug_width='strong'
-        PushButton: next_image:
-            text = ">"
-            tool_tip = "View next image in stack"
-            clicked :: controller.increase_selected_index()
-            enabled << controller._can_change_idx
-    GroupBox: peak_selection:
-        constraints = [hbox(peak_id),]
-        hug_height='required'
-        hug_width='medium'
-        title = "Peak ID:"
-        ComboBox: peak_id:
-            items << controller._peak_ids
-            index := controller._selected_peak
-            enabled <<  controller._can_map_peaks
-            hug_width = 'medium'
-    GroupBox: characteristic_box:
-        constraints = [hbox(characteristic, expression),]
-        hug_height='required'
-        title = "Color Map:"
-        hug_width = 'medium'
-        #:visible << controller._can_map_peaks
-        ComboBox: characteristic:
-            items << controller._characteristics
-            index := controller._characteristic 
-            enabled << controller._can_map_peaks
-            hug_width = 'medium'
-        Field: expression:
-            text := controller._peak_expression
-            enabled << controller._characteristics[characteristic.index] == "Expression"
-    GroupBox: vector_box:
-        constraints = [hbox(vector, vector_label, vector_scale),
-                    vector_scale.width == 0.5*vector.width,]
-        hug_height='required'
-        title = "Vector Map:"
-        hug_width='medium'
-        ComboBox: vector:
-            items << controller._vectors
-            index := controller._vector
-            enabled << controller._can_map_peaks
-            hug_width = 'strong'
-        Label: vector_label:
-            text = "Vector scale"
-        FloatField: vector_scale:
-            value := controller.vector_scale
-            enabled <<  controller._can_map_peaks
-        
+    FlowArea:
+        FlowItem:
+            GroupBox: image_box:
+                constraints = [hbox(save, prev_image, position, next_image),
+                prev_image.width == save.width,
+                next_image.width == save.width,]
+                title="Image:"
+                hug_height='required'
+                hug_width='medium'
+                PushButton: save:
+                    text = "Save"
+                    tool_tip = "Save current plot"
+                    enabled << controller._can_save
+                    clicked :: controller.open_save_UI()
+                    hug_width='strong'
+                PushButton: prev_image:
+                    text = "<"
+                    tool_tip = "View previous image in stack"
+                    clicked :: controller.decrease_selected_index()
+                    enabled << controller._can_change_idx
+                Label: position:
+                    text << "%i/%i" %(controller.selected_index+1, controller.numfiles)
+                    hug_width='strong'
+                PushButton: next_image:
+                    text = ">"
+                    tool_tip = "View next image in stack"
+                    clicked :: controller.increase_selected_index()
+                    enabled << controller._can_change_idx
+        FlowItem:
+            GroupBox: peak_selection:
+                constraints = [hbox(peak_id),]
+                hug_height='required'
+                hug_width='medium'
+                title = "Peak ID:"
+                ComboBox: peak_id:
+                    items << controller._peak_ids
+                    index := controller._selected_peak
+                    enabled <<  controller._can_map_peaks
+                    hug_width = 'medium'
+        FlowItem:
+            GroupBox: characteristic_box:
+                constraints = [hbox(characteristic, expression),]
+                hug_height='required'
+                title = "Color Map:"
+                hug_width = 'medium'
+                #:visible << controller._can_map_peaks
+                ComboBox: characteristic:
+                    items << controller._characteristics
+                    index := controller._characteristic 
+                    enabled << controller._can_map_peaks
+                    hug_width = 'medium'
+                Field: expression:
+                    text := controller._peak_expression
+                    enabled << controller._characteristics[characteristic.index] == "Expression"
+        FlowItem:
+            GroupBox: vector_box:
+                constraints = [hbox(vector, vector_label, vector_scale),
+                            vector_scale.width == 0.5*vector.width,]
+                hug_height='required'
+                title = "Vector Map:"
+                hug_width='medium'
+                ComboBox: vector:
+                    items << controller._vectors
+                    index := controller._vector
+                    enabled << controller._can_map_peaks
+                    hug_width = 'strong'
+                Label: vector_label:
+                    text = "Vector scale"
+                FloatField: vector_scale:
+                    value := controller.vector_scale
+                    enabled <<  controller._can_map_peaks        
 
 enamldef CellPlotButtons(Container): cell_buttons:
     attr controller
@@ -456,7 +454,7 @@ enamldef ImageViewDockPane(DockPane): imagedockpane:
 enamldef Main(MainWindow): main:
     attr controller
     initial_size = (500, 500)
-    title = "Analyzarr"
+    title << "Analyzarr" + controller.title
     MyMenuBar:
         controller << main.controller
     ViewToolBar: view_buttons:
