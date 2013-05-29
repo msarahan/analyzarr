@@ -21,8 +21,11 @@ from MDA_execute import MDAExecutionController
 
 from analyzarr.lib.io import file_import
 from analyzarr.testing.test_pattern import get_test_pattern
+from analyzarr.Release import version
 
 from scipy.misc import imsave
+
+from time import time
 
 import enaml
 with enaml.imports():
@@ -103,6 +106,7 @@ class HighSeasAdventure(HasTraits):
                                                     treasure_chest=self.chest)
         self.cell_controller = CellController(parent=self,
                                               treasure_chest=self.chest)
+        self.log_action(action="import", files=file_list)
 
     def load_test_data(self):
         # create the test pattern
@@ -134,3 +138,20 @@ class HighSeasAdventure(HasTraits):
         session_id = Application.instance().start_session('mda')
         mda_controller._session_id = session_id
         
+    def log_action(self, action, **parameters):
+        """
+        action - a short string describing the action itself (e.g. crop cells)
+        parameters - pass any number of named parameters.  These will be recorded as
+            a string that can then be recovered as a dictionary at some later date.
+        version - the version of analyzarr used to perform that action
+        """
+        row = self.chest.root.log.row
+        row['date']=time()
+        row['action']=action
+        # record parameter dictionary as string.  Can be brought back with:
+        #   dict2 = eval(string_from_table)
+        # http://stackoverflow.com/questions/4547274/convert-a-python-dict-to-a-string-and-back
+        row['parameters'] = parameters
+        row['version'] = version
+        row.append()
+        self.chest.root.log.flush()

@@ -12,6 +12,9 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 """
 
 from sklearn import decomposition
+import sklearn
+
+name="mda_sklearn_"+ sklearn.__version__
 
 def PCA(data, n_components=None, whiten=False):
     estimator = decomposition.PCA(n_components = n_components, 

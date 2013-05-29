@@ -254,7 +254,7 @@ enamldef CellPlotButtons(Container): cell_buttons:
             clicked :: controller.omit_selected_index()
             enabled << controller._can_change_idx
             checkable = True
-            checked :: controller.omitted
+            checked << controller.omitted
     GroupBox: id_box:
         title = "Peak IDs:"
         CheckBox:

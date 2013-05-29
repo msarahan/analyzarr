@@ -131,15 +131,9 @@ class MappableImageController(BaseImageController):
             if 'vectors' in self.plotdata.arrays:
                 self.plotdata.del_data('vectors')
                 # clear vector data
-        if self.get_characteristic_name() != "None":
-            if self.get_characteristic_name() == "Expression":
-                expression = self._peak_expression
-            else:
-                prefix = self._characteristics[self._characteristic][0].lower()
-                expression = prefix + str(self._selected_peak)
-            if expression != "":
-                data = self.get_expression_data(expression)
-                self.plotdata.set_data('color', data)
+        if self.get_expression_name() != "None":
+            data = self.get_expression_data(self.get_expression_name())
+            self.plotdata.set_data('color', data)
         else:
             if 'color' in self.plotdata.arrays:
                 self.plotdata.del_data('color')
@@ -148,7 +142,23 @@ class MappableImageController(BaseImageController):
         self.plot = self.get_scatter_quiver_plot(self.plotdata,
                                                       tool=None)
         self.set_plot_title(self.get_characteristic_plot_title())
+        self.log_action(action="plot peak map", 
+                        vector_plot=self.get_vector_name(),
+                        expression=self.get_expression_name())
         self._is_mapping_peaks=True
+
+    def get_expression_name(self):
+        if self.get_characteristic_name() =="None":
+            return "None"
+        if self.get_characteristic_name() == "Expression":
+            expression = self._peak_expression
+        elif self.get_characteristic_name != "None":
+            prefix = self._characteristics[self._characteristic][0].lower()
+            expression = prefix + str(self._selected_peak)
+            if expression != "":
+                data = self.get_expression_data(expression)
+                self.plotdata.set_data('color', data)
+        return expression
 
     def get_expression_data(self, expression):
         uv = self.chest.root.cell_peaks.colinstances

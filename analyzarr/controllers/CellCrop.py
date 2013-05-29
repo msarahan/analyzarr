@@ -250,11 +250,13 @@ class CellCropController(BaseImageController):
         self.parent.add_cell_data(template_data, name="template")
         # TODO: set attribute that tells where the template came from
         row = self.chest.root.cell_description.row
+        files=[]
         for idx in xrange(self.numfiles):
             # filter the peaks that are outside the selected threshold
             self.set_active_index(idx)
             active_image = self.get_active_image()
             peaks=np.ma.compress_rows(self.mask_peaks(self.get_active_name()))
+            files.append(self.get_active_name())
             tmp_sz=self.template_size
             data=np.zeros((peaks.shape[0],tmp_sz,tmp_sz), 
                           dtype=active_image.dtype)
@@ -283,4 +285,8 @@ class CellCropController(BaseImageController):
         average_data = np.average(data,axis=0).squeeze()
         self.parent.add_cell_data(average_data, name="average")
         self.parent.update_cell_data()
+        self.log_action(action="crop cells", files=files, thresh=self.thresh, 
+                        template_position=(self.template_left, self.template_top), 
+                        template_size=self.template_size, 
+                        template_filename=self.template_filename)
         Application.instance().end_session(self._session_id)

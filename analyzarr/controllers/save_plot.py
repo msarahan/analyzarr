@@ -14,13 +14,20 @@ class SaveFileController(HasTraits):
     plot_title = Str('')
     _session_id = Str('')
     
-    def __init__(self, plot):
+    def __init__(self, plot, parent):
         self.plot = plot
         self.plot_title = self.get_plot_title(plot)
+        self.parent=parent
     
     def save_plot(self, filename):
         self._save_plot(self.plot, filename, self.plot_width, self.plot_height,
                         self.dpi)
+        self.parent.log_action("save plot", 
+                               controller=self.parent.__class__.__name__,
+                               dpi=self.dpi,
+                               width=self.plot_width,
+                               height=self.plot_height,
+                               filename=filename)
         Application.instance().end_session(self._session_id)
     
     def _save_plot(self, plot, filename, width=800, height=600, dpi=72):

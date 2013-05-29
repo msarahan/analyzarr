@@ -32,9 +32,13 @@ class MDAExecutionController(HasTraits):
 
     def __init__(self, treasure_chest=None, data_path='/rawdata',
                  *args, **kw):
-        super(MDAExecutionController, self).__init__(treasure_chest=treasure_chest, data_path=data_path, *args, **kw)
+        super(MDAExecutionController, self).__init__(parent=parent, 
+                                                     treasure_chest=treasure_chest, 
+                                                     data_path=data_path, *args, 
+                                                     **kw)
         if treasure_chest is not None:
             self.chest = treasure_chest
+            self.parent = parent
             self.data_path = data_path
             # do we have any peaks?
             try:
@@ -70,6 +74,11 @@ class MDAExecutionController(HasTraits):
                                'dimensionality', self.number_to_derive)
             # close the dialog window
             Application.instance().end_session(self._session_id)
+            # add to the log file
+            self.parent.log_action(action=method, 
+                                   n_components = self.number_to_derive,
+                                   on_peaks = self.on_peaks,
+                                   backend=mda.name)
             # show the results windows
             self.parent.update_mda_data()
         except RuntimeError:
@@ -141,6 +150,11 @@ class MDAExecutionController(HasTraits):
             data = self.standardize(data)
         elif normalize:
             data = self.normalize(data)
+        self.parent.log_action(action="Obtain data for MDA", 
+                               standardize=standardize, 
+                               normalize=normalize,
+                               on_peaks=self.on_peaks,
+                               data_shape = active_data_shape)
         return data, active_data_shape
 
     def standardize(self, data):

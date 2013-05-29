@@ -77,7 +77,7 @@ class BaseImageController(ControllerBase):
             self.plot.aspect_ratio=(float(active_image.shape[1])/active_image.shape[0])
 
     def open_save_UI(self, plot_id='plot'):
-        save_controller = SaveFileController(plot=self.get_plot(plot_id))
+        save_controller = SaveFileController(plot=self.get_plot(plot_id), parent=self)
         save_dialog = simple_session('save', 'Save dialog', SavePlotDialog, 
                                       controller=save_controller)
         Application.instance().add_factories([save_dialog])

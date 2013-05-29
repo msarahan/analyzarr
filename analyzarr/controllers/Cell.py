@@ -77,10 +77,10 @@ class CellController(BaseImageController):
         self.show_labels(self._show_peak_ids)
 
     @on_trait_change("selected_index")
-    def get_omitted_status(self):
-        self.omitted = self.chest.root.cell_description.read(
-                            start=self.selected_index, field="omit")
-        return self.omitted
+    def update_omitted_status(self):
+        omitted = self.chest.root.cell_description.read(
+                            start=self.selected_index, field="omit")[0]
+        self.omitted=bool(omitted)
         
     def get_active_image(self):
         # Find this cell in the cell description table.  We use this to look
@@ -92,7 +92,7 @@ class CellController(BaseImageController):
             return       
         cell_record = self.chest.root.cell_description.read(
                             start=self.selected_index,
-                            stop=self.selected_index + 1)[0]        
+                            stop=self.selected_index + 1)[0]
         parent = self.get_cell_parent()
         # select that parent as the selected image (int because it is an index)
         selected_image = int([x['idx'] for x in
@@ -146,7 +146,7 @@ class CellController(BaseImageController):
             data = np.delete(data, exclusions, 0)
         else:
             # omit exclusions from data and also template and average
-            data = np.zeros((self.chest.root.cell_description.nrows-len(exclusions)-2,
+            data = np.zeros((self.chest.root.cell_description.nrows-2,
                              self.chest.root.cells.template.shape[1],
                              self.chest.root.cells.template.shape[0]
                              ),
@@ -156,8 +156,13 @@ class CellController(BaseImageController):
             start_idx = 0
             end_idx=0
             tmp_size = self.chest.root.cells.template.shape[0]
+            empty_slices=0
             for node in nodes:
                 node_data = node[:]
+                exclusions = self.get_omitted_indices(node.name)
+                data = np.delete(node_data, exclusions, 0)                
+                empty_slices+=len(exclusions)
+                
                 node_data = node_data.reshape((-1, node_data.shape[-2], 
                                                node_data.shape[-1]))
                 # cut out any exclusions
@@ -167,6 +172,7 @@ class CellController(BaseImageController):
                     end_idx = start_idx + node_data.shape[0]
                     data[start_idx:end_idx,:,:] = node_data
                     start_idx = end_idx
+            # delete the empty space used for the excluded cells
         return data
         
     def _get_average_image(self):
@@ -187,9 +193,17 @@ class CellController(BaseImageController):
         self.characterize()
     
     def omit_selected_index(self):
-        cell_record = self.chest.root.cell_description.read(
-                    start=self.selected_index)[0]
+        cell_record=self.chest.root.cell_description[self.selected_index]
+        self.chest.root.cell_description.cols.omit[self.selected_index]=not cell_record["omit"]
+        #cell_record["omit"] = np.bool(not cell_record["omit"])
+        #self.chest.root.cell_description.modifyRows(self.selected_index,
+        #    rows=[self.selected_index,cell_record])
+        self.chest.root.cell_description.flush()
         self.omitted = not self.omitted
+        self.log_action(action="omit cell", 
+                        idx=cell_record["file_idx"], 
+                        image=cell_record["filename"],
+                        state=cell_record["omit"])
     
     # TODO: execute this in a separate thread/process for responsiveness.
     # TODO: automatically determine the peak width from an average image
@@ -242,7 +256,7 @@ class CellController(BaseImageController):
             data['filename'] = node
             data['file_idx'] = np.arange(cell_data.shape[0])            
             # reshape possibly 2D arrays (average fits this)
-            attribs = self.peak_attribs_stack(cell_data,
+            attribs = self._peak_attribs_stack(cell_data,
                             peak_width=self.peak_width, 
                             target_locations=target_locations,
                             target_neighborhood=target_neighborhood,
@@ -263,9 +277,13 @@ class CellController(BaseImageController):
         self._can_show_peak_ids = True
         self.parent.image_controller.update_peak_map_choices()
         self._progress_value = 0
+        self.log_action(action="Characterize peaks", 
+                        target_locations=target_locations, 
+                        target_neighborhood=target_neighborhood, 
+                        medfilt_radius=medfilt_radius)
         self._toggle_UI(True)
 
-    def peak_attribs_stack(self, stack, peak_width, target_locations=None,
+    def _peak_attribs_stack(self, stack, peak_width, target_locations=None,
                            target_neighborhood=20, medfilt_radius=5,
                            mask = True):
         """

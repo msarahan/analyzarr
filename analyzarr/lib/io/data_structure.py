@@ -19,9 +19,9 @@ class MdaResultsTable(tables.IsDescription):
     idx = tables.Int64Col(pos=0)
     # the MDA type and the date it was run - an identifier for each run.
     # XXX_YYYY-MM-DD HH:MM
-    context = tables.StringCol(24)
+    context = tables.StringCol(25)
     # type of MDA
-    mda_type = tables.StringCol(10)
+    mda_type = tables.StringCol(25)
     # description of where data came from (as a path in the file, for example:
     # '/root/rawdata'
     input_data = tables.StringCol(250)
@@ -44,12 +44,18 @@ class CellsTable(tables.IsDescription):
     # '/root/rawdata'
     input_data = tables.StringCol(250)
     # filename that the data is from
-    filename = tables.StringCol(250, pos=1)
+    filename = tables.StringCol(250,pos=1)
     # the upper left coordinate of the parent image where this
     # cell was cropped from.
     x_coordinate = tables.Float32Col(pos=3)
     y_coordinate = tables.Float32Col(pos=4)
     omit = tables.BoolCol()
+    
+class LogTable(tables.IsDescription):
+    date = tables.Time64Col(pos=0)
+    action = tables.StringCol(100, pos=1)
+    parameters = tables.StringCol(700, pos=2)
+    version = tables.StringCol(20,pos=3)
 
 
 class SpectrumDataTable(tables.IsDescription):
@@ -103,6 +109,13 @@ def get_image_h5file(filename):
     #       - Factors
     #       - Scores
     h5file.createGroup('/', 'mda_results')
+    
+    # Finally, a logging table.  Every GUI interaction will log here so that people *should* be
+    #   able to reproduce any of their results.  Its columns are:
+    #  1. time, as a time64col - which is seconds from the epoch.
+    #  2. action - a very brief text description
+    #  3. parameters - a variable length string.  Ideally, this should be parsable?
+    data_outline = h5file.createTable('/', 'log', LogTable)
 
     h5file.flush()
 

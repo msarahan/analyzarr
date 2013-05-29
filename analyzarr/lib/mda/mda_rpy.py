@@ -27,6 +27,9 @@ import rpy2.robjects.numpy2ri #automatically converts numpy arrays to R types
 from scipy.stats import poisson,norm
 from scipy import integrate
 
+# TODO: put in rpy version and R version (and, ideally, version of any plugin used.)
+name="mda_rpy_"#+ sklearn.__version__
+
 getmethod = ro.baseenv.get("getMethod")
 StrVector = ro.StrVector
 
