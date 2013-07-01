@@ -50,6 +50,7 @@ def _render_image(array_plot_data, title=None, tools=["zoom","pan"]):
     if "csr" in tools:
         csr = CursorTool(img_renderer, drag_button='left', color='red',
                          line_width=2.0)
+        csr.current_position = 64, 64
         img_renderer.overlays.append(csr)            
     return plot, csr
 
