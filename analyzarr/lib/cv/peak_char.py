@@ -119,7 +119,7 @@ except:
         # (not the whole maxpeakn x 3 array)
         return P[:peak], H[:peak]
 
-def two_dim_findpeaks(arr,peak_width=10, medfilt_radius=5,
+def two_dim_findpeaks(arr,peak_width=11, medfilt_radius=5,
                       maxpeakn=10000):
     """
     Locate peaks on a 2-D image.  Basic idea is to locate peaks in X direction,
@@ -172,7 +172,7 @@ def two_dim_findpeaks(arr,peak_width=10, medfilt_radius=5,
     coords=np.ma.masked_less(coords,0)
     coords=np.ma.compress_rows(coords)
     # push them down and to the right to account for zero-based indexing
-    coords+=1
+    #coords+=1
     # add in the heights
     heights=np.array([arr[coords[i,1],coords[i,0]] for i in xrange(coords.shape[0])]).reshape((-1,1))
     coords=np.hstack((coords,heights))
@@ -305,7 +305,10 @@ def stack_coords(stack,peak_width,maxpeakn=5000):
 def best_match(arr, target, neighborhood=None):
     """
     Attempts to find the best match (least distance) for target coordinates 
-    in array of coordinates arr. 
+    in array of coordinates arr.
+    
+    target is a 1D array of 2 coordinates.
+    arr is a 
     
     Usage:
     best_match(arr, target)
@@ -347,6 +350,11 @@ def draw_mask(array_size, radius, target_locations):
     return array
 
 def min_peak_distance(target_locations):
+    """
+    This function is meant to estimate the smallest distance between peaks.
+    It is used in turn (in Cell.py) to estimate the peak size for cell 
+    characterization.
+    """
     minimum = 3000
     xx, yy = np.meshgrid(range(len(target_locations)), 
                 range(len(target_locations)))

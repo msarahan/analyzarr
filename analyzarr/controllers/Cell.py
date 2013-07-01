@@ -137,6 +137,11 @@ class CellController(BaseImageController):
         
     # TODO: is there any compelling reason that we need the whole stack at once?
     def get_cell_set(self, node_name = None):
+        """ 
+        If node_name is specified (it would be the name of a parent image),
+            then this method will return cell images for only that node.
+        The default behavior is to return data from all nodes.
+        """
         node_names = [node.name for node in self.nodes]
         if node_name is not None:
             data = self.nodes[node_names.index(node_name)][:]
@@ -235,14 +240,15 @@ class CellController(BaseImageController):
         names = [item for sublist in names for item in sublist]
         # make tuples of each column name and 'f8' for the data type
         dtypes = zip(names, ['f8', ] * self.numpeaks*9)
-        # prepend the index column
+        # prepend the filename and index columns
         dtypes = [('filename', '|S250'), ('file_idx', 'i4')] + dtypes
+        # create an empty recarray with our data type
         desc = np.recarray((0,), dtype=dtypes)
+        # create the table using the empty description recarray
         self.chest.createTable(self.chest.root,
                                'cell_peaks', description=desc)        
         # for each file in the cell_data group, run analysis.
         nodes = self.chest.listNodes('/cells')
-        # exclude some nodes
         node_names = [node.name for node in nodes]
         progress = ProgressDialog(title="Peak characterization progress", 
                                   message="Characterizing peaks on %d images"%(len(node_names)-2),
@@ -250,13 +256,14 @@ class CellController(BaseImageController):
         progress.open()
         file_progress=0
         for node in node_names:
+            # exclude some nodes
             if node == 'template':
                 continue
             cell_data = self.get_cell_set(node)
             data = np.zeros((cell_data.shape[0]),dtype=dtypes)
             data['filename'] = node
             data['file_idx'] = np.arange(cell_data.shape[0])            
-            # reshape possibly 2D arrays (average fits this)
+            # might want to tweak this loop or cythonize for speed...
             attribs = self._peak_attribs_stack(cell_data,
                             peak_width=self.peak_width, 
                             target_locations=target_locations,
@@ -332,7 +339,7 @@ class CellController(BaseImageController):
         avgImage=np.average(stack,axis=0)
         if target_locations is None:
             # get peak locations from the average image
-            # an initial value for the peak width of 10 pixels works
+            # an initial value for the peak width of 11 pixels works
             #   OK to find initial peaks.  We determine a proper value
             #   soon.
             target_locations=pc.two_dim_findpeaks(avgImage, 10)

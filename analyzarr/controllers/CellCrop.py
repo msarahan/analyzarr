@@ -76,7 +76,7 @@ class CellCropController(BaseImageController):
             self.plotdata.set_data("imagedata",CC)
             self.plot = self.get_scatter_overlay_plot(array_plot_data=self.plotdata,
                         title=self.get_active_name(),
-                        tool='colorbar',
+                        tools=['csr','zoom','pan', 'colorbar'],
                         )
             self.plot.aspect_ratio = (float(CC.shape[1])/ 
                                                   CC.shape[0])                                    
@@ -88,7 +88,7 @@ class CellCropController(BaseImageController):
             self.plotdata.set_data("imagedata", self.get_active_image())
             self.plot = self.get_scatter_overlay_plot(array_plot_data=self.plotdata,
                         title=self.get_active_name(),
-                        tool='colorbar',
+                        tools=['csr','zoom','pan', 'colorbar'],
                         )
             self.plot.aspect_ratio = (float(self.get_active_image().shape[1])/ 
                                       self.get_active_image().shape[0])             
@@ -96,6 +96,12 @@ class CellCropController(BaseImageController):
             grid_data_source = self._base_plot.range2d.sources[0]
             grid_data_source.set_data(np.arange(self.get_active_image().shape[1]), 
                                       np.arange(self.get_active_image().shape[0]))
+
+    def update_CC(self):
+        if self.ShowCC:
+            CC = cv_funcs.xcorr(self.template_data.get_data('imagedata'),
+                                     self.get_active_image())
+            self.plotdata.set_data("imagedata",CC)
 
     @on_trait_change('template_left, template_top, template_size')
     def update_template_data(self):
@@ -109,6 +115,9 @@ class CellCropController(BaseImageController):
         if self.numpeaks_total>0:
             print "clearing peaks"
             self.peaks={}
+        # when template data changes, we should check whether to update the 
+        #    cross correlation plot, which depends on the template
+        self.update_CC()
     
     @on_trait_change('selected_index, template_size')
     def _get_max_positions(self):
@@ -192,8 +201,7 @@ class CellCropController(BaseImageController):
             self.plotdata.set_data("value",self.peaks[self.get_active_name()][:,1])
             self.plotdata.set_data("color",self.peaks[self.get_active_name()][:,2])
             self.plot = self.get_scatter_overlay_plot(array_plot_data=self.plotdata,
-                                                      tool='colorbar',
-                                                      )
+                                                      tools=['zoom','pan','colorbar'])
             scatter_renderer = self._scatter_plot.plots['scatter_plot'][0]
             scatter_renderer.color_data.metadata['selections']=self.thresh
             scatter_renderer.color_data.metadata_changed={'selections':self.thresh}
@@ -205,7 +213,6 @@ class CellCropController(BaseImageController):
             if 'color' in self.plotdata.arrays:
                 self.plotdata.del_data('color')
             self.plot = self.get_scatter_overlay_plot(array_plot_data=self.plotdata,
-                                                      tool=None,
                                                       )
             
     def locate_peaks(self):

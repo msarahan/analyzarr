@@ -34,7 +34,9 @@ def _render_plot(self, array_plot_data, tools=[]):
 
 def _render_image(array_plot_data, title=None, tools=["zoom","pan"]):
     plot = Plot(array_plot_data, default_origin="top left")        
-    plot.img_plot("imagedata", colormap=gray, name="base_plot")
+    # the cursor tool, if any
+    csr = None
+    img_renderer = plot.img_plot("imagedata", colormap=gray, name="base_plot")[0]
     # todo: generalize title and aspect ratio
     plot.title = title
     data_array = array_plot_data.arrays['imagedata']
@@ -45,7 +47,11 @@ def _render_image(array_plot_data, title=None, tools=["zoom","pan"]):
     if "zoom" in tools:
         zoom = ZoomTool(plot, tool_mode="box", always_on=False, aspect_ratio=plot.aspect_ratio)
         plot.overlays.append(zoom)
-    return plot
+    if "csr" in tools:
+        csr = CursorTool(img_renderer, drag_button='left', color='red',
+                         line_width=2.0)
+        img_renderer.overlays.append(csr)            
+    return plot, csr
 
 def _create_colorbar(colormap, tools=[]):
     colorbar = ColorBar(index_mapper=LinearMapper(range=colormap.range),
@@ -100,10 +106,6 @@ def _render_scatter_overlay(base_plot, array_plot_data,
             scatter_renderer.overlays.append(selection)
     else:
         colorbar = None
-    if "csr" in tools:
-        csr = CursorTool(scatter_plot, drag_button='left', color='red',
-                         line_width=2.0)
-        scatter_plot.overlays.append(csr)        
     if 'inspector' in tools:
         # Attach the inspector and its overlay
         scatter_renderer = scatter_plot.plots['scatter_plot'][0]
@@ -163,7 +165,6 @@ class HasRenderer(HasTraits):
     _scatter_plot = Instance(Plot)
     _quiver_plot = Instance(Plot)
     _csr=Instance(BaseCursorTool)
-    _labels = Dict({})
     
     thresh = Trait([0,1],None,List,Tuple,Array)
     thresh_upper = Range(-1.0, 1.0, 1.0)
@@ -179,20 +180,30 @@ class HasRenderer(HasTraits):
         return plot_container
 
     def get_simple_image_plot(self, array_plot_data, title='', tools=["zoom", "pan"]):
-        image_plot = _render_image(array_plot_data=array_plot_data, 
+        image_plot, csr = _render_image(array_plot_data=array_plot_data, 
                                         title=title, tools=tools)
         # container isn't necessary here, but we do it to keep it consistent
         #   with how the other plot types return data.
         image_container = OverlayPlotContainer(image_plot)
         self._base_plot = image_plot
         if "csr" in tools:
-            self._csr = _base_plot.tools[0]
+            if self._csr is None:
+                # add the new cursor to our object
+                self._csr = csr
+            else:
+                img_renderer = image_plot.plots['base_plot'][0]
+                # remove the cursor from the plot overlays - we won't use the one
+                #   we just created (it doesn't know where the current position is)
+                img_renderer.overlays.pop()
+                # append the existing cursor to the image overlay
+                img_renderer.overlays.append(self._csr)
+            
         self.image_container = image_container
         return image_container
 
     # TODO - add optional appearance tweaks
     def get_scatter_overlay_plot(self, array_plot_data, title='', 
-                                 tools=[]):
+                                 tools=['zoom','pan']):
         """
         tool can be either:
         'colorbar' - the range selection colobar (for thresholding cells)
@@ -200,10 +211,10 @@ class HasRenderer(HasTraits):
         'inspector' - the peak-picking tool that uses clicks to select cells
             from the parent image
         """
-        image_plot = _render_image(array_plot_data, title, tools=tools)
+        image_plot, csr = _render_image(array_plot_data, title, tools=tools)
         scatter_plot, colorbar = _render_scatter_overlay(image_plot, 
-                                    array_plot_data,
-                                    tools=tools,)
+                                                              array_plot_data,
+                                                              tools=tools,)
         image_container = OverlayPlotContainer(image_plot, scatter_plot)
         if colorbar is not None:
             image_container = HPlotContainer(image_container, colorbar)
@@ -219,8 +230,13 @@ class HasRenderer(HasTraits):
         if 'inspector' in tools:
             scatter_renderer = scatter_plot.plots['scatter_plot'][0]
         if "csr" in tools:
-            self._csr = [scatter_plot.tools[i] for i in xrange(len(scatter_plot.tools)) 
-                        if "CursorTool" in scatter_plot.tools[i].__repr__()][0]
+            if self._csr is not None:
+                # set the new cursor's position to the existing one
+                csr.current_position=self._csr.current_position
+            # add the new cursor to our object
+            self._csr = csr
+                
+                
         self._base_plot = image_plot
         self._scatter_plot = scatter_plot
         self.image_container = image_container
