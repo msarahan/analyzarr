@@ -166,6 +166,7 @@ class HasRenderer(HasTraits):
     _scatter_plot = Instance(Plot)
     _quiver_plot = Instance(Plot)
     _csr=Instance(BaseCursorTool)
+    _labels=Dict(value={})
     
     thresh = Trait([0,1],None,List,Tuple,Array)
     thresh_upper = Range(-1.0, 1.0, 1.0)
@@ -247,7 +248,7 @@ class HasRenderer(HasTraits):
     def get_scatter_quiver_plot(self, array_plot_data, title='',
                                 tools=[]):
         colorbar = None
-        image_plot = _render_image(array_plot_data, title)
+        image_plot, csr = _render_image(array_plot_data, title)
         scatter_plot, colorbar = _render_scatter_overlay(image_plot,
                                                          array_plot_data,
                                                          tools=tools)
