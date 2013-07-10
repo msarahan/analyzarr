@@ -30,7 +30,7 @@ class MDAExecutionController(HasTraits):
     _session_id = String('')
     context = String('')
 
-    def __init__(self, treasure_chest=None, data_path='/rawdata',
+    def __init__(self, parent, treasure_chest=None, data_path='/rawdata',
                  *args, **kw):
         super(MDAExecutionController, self).__init__(parent=parent, 
                                                      treasure_chest=treasure_chest, 
@@ -197,7 +197,7 @@ class MDAExecutionController(HasTraits):
             # get the row for the average cell from the cell_peaks table.
             #   we use this for recording the X and Y coordinates of peaks,
             #   which we do not feed into MDA itself.
-            peak_record = self.chest.root.cell_peaks.readWhere(
+            peak_record = self.chest.root.cell_peaks.read_where(
                 'filename == "average"')[0]        
             for idx in coordinate_data_indices:
                 data[idx] = peak_record[idx]

@@ -141,18 +141,18 @@ class MDAViewController(BaseImageController):
             
     def render_active_score_image(self, context):
         self.score_plotdata.set_data('imagedata', self.get_active_image())
-        values = self.chest.root.cell_description.readWhere(
+        values = self.chest.root.cell_description.read_where(
                 'filename == "%s"' % self.get_active_name(),
                 field='y_coordinate',)
     
-        indices = self.chest.root.cell_description.readWhere(
+        indices = self.chest.root.cell_description.read_where(
                 'filename == "%s"' % self.get_active_name(),
                 field='x_coordinate',)
         if self.chest.getNodeAttr('/mda_results/'+context, 'on_peaks'):
             scores = self.chest.getNode('/mda_results/'+context+'/peak_scores')          
         else:
             scores = self.chest.getNode('/mda_results/'+context+'/image_scores')
-        color = scores.readWhere(
+        color = scores.read_where(
             'filename == "%s"' % self.get_active_name(),
             field='c%i' % self.component_index,
         )

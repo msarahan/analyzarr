@@ -65,8 +65,8 @@ class CellController(BaseImageController):
                             stop=self.selected_index + 1)[0]
         file_idx = cell_record['file_idx']
         # this is the corresponding record in the cell_peaks table:
-        peak_record = self.chest.root.cell_peaks.readWhere(
-            'filename == "%s" and file_idx == %i'%(self.get_cell_parent(), file_idx)
+        peak_record = self.chest.root.cell_peaks.read_where(
+            '(filename == "%s") & (file_idx == %i)'%(self.get_cell_parent(), file_idx)
             )[0]        
         for peak in range(self.numpeaks):
             x = peak_record['x%i'%peak]
@@ -131,7 +131,7 @@ class CellController(BaseImageController):
         self.chest.flush()
 
     def get_omitted_indices(self, node_name):
-        return self.chest.root.cell_description.readWhere(
+        return self.chest.root.cell_description.read_where(
             '(omit==True) & (filename == "%s")' % node_name, 
             field='file_idx').tolist()
         
@@ -148,11 +148,10 @@ class CellController(BaseImageController):
             data = data.reshape((-1, data.shape[-2], 
                                  data.shape[-1]))
             # cut out any exclusions
-            exclusions = self.get_omitted_indices(node_name)
-            data = np.delete(data, exclusions, 0)
+            #exclusions = self.get_omitted_indices(node_name)
+            #data = np.delete(data, exclusions, 0)
         else:
-            # omit exclusions from data and also template and average
-            data = np.zeros((self.chest.root.cell_description.nrows-2,
+            data = np.zeros((self.chest.root.cell_description.nrows,
                              self.chest.root.cells.template.shape[1],
                              self.chest.root.cells.template.shape[0]
                              ),
@@ -165,15 +164,15 @@ class CellController(BaseImageController):
             empty_slices=0
             for node in nodes:
                 node_data = node[:]
-                exclusions = self.get_omitted_indices(node.name)
-                data = np.delete(node_data, exclusions, 0)                
-                empty_slices+=len(exclusions)
+                #exclusions = self.get_omitted_indices(node.name)
+                #data = np.delete(node_data, exclusions, 0)                
+                #empty_slices+=len(exclusions)
                 
                 node_data = node_data.reshape((-1, node_data.shape[-2], 
                                                node_data.shape[-1]))
                 # cut out any exclusions
-                exclusions = self.get_omitted_indices(node.name)
-                node_data = np.delete(node_data, exclusions, 0)
+                #exclusions = self.get_omitted_indices(node.name)
+                #node_data = np.delete(node_data, exclusions, 0)
                 if node.name not in ['template', 'average']:
                     end_idx = start_idx + node_data.shape[0]
                     data[start_idx:end_idx,:,:] = node_data
@@ -200,7 +199,17 @@ class CellController(BaseImageController):
     
     def omit_selected_index(self):
         cell_record=self.chest.root.cell_description[self.selected_index]
+        # this is not the nicest - would be better to do a table join, 
+        #    but this is more a feature of relational databases, not pytables.
         self.chest.root.cell_description.cols.omit[self.selected_index]=not cell_record["omit"]
+        # locate the cell in the cell peaks table by its image id and cell id 
+        #         (here is where the join would be nice...)
+        
+        peak_selected_idx = self.chest.root.cell_peaks.get_where_list(
+            '(filename == "%s") & (file_idx == %i)'%(cell_record["filename"], 
+                                               cell_record["file_idx"]))[0]
+        
+        self.chest.root.cell_peaks.cols.omit[peak_selected_idx]=not cell_record["omit"]
         #cell_record["omit"] = np.bool(not cell_record["omit"])
         #self.chest.root.cell_description.modifyRows(self.selected_index,
         #    rows=[self.selected_index,cell_record])
@@ -241,7 +250,7 @@ class CellController(BaseImageController):
         # make tuples of each column name and 'f8' for the data type
         dtypes = zip(names, ['f8', ] * self.numpeaks*9)
         # prepend the filename and index columns
-        dtypes = [('filename', '|S250'), ('file_idx', 'i4')] + dtypes
+        dtypes = [('filename', '|S250'), ('file_idx', 'i4'), ('omit', 'bool')] + dtypes
         # create an empty recarray with our data type
         desc = np.recarray((0,), dtype=dtypes)
         # create the table using the empty description recarray
@@ -350,7 +359,7 @@ class CellController(BaseImageController):
     
         if mask:
             mask = pc.draw_mask(avgImage.shape,
-                                peak_width/2,
+                                peak_width/2.0,
                                 target_locations)            
             stack *= mask
         # get all peaks on all images
@@ -419,10 +428,11 @@ class CellController(BaseImageController):
             
         indices - peak indices (integers) to select from.  Use this if you want to compare
             only a few peaks in the cell structure to compare.
-            None selects all peaks.
+            None selects all peaks from all non-omitted cells.
         """
         if len(chars) > 0:
             if len(indices) is 0:
+                # we want data for all the peaks in each cell
                 indices = range(self.chest.getNodeAttr('/cell_peaks','number_of_peaks'))
             # the columns we get are the combination of the chars with the
             #   indices we want.
@@ -436,7 +446,25 @@ class CellController(BaseImageController):
             cols = [['%s%i' % (c, i) for c in chars] for i in indices]
         # make the cols a simple list, rather than a list of lists
         cols = [item for sublist in cols for item in sublist]
-        # get the data from the table
-        peak_data = self.chest.root.cell_peaks[:]
+        # get the data from the table, omitting any excluded data
+        indices = self.chest.getNode('/cell_peaks').get_where_list(
+            '(omit==False)')
+        peak_data = self.chest.root.cell_peaks[indices]
         # return an ndarray with only the selected columns
         return np.array(peak_data[cols]).view(float).reshape(len(cols), -1)
+
+    def merge_processed_peak_data(self, data):
+        """
+        We passed data to PCA/ICA that did not include omitted cells.  When 
+        we add data back into the results table, we need to indicate in that
+        table that we don't have data on those cells.
+        """
+        indices = self.chest.getNode('/cell_peaks').get_where_list(
+                    '(omit==False)')        
+        if len(indices)==0:
+            return data
+        desc = np.recarray((0,), dtype=dtypes)
+        data=np.insert(data,1,desc,0)
+        return data
+        
+        
