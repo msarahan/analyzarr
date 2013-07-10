@@ -308,7 +308,7 @@ def best_match(arr, target, neighborhood=None):
     in array of coordinates arr.
     
     target is a 1D array of 2 coordinates.
-    arr is a 
+    arr is a 2D array of (npeaks)x2 coordinates.
     
     Usage:
     best_match(arr, target)

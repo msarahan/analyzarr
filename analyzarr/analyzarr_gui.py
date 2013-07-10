@@ -20,10 +20,16 @@ def main():
     from controllers.HighSeasAdventure import HighSeasAdventure
     
     controller = HighSeasAdventure()
+    # For enaml 0.7
+    #qtapp = QtApplication()
+    #view=Main("Ahoy!")
+    
+    # for enaml 0.6
     qtapp = QtApplication([])
     main_ui = simple_session('main', 'The main UI window', Main, controller=controller)
     qtapp.add_factories([main_ui])
     qtapp.start_session('main')
+    # version agnostic
     qtapp.start()
 
 if __name__ == '__main__':

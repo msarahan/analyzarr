@@ -43,7 +43,7 @@ class MappableImageController(BaseImageController):
             cell_desc = self.chest.root.cell_description
         except:
             return
-        if (len(self.chest.root.cell_description.getWhereList(
+        if (len(self.chest.root.cell_description.get_where_list(
                'filename == "%s"' % self.get_active_name())) > 0):
             try:
                 # if this table doesn't exist, we raise an exception
@@ -63,7 +63,7 @@ class MappableImageController(BaseImageController):
             pass
     
     def get_numpeaks(self):
-        self.chest.getNodeAttr('/cell_peaks','number_of_peaks')
+        return self.chest.getNodeAttr('/cell_peaks','number_of_peaks')
     
     def get_characteristic_plot_title(self):
         name = ""
@@ -152,10 +152,12 @@ class MappableImageController(BaseImageController):
     def get_expression_data(self, expression, table_loc="/cell_peaks"):
         target_table = self.chest.getNode(table_loc)
         uv = target_table.colinstances
+        # apply any shortcuts/macros
         expression = self.remap_distance_expressions(expression)
+        # evaluate the math expression
         data = t.Expr(expression, uv).eval()
         # pick out the indices for only the active image
-        indices = target_table.getWhereList(
+        indices = target_table.get_where_list(
             '(omit==False) & (filename == "%s")' % self.get_active_name())
         # access the array data for those indices
         data=data[indices]
