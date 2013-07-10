@@ -84,23 +84,23 @@ class HighSeasAdventure(HasTraits):
         if "chest" in ext:
             filename = prefix
         chest = file_import.new_treasure_chest(filename)
+        self.chest = chest
         self.image_controller = MappableImageController(parent=self, 
                                                     treasure_chest=chest)
         self.cell_controller = CellController(parent=self, 
                                               treasure_chest=chest)
-        self.chest = chest
         self.title = " - %s" % os.path.split(filename)[1]
 
     def open_treasure_chest(self, filename):
         if self.chest is not None:
             self.chest.close()
         chest = file_import.open_treasure_chest(filename)
+        self.chest = chest
         self.image_controller = MappableImageController(parent=self, 
                                                     treasure_chest=chest)
         self.cell_controller = CellController(parent=self, 
                                               treasure_chest=chest)
         self.mda_controller = MDAViewController(parent=self, treasure_chest=chest)
-        self.chest = chest
         self.title = " - %s" % os.path.split(filename)[1]
 
     def import_files(self, file_list):
