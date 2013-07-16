@@ -120,7 +120,7 @@ class MappableImageController(BaseImageController):
             if 'vectors' in self.plotdata.arrays:
                 self.plotdata.del_data('vectors')
                 # clear vector data
-        if self.get_expression_name() != "None":
+        if self.get_expression_name() not in ["None",'']:
             data = self.get_expression_data(self.get_expression_name())
             self.plotdata.set_data('color', data)
         else:
