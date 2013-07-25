@@ -11,9 +11,7 @@ syntax: glob
 *.png
 *.chest
 bin/*
-doc/.build/*
-doc/user_guide/_build/*
-doc/user_guide/.build/
+docs/_build/*
 build/*
 dist/*
 analyzarr.egg-info/*
