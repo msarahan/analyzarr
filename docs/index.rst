@@ -11,7 +11,9 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
-
+   setup
+   ui
+   file_io
 
 Indices and tables
 ==================
