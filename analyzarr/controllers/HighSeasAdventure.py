@@ -38,6 +38,7 @@ import os
  
 # the UI controller
 class HighSeasAdventure(HasTraits):
+    has_chest = Bool(False)
     show_image_view = Bool(False)
     show_cell_view = Bool(False)
     show_score_view = Bool(False)
@@ -90,6 +91,7 @@ class HighSeasAdventure(HasTraits):
         self.cell_controller = CellController(parent=self, 
                                               treasure_chest=chest)
         self.title = " - %s" % os.path.split(filename)[1]
+        self.has_chest=True
 
     def open_treasure_chest(self, filename):
         if self.chest is not None:
@@ -102,6 +104,7 @@ class HighSeasAdventure(HasTraits):
                                               treasure_chest=chest)
         self.mda_controller = MDAViewController(parent=self, treasure_chest=chest)
         self.title = " - %s" % os.path.split(filename)[1]
+        self.has_chest=True
 
     def import_files(self, file_list):
         file_import.import_files(self.chest, file_list)
@@ -113,7 +116,7 @@ class HighSeasAdventure(HasTraits):
 
     def load_test_data(self):
         # create the test pattern
-        tp = get_test_pattern()
+        tp = get_test_pattern((256,256))
         # save it as a file, for user's reference, and because we have
         #    to load files into chests (TODO: fix this to be more generic?)
         imsave('tp.png', tp)
@@ -122,6 +125,16 @@ class HighSeasAdventure(HasTraits):
         # import the newly saved test pattern file
         self.import_files(['tp.png'])
         # delete the file for cleanliness?
+
+    def characterize_peaks(self):
+        has_cells = self.cell_controller._can_change_idx
+        # TODO: need to make peak width a user-specified value, or some
+        #   auto-detect algorithm...
+        self.image_controller.characterize_peaks(10)
+        #if has_cells:
+            # TODO: cell_controller accesses the database for 
+            #  the image controller here.  Need to clean up.
+            #self.cell_controller.map_peaks_to_cells()
 
     def open_crop_UI(self):
         crop_controller = CellCropController(parent=self,

@@ -65,6 +65,42 @@ class MappableImageController(BaseImageController):
     def get_numpeaks(self):
         return self.chest.getNodeAttr('/cell_peaks','number_of_peaks')
     
+    def characterize_peaks(self, peak_width):
+        from lib.io.data_structure import ImagePeakTable
+        import lib.cv.peak_char as pc
+        # clear out the existing peak data table
+        # TODO: there's probably a better way to intelligently only recalculate
+        #    peaks as necessary for new images, or if peak_width changes.
+        try:
+            # wipe out old results
+            self.chest.removeNode('/image_peaks')
+        except:
+            # any errors will be because the table doesn't exist. That's OK.
+            pass
+        self.chest.createTable('/', 'image_peaks', ImagePeakTable)
+        table = self.chest.root.image_peaks
+        for node in self.chest.listNodes('/rawdata'):
+            # TODO: progress bar here for image progress
+            # TODO: progress bar for characterizing each peak (within this function call...)
+            # uses default median filter radius of 5 pixels
+            peak_data = pc.peak_attribs_image(node[:],peak_width=peak_width)
+            # prepend the filename and index columns
+            dtypes = ['i8','|S250']+['f8']*7
+            dtypes = zip(table.colnames, dtypes)
+            rows = peak_data.shape[0]
+            cols = peak_data.shape[1]
+            # prepend the filename and index columns
+            data = np.zeros(rows,dtype=dtypes)
+            data['filename'] = node.name
+            data['file_idx'] = np.arange(rows)
+            for name_idx in xrange(cols):
+                data[table.colnames[name_idx+2]] = peak_data[:, name_idx]
+            # populate the peak_data table
+            self.chest.root.image_peaks.append(data)
+            self.chest.root.image_peaks.flush()
+            self.chest.flush()
+            
+    
     def get_characteristic_plot_title(self):
         name = ""
         if self.get_characteristic_name() != "None":

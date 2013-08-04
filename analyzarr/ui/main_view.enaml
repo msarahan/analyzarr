@@ -84,6 +84,7 @@ enamldef MyMenuBar(MenuBar): menu:
             triggered :: chest_dialog.open()
         Action:
             text = 'Import Files'
+            enabled << controller.has_chest
             triggered :: import_dialog.open()
         Action:
             text = 'Test data'
@@ -404,9 +405,9 @@ enamldef ToolsToolBar(ToolBar):
         enabled << (controller.image_controller.numfiles>0)
     Action: characterize:
         text = "Characterize Peaks"
-        tool_tip = "Locate and characterize peaks in the cell stack"
-        triggered :: controller.cell_controller.toggle_char()
-        enabled << (controller.cell_controller.numfiles>0)
+        tool_tip = "Locate and characterize peaks in the collection of images"
+        triggered :: controller.characterize_peaks()
+        enabled << (controller.image_controller.numfiles>0)
     Action: mda:
         text = "MDA"
         tool_tip = "Perform some sort of multivariate data analysis"

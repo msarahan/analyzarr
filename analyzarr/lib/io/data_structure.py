@@ -38,6 +38,21 @@ class ImageDataTable(tables.IsDescription):
     treatments = tables.StringCol(250)
 
 
+class ImagePeakTable(tables.IsDescription):
+    file_idx = tables.Int64Col(pos=0)
+    # metadata = tables.
+    # attributes - tags
+    # name of a file
+    filename = tables.StringCol(250, pos=1)
+    x = tables.Float64Col(pos=2)
+    y = tables.Float64Col(pos=3)
+    height = tables.Float64Col(pos=4)
+    orientation = tables.Float64Col(pos=5)
+    eccentricity = tables.Float64Col(pos=6)
+    skew_x = tables.Float64Col(pos=7)
+    skew_y = tables.Float64Col(pos=8)
+    
+    
 class CellsTable(tables.IsDescription):
     file_idx = tables.Int64Col(pos=0)
     # description of where data came from (as a path in the file, for example:
@@ -50,6 +65,7 @@ class CellsTable(tables.IsDescription):
     x_coordinate = tables.Float32Col(pos=3)
     y_coordinate = tables.Float32Col(pos=4)
     omit = tables.BoolCol()
+
     
 class LogTable(tables.IsDescription):
     date = tables.Time64Col(pos=0)
@@ -73,6 +89,8 @@ def get_image_h5file(filename):
     # data outline keeps records of what data are available - the linkage
     # between which cells came from which images, locations, etc.
     h5file.createTable('/', 'image_description', ImageDataTable)
+    
+    h5file.createTable('/', 'image_peaks', ImagePeakTable)
 
     h5file.createTable('/', 'cell_description', CellsTable)
 

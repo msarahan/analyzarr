@@ -271,7 +271,7 @@ class CellController(BaseImageController):
             cell_data = self.get_cell_set(node)
             data = np.zeros((cell_data.shape[0]),dtype=dtypes)
             data['filename'] = node
-            data['file_idx'] = np.arange(cell_data.shape[0])            
+            data['file_idx'] = np.arange(cell_data.shape[0])
             # might want to tweak this loop or cythonize for speed...
             attribs = self._peak_attribs_stack(cell_data,
                             peak_width=self.peak_width, 
