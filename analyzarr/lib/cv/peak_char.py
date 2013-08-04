@@ -15,7 +15,8 @@ import sys
 
 import numpy as np
 from scipy.signal import medfilt
-from fit_gaussian import fitgaussian
+from gaussfitter import gaussfit
+#from fit_gaussian import fitgaussian
 
 # try to use the faster Cython version.  If it's not available, fall back to the python definition below (~5x slower)
 try:
@@ -119,7 +120,7 @@ except:
         # (not the whole maxpeakn x 3 array)
         return P[:peak], H[:peak]
 
-def two_dim_findpeaks(arr,peak_width=11, medfilt_radius=5,
+def two_dim_findpeaks_old(arr,peak_width=11, medfilt_radius=5,
                       maxpeakn=10000):
     """
     Locate peaks on a 2-D image.  Basic idea is to locate peaks in X direction,
@@ -167,6 +168,8 @@ def two_dim_findpeaks(arr,peak_width=11, medfilt_radius=5,
     Fmap = mapX*mapY
     nonzeros=np.nonzero(Fmap)
     coords=np.vstack((nonzeros[1],nonzeros[0])).T
+    # ideally, tries to exclude peaks that are too near one another.  
+    #    In practice, doesn't work very well.
     coords=np.ma.fix_invalid(coords,fill_value=-1)
     coords=np.ma.masked_outside(coords,peak_width/2+1,arr.shape[0]-peak_width/2-1)
     coords=np.ma.masked_less(coords,0)
@@ -177,6 +180,46 @@ def two_dim_findpeaks(arr,peak_width=11, medfilt_radius=5,
     heights=np.array([arr[coords[i,1],coords[i,0]] for i in xrange(coords.shape[0])]).reshape((-1,1))
     coords=np.hstack((coords,heights))
     return coords 
+
+# Code tweaked from the example by Alejandro at:
+# http://stackoverflow.com/questions/16842823/peak-detection-in-a-noisy-2d-array
+# main tweak is the pre-allocation of the results, which should speed 
+#    things up quite a lot for large numbers of peaks.
+def two_dim_findpeaks(image,sigma=None,alpha=3,peak_width=10,medfilt_radius=5, max_peak_number=10000):
+    """
+    
+    """
+    from copy import deepcopy
+    # do a 2D median filter
+    if medfilt_radius > 0:
+        image = medfilt(image,medfilt_radius)    
+    coords = np.zeros((max_peak_number,2))
+    image_temp = deepcopy(image)
+    peak_ct=0
+    size=peak_width/2
+    if sigma is None:
+        sigma=np.std(image)
+    while True:
+        k = np.argmax(image_temp)
+        j,i = np.unravel_index(k, image_temp.shape)
+        if(image_temp[j,i] >= alpha*sigma):
+            # store the coordinate
+            coords[peak_ct]=[j,i]
+            # set the neighborhood of the peak to zero so we go look elsewhere
+            #  for other peaks
+            x = np.arange(i-size, i+size)
+            y = np.arange(j-size, j+size)
+            xv,yv = np.meshgrid(x,y)
+            image_temp[yv.clip(0,image_temp.shape[0]-1),
+                                   xv.clip(0,image_temp.shape[1]-1) ] = 0
+            peak_ct+=1
+        else:
+            break
+    # add in the heights
+    heights=np.array([image[coords[i,1],coords[i,0]] for i in xrange(coords.shape[0])]).reshape((-1,1))
+    coords=np.hstack((coords,heights))
+    return coords[:peak_ct]
+    
 
 def get_characteristics(moments):
     try:
@@ -236,11 +279,12 @@ def peak_attribs_image(image, peak_width, target_locations=None, medfilt_radius=
 
         2D numpy array:
         - One row per peak
-        - 5 columns:
+        - 7 columns:
           0,1 - location
           2 - height
           3 - orientation
           4 - eccentricity
+          5,6 - skew
 
     """
     try:
@@ -255,7 +299,7 @@ def peak_attribs_image(image, peak_width, target_locations=None, medfilt_radius=
     if medfilt_radius:
         image=medfilt(image,medfilt_radius)
     if target_locations is None:
-        target_locations=two_dim_findpeaks(image, peak_width=peak_width)
+        target_locations=two_dim_findpeaks(image, peak_width=peak_width, medfilt_radius=5)
     rlt=np.zeros((target_locations.shape[0],7))
     r=np.ceil(peak_width/2)
     imsize=image.shape[0]
@@ -279,13 +323,15 @@ def peak_attribs_image(image, peak_width, target_locations=None, medfilt_radius=
         ms=cv.Moments(cv.fromarray(roi))
         height=image[c[1],c[0]]
         rlt[loc] = get_characteristics(ms)
-        rlt[loc,:2] += target_locations[loc]
+        # rlt[loc,:2] += target_locations[loc]
         
         # To use Gaussian fitting on the peaks for height and location, uncomment the following two lines.
-        #height, x, y, width_x, width_y = fitgaussian(roi)
-        #rlt[loc,:2] = (np.array([bymin,bxmin]) + np.array([y,x]))
-        
-        rlt[loc,2]=height
+        height, amp, x, y, width_x, width_y, rot = gaussfit(roi)
+        rlt[loc,:2] = (np.array([bymin,bxmin]) + np.array([y,x]))
+        rlt[loc,2]=amp
+        # TODO: compare this with OpenCV moment calculation above:
+        #  (this is using the gaussfitter value)
+        rlt[loc,3]=rot
     return rlt
 
 def stack_coords(stack,peak_width,maxpeakn=5000):
