@@ -1,12 +1,9 @@
 analyzarr
 =========
 
-Analyzarr is hyperdimensional data analysis by pirates, for pirates.
+Analyzarr is high-resolution image analysis by pirates, for pirates.
 
-The primary purpose of this software is exploratory multivariate data analysis.  It was developed
-originally for transmission electron microscope data, specifically electron energy loss spectra
-and high-resolution high-angle annular dark-field STEM images.  Hopefully, it might be useful for
-other data where small patterns in spectrally or spatially repetitive data need to be identified.
+The primary purpose of this software is the study of relationships among peaks in crystalline structures. It was developed originally for transmission electron microscope data, specifically high-resolution high-angle annular dark-field (HAADF) STEM images. Hopefully, it might be useful for other data where small patterns in spatially repetitive data need to be identified.
 
 Analyzarr has been developed using a kindly donated license for the Wing Pro IDE.  Its debugging capabilities have been instrumental.
 
