@@ -8,7 +8,6 @@ syntax: glob
 *.enamlc
 *.c
 *.so
-*.png
 *.chest
 bin/*
 docs/_build/*
