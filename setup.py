@@ -75,5 +75,5 @@ setup(
         "Topic :: Scientific/Engineering",
         "Topic :: Scientific/Engineering :: Physics",
         ],
-    ext_modules = [peak_finder_cython,]
+    #ext_modules = [peak_finder_cython,]
     )
