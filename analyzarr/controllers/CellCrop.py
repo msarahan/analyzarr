@@ -221,9 +221,7 @@ class CellCropController(BaseImageController):
             self.set_active_index(idx)
             CC = cv_funcs.xcorr(self.template_data.get_data("imagedata"),
                                     self.get_active_image())
-            # peak finder needs peaks greater than 1.  Multiply by 255 to scale them.
-            pks=pc.two_dim_findpeaks(CC*255, peak_width=self.peak_width, medfilt_radius=None)
-            pks[:,2]=pks[:,2]/255.
+            pks=pc.two_dim_findpeaks(CC, peak_width=self.peak_width, medfilt_radius=None, alpha=1)
             peaks[self.get_active_name()]=pks
         self.peaks=peaks
         
