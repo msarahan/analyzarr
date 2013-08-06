@@ -130,7 +130,7 @@ class HighSeasAdventure(HasTraits):
         has_cells = self.cell_controller._can_change_idx
         # TODO: need to make peak width a user-specified value, or some
         #   auto-detect algorithm...
-        self.image_controller.characterize_peaks(10)
+        self.image_controller.characterize_peaks()
         #if has_cells:
             # TODO: cell_controller accesses the database for 
             #  the image controller here.  Need to clean up.

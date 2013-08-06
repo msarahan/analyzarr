@@ -41,6 +41,7 @@ class CellCropController(BaseImageController):
             if self.numfiles > 0:
                 self.init_plot()
                 print "initialized plot for data in %s" % data_path
+                self.peak_width=pc.estimate_peak_width(self.get_active_image())
     
     def data_updated(self):
         # reinitialize data

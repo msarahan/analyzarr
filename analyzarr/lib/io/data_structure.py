@@ -44,13 +44,22 @@ class ImagePeakTable(tables.IsDescription):
     # attributes - tags
     # name of a file
     filename = tables.StringCol(250, pos=1)
+    # peak position on parent image
     x = tables.Float64Col(pos=2)
     y = tables.Float64Col(pos=3)
-    height = tables.Float64Col(pos=4)
-    orientation = tables.Float64Col(pos=5)
-    eccentricity = tables.Float64Col(pos=6)
-    skew_x = tables.Float64Col(pos=7)
-    skew_y = tables.Float64Col(pos=8)
+    # height
+    h = tables.Float64Col(pos=4)
+    # longest axis (may not be orthogonal to image frame!)
+    long_axis = tables.Float64Col(pos=5)
+    # shorter axis (may not be orthogonal to image frame!)
+    short_axis = tables.Float64Col(pos=6)
+    # rotation in degrees (orientation)
+    o = tables.Float64Col(pos=7)
+    # how round the peak is (eccentricity)
+    e = tables.Float64Col(pos=8)
+    # skew
+    sx = tables.Float64Col(pos=9)
+    sy = tables.Float64Col(pos=10)
     
     
 class CellsTable(tables.IsDescription):
