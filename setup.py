@@ -18,8 +18,8 @@ import distutils.dir_util
 
 import os
 
-from distutils.extension import Extension
-from Cython.Distutils import build_ext
+#from distutils.extension import Extension
+#from Cython.Distutils import build_ext
 
 import numpy as np
 
@@ -34,15 +34,17 @@ install_req = ['scipy', 'numpy', 'traits', 'chaco>=4.3', 'enaml==0.6.8',
 
 numpy_include_dir = np.get_include()
 
+"""
 peak_finder_cython = Extension(
     'analyzarr.lib.cv.one_dim_findpeaks', 
     sources=['analyzarr/lib/cv/one_dim_findpeaks.pyx'],
     include_dirs=[numpy_include_dir],
     )
+    """
     
 version = Release.version
 setup(
-    cmdclass = {'build_ext': build_ext},
+    #cmdclass = {'build_ext': build_ext},
     name = "analyzarr",
     package_dir = {'analyzarr': 'analyzarr'},
     version = version,
