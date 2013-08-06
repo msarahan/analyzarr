@@ -63,11 +63,19 @@ def get_characteristics(moments):
     return np.array([xCenter, yCenter, 0, long_axis, short_axis, orientation, eccentricity, xSkew, ySkew])
 
 def estimate_peak_width(image, window_size=64, window_center=None, medfilt=5):
-    # put the window in the image center
+    from copy import deepcopy
     if window_center is None:
+        tmp_image = deepcopy(image)
+        # apply a quick mask so that we don't end up on the edges.
+        mask = np.ones((image.shape[0],image.shape[1]))
+        mask[0:window_size/8]=0
+        mask[7*window_size/8]=0
+        mask[:,0:window_size/8]=0
+        mask[:,7*window_size/8]=0
+        tmp_image *= mask
         # center the window around the tallest peak in the image
         # find the highest point in the image.
-        k = np.argmax(image)
+        k = np.argmax(tmp_image)
         cx,cy = np.unravel_index(k, image.shape)
         #cx = (image.shape[1])/2
         #cy = (image.shape[0])/2
@@ -75,23 +83,27 @@ def estimate_peak_width(image, window_size=64, window_center=None, medfilt=5):
     else:
         # let the user define the window center
         cx,cy = window_center
+        tmp_image=image
     
     # cut out a smaller sub-region    
     x = np.arange(cx-window_size/2, cx+window_size/2)
     y = np.arange(cy-window_size/2, cy+window_size/2)
     xv,yv = np.meshgrid(x,y)
-    image_tmp = image[yv,xv]
+    
+    tmp_image = image[yv.clip(0,tmp_image.shape[0]-1),
+                          xv.clip(0,tmp_image.shape[1]-1) ]    
+        
     
     # Pick out the row around that highest point.  Make sure datatype
     #    is signed so we can have negative numbers
-    tmp_row = np.array(image_tmp[int(window_size/2)],dtype=np.integer)
+    tmp_row = np.array(tmp_image[int(window_size/2)],dtype=np.integer)
     # convert it to float
     # make lowest point zero
     tmp_row -= np.min(tmp_row)
     # subtract the half of the maximum height 
     #     (This makes our measurement Full Width eigth Max).
     #     It is better to get a slightly too large neighborhood!
-    tmp_row -= (np.max(tmp_row))/8
+    tmp_row -= (np.max(tmp_row))/4
     # Detect where we cross 0
     zero_crossings = np.where(np.diff(np.sign(tmp_row)))[0]
     # reuse the cx variable to represent the middle of our sub-window.
@@ -103,14 +115,27 @@ def estimate_peak_width(image, window_size=64, window_center=None, medfilt=5):
     left = peak_left_crossings[-1]
     peak_right_crossings = zero_crossings[zero_crossings>cx]
     right = peak_right_crossings[0]
-    return int(right-left)
+    # tends to underestimate.  Tweak it.
+    return int(right-left)+7
     
+# code from
+# http://stackoverflow.com/questions/8647024/how-to-apply-a-disc-shaped-mask-to-a-numpy-array
+def draw_mask(array_size, radius, target_locations):
+    array = np.zeros(array_size)
+    for loc in target_locations:
+        ay, ax = array_size[0], array_size[1]
+        ty, tx = loc[0], loc[1]
+        y,x = np.mgrid[-ty:ay-ty, -tx:ax-tx]
+        mask = x*x + y*y <= radius*radius
+        array[mask] = 1
+    return array
+
 
 # Code tweaked from the example by Alejandro at:
 # http://stackoverflow.com/questions/16842823/peak-detection-in-a-noisy-2d-array
 # main tweak is the pre-allocation of the results, which should speed 
 #    things up quite a lot for large numbers of peaks.
-def two_dim_findpeaks(image, peak_width=None, sigma=None, alpha=1, medfilt_radius=3, max_peak_number=10000):
+def two_dim_findpeaks(image, peak_width=None, sigma=None, alpha=2, medfilt_radius=3, max_peak_number=50000, recursion_depth=1, recursion_level=0):
     """
     
     """
@@ -118,38 +143,46 @@ def two_dim_findpeaks(image, peak_width=None, sigma=None, alpha=1, medfilt_radiu
     # do a 2D median filter
     if medfilt_radius > 0:
         image = medfilt(image,medfilt_radius)    
-    if peak_width is None:
+    if peak_width is None and recursion_level==0:
         peak_width = estimate_peak_width(image)
+    # draw a circular mask to be used around peaks
     coords = np.zeros((max_peak_number,2))
     image_temp = deepcopy(image)
     peak_ct=0
     size=peak_width/2
+    mask = draw_mask((size*2,size*2), size, [(size,size)])
+    # invert the mask to chuck the peak, not the surrounding area.
+    mask = mask==0
     if sigma is None:
         # peaks are some number of standard deviations from mean
-        #sigma=np.std(image)
+        sigma=np.std(image_temp)
         # peaks are some set fraction of the max peak height
-        sigma = np.min(image)+0.2*(np.max(image)-np.min(image))
+        #sigma = np.min(image)+0.2*(np.max(image)-np.min(image))
     while True:
         k = np.argmax(image_temp)
         j,i = np.unravel_index(k, image_temp.shape)
         if(image_temp[j,i] >= alpha*sigma):
             # store the coordinate
-            coords[peak_ct]=[j,i]
+            coords[peak_ct]=[i,j]
             # set the neighborhood of the peak to zero so we go look elsewhere
             #  for other peaks
             x = np.arange(i-size, i+size)
-            y = np.arange(j-size, j+size)
+            y = np.arange(j-size+1, j+size+1)
             xv,yv = np.meshgrid(x,y)
             image_temp[yv.clip(0,image_temp.shape[0]-1),
-                                   xv.clip(0,image_temp.shape[1]-1) ] = 0
+                                   xv.clip(0,image_temp.shape[1]-1) ] *= mask
             peak_ct+=1
         else:
             break
     
     coords = coords[:peak_ct]
     # add in the heights
-    heights=np.array([image[coords[i,0],coords[i,1]] for i in xrange(coords.shape[0])]).reshape((-1,1))
+    heights=np.array([image[coords[i,1],coords[i,0]] for i in xrange(coords.shape[0])]).reshape((-1,1))
     coords=np.hstack((coords,heights))
+    sigma=np.std(image_temp)
+    fudge_factor=1.5
+    if image_temp.max()>sigma*alpha*fudge_factor:
+        coords = np.vstack((coords,two_dim_findpeaks(image_temp,alpha=alpha*fudge_factor,peak_width=peak_width, recursion_level=recursion_level+1)))
     return coords
     
 
@@ -218,32 +251,40 @@ def peak_attribs_image(image, peak_width=None, target_locations=None, medfilt_ra
                               message="Characterizing %d peaks on current image"%target_locations.shape[0], 
                               max=int(target_locations.shape[0]), show_time=True, can_cancel=False)
     progress.open()
+    
+    mask = draw_mask((r*2,r*2), r, [(r,r)])
 
     for loc in xrange(target_locations.shape[0]):
         progress.update(int(loc+1))
         c=target_locations[loc]
-        bxmin=c[1]-r
-        bymin=c[0]-r
-        bxmax=c[1]+r
-        bymax=c[0]+r
-        if bxmin<0: bxmin=0; bxmax=peak_width
-        if bymin<0: bymin=0; bymax=peak_width
-        if bxmax>imsize: bxmax=imsize; bxmin=imsize-peak_width
-        if bymax>imsize: bymax=imsize; bymin=imsize-peak_width
-        roi[:,:]=image[bymin:bymax,bxmin:bxmax]
+        peak_left=c[0]-r
+        peak_top=c[1]-r
+        #if bxmin<0: bxmin=0; bxmax=peak_width
+        #if bymin<0: bymin=0; bymax=peak_width
+        #if bxmax>imsize: bxmax=imsize; bxmin=imsize-peak_width
+        #if bymax>imsize: bymax=imsize; bymin=imsize-peak_width
+        # set the neighborhood of the peak to zero so we go look elsewhere
+        #  for other peaks
+        x = np.array(np.arange(c[0]-r, c[0]+r),dtype=np.integer)
+        y = np.array(np.arange(c[1]-r, c[1]+r),dtype=np.integer)
+        xv,yv = np.meshgrid(x,y)
+        roi[:,:] = image[yv.clip(0,image.shape[0]-1),
+                         xv.clip(0,image.shape[1]-1) ] * mask
+        #roi[0:,:]=image[bymin:bymax,bxmin:bxmax]
         # skip frames with significant dead pixels (corners of
         #    rotated images, perhaps
-        if np.average(roi)< 0.5*np.average(image):
-            rlt[loc,:2] = (c[1], c[0])
-            continue
+        #if np.average(roi)< 0.5*np.average(image):
+            #rlt[loc,:2] = (c[1], c[0])
+            #continue
         ms=cv.Moments(cv.fromarray(roi))
         # output from get_characteristics is:
         # x, y, height, long_axis, short_axis, orientation, eccentricity, skew_x, skew_y
         rlt[loc] = get_characteristics(ms)
         
         dummy, amp, x, y, width_x, width_y, rot = gaussfit(roi)
-        # we are looking at global peak locations - why are we adjusting for bymin/bymax?
-        rlt[loc,:2] = (np.array([bymin,bxmin]) + np.array([y,x]))
+        # x and y are the locations within the ROI.  Add the coordinates of 
+        #    the top-left corner of our ROI on the global image.
+        rlt[loc,:2] = (np.array([peak_top,peak_left]) + np.array([y,x]))
         #rlt[loc,:2] = np.array([y,x])
         # insert the height
         rlt[loc,2]=amp
@@ -301,17 +342,7 @@ def normalize(arr,lower=0.0,upper=1.0):
     arr += lower
     return arr
 
-# code from
-# http://stackoverflow.com/questions/8647024/how-to-apply-a-disc-shaped-mask-to-a-numpy-array
-def draw_mask(array_size, radius, target_locations):
-    array = np.zeros(array_size)
-    for loc in target_locations:
-        ay, ax = array_size[0], array_size[1]
-        ty, tx = loc[0], loc[1]
-        y,x = np.mgrid[-ty:ay-ty, -tx:ax-tx]
-        mask = x*x + y*y <= radius*radius
-        array[mask] = 1
-    return array
+
 
 def min_peak_distance(target_locations):
     """
