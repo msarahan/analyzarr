@@ -82,6 +82,20 @@ class CellController(BaseImageController):
                             start=self.selected_index, field="omit")[0]
         self.omitted=bool(omitted)
         
+    def map_peaks_to_cells(self):
+        """
+        This function takes the global collection of peaks from each parent
+        image and figures out where they fit in the context of a local cell.
+        """
+        
+        # we have to first identify the locations on the average image of the
+        # peaks that we should look at. 
+        
+        #Now for each cell we've cropped, and for each peak ID, locate the
+        #best matching global peak. The best match is defined as the
+        #coordinate closest to the top-left corner of the cell, plus the
+        #cell-local offset (from the average image) to get to the peak.
+        
     def get_active_image(self):
         # Find this cell in the cell description table.  We use this to look
         # up the parent image and subsequently the local cell index (the
@@ -379,7 +393,7 @@ class CellController(BaseImageController):
         progress = ProgressDialog(title="Peak characterization progress", 
                                   message="Characterizing peaks on %d cells"%stack.shape[0], 
                                   max=int(stack.shape[0]), show_time=True, can_cancel=False)
-        progress.open()        
+        progress.open()
         
         for i in xrange(stack.shape[0]):
             progress.update(int(i+1))

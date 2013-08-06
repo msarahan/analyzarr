@@ -205,7 +205,7 @@ enamldef ImagePlotButtons(Container): image_buttons:
                 ComboBox: vector:
                     items << controller._vectors
                     index := controller._vector
-                    enabled << controller._can_map_peaks
+                    enabled << controller._can_map_vectors
                     hug_width = 'strong'
                 Label: vector_label:
                     text = "Vector scale"
