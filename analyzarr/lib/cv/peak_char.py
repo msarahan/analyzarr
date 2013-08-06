@@ -115,6 +115,7 @@ def two_dim_findpeaks(image, peak_width=None, sigma=None, alpha=1, medfilt_radiu
     
     """
     from copy import deepcopy
+    import numpy.ma as ma
     # do a 2D median filter
     if medfilt_radius > 0:
         image = medfilt(image,medfilt_radius)    
@@ -149,8 +150,12 @@ def two_dim_findpeaks(image, peak_width=None, sigma=None, alpha=1, medfilt_radiu
     coords = coords[:peak_ct]
     # add in the heights
     heights=np.array([image[coords[i,0],coords[i,1]] for i in xrange(coords.shape[0])]).reshape((-1,1))
+    sigma = np.std(heights)
+    mean = np.mean(heights)
+    # filter out junk peaks - anything beyond 5 sigma.
+    heights = ma.masked_outside(heights, mean-(5*sigma), mean+(5*sigma))
     coords=np.hstack((coords,heights))
-    return coords
+    return ma.compress_rows(coords)
     
 
 def peak_attribs_image(image, peak_width=None, target_locations=None, medfilt_radius=5):
