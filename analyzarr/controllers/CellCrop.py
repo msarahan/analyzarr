@@ -41,7 +41,6 @@ class CellCropController(BaseImageController):
             if self.numfiles > 0:
                 self.init_plot()
                 print "initialized plot for data in %s" % data_path
-                self.peak_width=pc.estimate_peak_width(self.get_active_image())
     
     def data_updated(self):
         # reinitialize data
@@ -222,7 +221,12 @@ class CellCropController(BaseImageController):
             self.set_active_index(idx)
             CC = cv_funcs.xcorr(self.template_data.get_data("imagedata"),
                                     self.get_active_image())
-            pks=pc.two_dim_findpeaks(CC, peak_width=self.peak_width, medfilt_radius=None, alpha=1)
+            # 
+            pks=pc.two_dim_findpeaks((CC-CC.min())*255, medfilt_radius=None, alpha=1,
+                                     coords_list=[],
+                                     )
+            pks=pc.flatten_peak_list(pks)
+            pks[:,2]=pks[:,2]/255+CC.min()
             peaks[self.get_active_name()]=pks
         self.peaks=peaks
         

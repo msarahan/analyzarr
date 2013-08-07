@@ -82,6 +82,9 @@ class CellController(BaseImageController):
                             start=self.selected_index, field="omit")[0]
         self.omitted=bool(omitted)
         
+    def get_average_cell(self):
+        pass
+    
     def map_peaks_to_cells(self):
         """
         This function takes the global collection of peaks from each parent
@@ -90,6 +93,7 @@ class CellController(BaseImageController):
         
         # we have to first identify the locations on the average image of the
         # peaks that we should look at. 
+        avg=self.get_average_cell()
         
         #Now for each cell we've cropped, and for each peak ID, locate the
         #best matching global peak. The best match is defined as the

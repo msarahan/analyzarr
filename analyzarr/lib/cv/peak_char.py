@@ -32,9 +32,9 @@ def get_characteristics(moments):
             print 'Module %s:' % sys.modules[__name__]
             print 'OpenCV is not available, the peak characterization functions will not work.'
             return None
-    mu00 = cv.GetCentralMoment(moments,0,0)
-    mu01 = cv.GetCentralMoment(moments,0,1)
-    mu10 = cv.GetCentralMoment(moments,1,0)
+    m=moments
+    # these are all central moments!
+    mu00 = cv.GetCentralMoment(m,0,0)
     mu11 = cv.GetCentralMoment(moments,1,1)
     mu02 = cv.GetCentralMoment(moments,0,2)
     mu20 = cv.GetCentralMoment(moments,2,0)
@@ -43,9 +43,10 @@ def get_characteristics(moments):
     
     xxVar = mu20/mu00
     yyVar = mu02/mu00
-    
-    xCenter = mu10/mu00
-    yCenter = mu01/mu00
+
+    # these use raw moments!
+    xCenter = m.m10/m.m00
+    yCenter = m.m01/m.m00
     
     xyCenter=mu11/mu00
     
@@ -65,6 +66,7 @@ def get_characteristics(moments):
     return np.array([xCenter, yCenter, 0, long_axis, short_axis, orientation, eccentricity, xSkew, ySkew])
 
 def estimate_peak_width(image, window_size=64, window_center=None, medfilt=5, max_peak_width=100):
+    from scipy.ndimage import gaussian_filter
     from copy import deepcopy
     if window_center is None:
         tmp_image = deepcopy(image)
@@ -99,7 +101,10 @@ def estimate_peak_width(image, window_size=64, window_center=None, medfilt=5, ma
     # Pick out the row around that highest point.  Make sure datatype
     #    is signed so we can have negative numbers
     tmp_row = np.array(tmp_image[int(window_size/2)],dtype=np.integer)
-
+    # blur it just to make damn sure we don't have some kind 
+    #     of crappy derivative.
+    tmp_row=gaussian_filter(tmp_row,5)
+    
     # Detect where our derivative switches sign
     zero_crossings = np.where(np.diff(np.sign(np.diff(tmp_row))))[0]
     
@@ -120,16 +125,17 @@ def estimate_peak_width(image, window_size=64, window_center=None, medfilt=5, ma
     
     
     # reuse the cx variable to represent the middle of our sub-window.
-    cx=window_size/2
+    # they're 0-based indexes, so adjust for that...
+    cx=window_size/2-1
     if len(zero_crossings)<2 or min(zero_crossings)>cx or max(zero_crossings)<cx:
             return 0    
     # find the zero crossing closest to the left of the peak.
     # First, chuck any values to the right of our peak.
-    peak_left_crossings = zero_crossings[zero_crossings<cx]
+    peak_left_crossings = zero_crossings[zero_crossings<cx-1]
     # the rightmost value is the greatest of those.
     left = peak_left_crossings[-1]
     # First, chuck any values to the left of our peak.
-    peak_right_crossings = zero_crossings[zero_crossings>cx]
+    peak_right_crossings = zero_crossings[zero_crossings>cx+1]
     #  The leftmost value is the closest one.
     right = peak_right_crossings[0]
     # tends to underestimate.  Tweak it.  7 is "empirically derived"
@@ -137,11 +143,15 @@ def estimate_peak_width(image, window_size=64, window_center=None, medfilt=5, ma
     width = int(right-left)#+fudge_factor
     # black out our current ROI if it has led us astray
     if width>max_peak_width:
-        image[yv.clip(0,image.shape[0]-1),
-              xv.clip(0,image.shape[1]-1) ]=0
-        print "width estimation recursing."
+        return 0
+    #if width>max_peak_width and width>5:
+        #image[yv.clip(0,image.shape[0]-1),
+              #xv.clip(0,image.shape[1]-1) ]=0
+        #print "width estimation recursing."
         # recurse to (hopefully) a better peak.
-        width = estimate_peak_width(image, window_size=window_size, max_peak_width=max_peak_width)
+        #width = estimate_peak_width(image, window_size=window_size, max_peak_width=max_peak_width)
+    #if width<5:
+        #return 0
     return width
     
 # code from
@@ -175,6 +185,7 @@ def two_dim_findpeaks(image, peak_width=None, sigma=None, alpha=2,
         peak_width = estimate_peak_width(image,max_peak_width=max_peak_width)
         # break recursion if peak width estimation fails
         if peak_width == 0:
+            print "peak width estimated as 0.  Skipping iteration."
             return
         print "Estimated peak width as %d pixels"%peak_width
     # draw a circular mask to be used around peaks
@@ -184,7 +195,8 @@ def two_dim_findpeaks(image, peak_width=None, sigma=None, alpha=2,
     # plus 3 is to black out a slightly larger area than the measured 
     #   size of the peak so that we don't get edges of peaks turning into 
     #   false peaks.
-    size=peak_width/2+3
+    #size=peak_width/2+3
+    size=peak_width/2
     mask = draw_mask((size*2,size*2), size, [(size,size)])
     # invert the mask to chuck the peak, not the surrounding area.
     mask = mask==0
@@ -202,7 +214,7 @@ def two_dim_findpeaks(image, peak_width=None, sigma=None, alpha=2,
             # set the neighborhood of the peak to zero so we go look elsewhere
             #  for other peaks
             x = np.arange(i-size, i+size)
-            y = np.arange(j-size+1, j+size+1)
+            y = np.arange(j-size, j+size)
             xv,yv = np.meshgrid(x,y)
             image_temp[yv.clip(0,image_temp.shape[0]-1),
                                    xv.clip(0,image_temp.shape[1]-1) ] *= mask
@@ -221,10 +233,11 @@ def two_dim_findpeaks(image, peak_width=None, sigma=None, alpha=2,
     coords=ma.compress_rows(coords)
     sigma=np.std(image_temp)
     # smaller fudge factor makes it more sensitive to junk.
-    fudge_factor=1.6
+    fudge_factor=1.5
     coords_list.append(coords)
+    print "Iteration %d done.  %d peaks found." %(recursion_level,coords.shape[0])
     if image_temp.max()>sigma*alpha*fudge_factor:
-        print "Iteration %d done.  Recursing..."%recursion_level
+        print "Recursing..."
         # we'll determine another peak width in this recursion, because less bright peaks might also be smaller.
         two_dim_findpeaks(image_temp,alpha=alpha*fudge_factor, 
                           recursion_level=recursion_level+1, 
@@ -233,7 +246,7 @@ def two_dim_findpeaks(image, peak_width=None, sigma=None, alpha=2,
     return coords_list
     
 
-def kill_duplicates(arr, minimum_distance=6):
+def kill_duplicates(arr, minimum_distance=10):
     """
     Attempts to eliminate garbage coordinates
     
@@ -259,7 +272,7 @@ def kill_duplicates(arr, minimum_distance=6):
         chuck_list += match
         
     keepers = range(arr.shape[0])
-    [keepers.remove(chuck) for chuck in chuck_list if chuck in chuck_list]
+    [keepers.remove(chuck) for chuck in chuck_list if chuck in keepers]
     return arr[keepers]
     
 
@@ -334,7 +347,7 @@ def peak_attribs_image(image, peak_width=None, target_locations=None, medfilt_ra
 
     for recursed_peak_array in target_locations:
         peak_width = recursed_peak_array[0][3]
-        r=np.ceil(peak_width/2)+2
+        r=np.ceil(peak_width/2)
         roi=np.zeros((r*2,r*2))
         mask = draw_mask((r*2,r*2), r, [(r,r)])
         for loc in xrange(recursed_peak_array.shape[0]):
@@ -357,7 +370,7 @@ def peak_attribs_image(image, peak_width=None, target_locations=None, medfilt_ra
             y = np.array(np.arange(peak_top, peak_bottom),dtype=np.integer)
             xv,yv = np.meshgrid(x,y)
             roi[:,:] = image[yv.clip(0,image.shape[0]-1),
-                             xv.clip(0,image.shape[1]-1) ] * mask
+                             xv.clip(0,image.shape[1]-1)] * mask
             #roi[0:,:]=image[bymin:bymax,bxmin:bxmax]
             # skip frames with significant dead pixels (corners of
             #    rotated images, perhaps
@@ -369,13 +382,46 @@ def peak_attribs_image(image, peak_width=None, target_locations=None, medfilt_ra
             # x, y, height, long_axis, short_axis, orientation, eccentricity, skew_x, skew_y
             rlt[rlt_offset] = get_characteristics(ms)
         
-            dummy, amp, x, y, width_x, width_y, rot = gaussfit(roi)
+            # order for these is:
+            # amp, xShift, yShift, xWidth, height, yWidth, Rotation
+            #  WTF???  Why is this different from return order!?
+            # I'm a control freak...
+            limit_min = [True, True, True, True, True, True, True]
+            limit_max = [True, True, True, True, True, True, True]
+            
+            # 30 pixels seems like a hell of a lot for a peak...
+            max_width=30
+            max_height = 1.2*np.max(roi)
+            ctr = np.array(roi.shape)/2
+            min_height = np.mean(image)/1.5
+            
+            x = rlt[rlt_offset][0]
+            y = rlt[rlt_offset][1]
+            amp = image[peak_top+y,peak_left+x]
+            long_axis = rlt[rlt_offset][3]
+            short_axis = rlt[rlt_offset][4] 
+            orientation = rlt[rlt_offset][5]
+            height = 0
+            params = [amp, x, y, long_axis, height, short_axis, orientation]
+            
+            minpars = [min_height, x-2, y-2, 0, 0, 0, 0]
+            maxpars = [max_height, x+2, y+2, max_width, 0, max_width, 360]
+            
+            # TODO: could use existing moments or parameters to speed up...
+            
+            amp, fit_x, fit_y, width_x, height, width_y, rot = gaussfit(roi,
+                                        limitedmin=limit_min, 
+                                        limitedmax=limit_max,
+                                        maxpars=maxpars,
+                                        minpars=minpars,
+                                        params=params
+                                        )
             # x and y are the locations within the ROI.  Add the coordinates of 
             #    the top-left corner of our ROI on the global image.
-            rlt[rlt_offset,:2] = (np.array([peak_top,peak_left]) + np.array([x,y]))
+            rlt[rlt_offset,:2] = (np.array([peak_top,peak_left]) + np.array([fit_y,fit_x]))
             #rlt[loc,:2] = np.array([y,x])
             # insert the height
-            rlt[rlt_offset,2]=amp
+            rlt[rlt_offset,2]=amp+height
             # TODO: compare this with OpenCV moment calculation above:
             #  (this is using the gaussfitter value)
             rlt[rlt_offset,5]=rot
@@ -389,7 +435,20 @@ def peak_attribs_image(image, peak_width=None, target_locations=None, medfilt_ra
     # kill outliers based on height
     rlt=rlt[np.logical_and(s<10, rlt[:,2]<image.max()*1.3)]
     # kill peaks that are too close to other peaks
-    rlt = kill_duplicates(rlt)
+    # the minimum width is 1.5 times the smallest peak width.
+    min_width = 1.5*target_locations[-1][0][3]
+    #rlt = kill_duplicates(rlt,min_width)
+    return rlt
+
+def flatten_peak_list(peak_list):
+    total_peaks=0
+    peak_offset=0
+    for arr in peak_list:
+        total_peaks+=arr.shape[0]
+    rlt=np.zeros((total_peaks,4))
+    for arr in peak_list:
+        rlt[peak_offset:peak_offset+arr.shape[0]]=arr
+        peak_offset+=arr.shape[0]
     return rlt
 
 def stack_coords(stack, peak_width, maxpeakn=5000):
