@@ -11,13 +11,16 @@ Redistribution and use in source and binary forms, with or without modification,
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
-from traits.api import HasTraits, Bool, Instance, String
+#from traits.api import HasTraits, Bool, Instance, String
+from atom.api import Atom, Unicode, Bool, Instance
 
 from MappableImage import MappableImageController
 from Cell import CellController
 from CellCrop import CellCropController
 from MDA_view import MDAViewController
 from MDA_execute import MDAExecutionController
+
+import tables as tb
 
 from analyzarr.lib.io import file_import
 from analyzarr.testing.test_pattern import get_test_pattern
@@ -32,22 +35,23 @@ with enaml.imports():
     from analyzarr.ui.ucc import CellCropperInterface
     from analyzarr.ui.MDA_popup import MDAInterface
 from enaml.application import Application
-from enaml.stdlib.sessions import simple_session
+
 
 import os
  
 # the UI controller
-class HighSeasAdventure(HasTraits):
+class HighSeasAdventure(Atom):
     has_chest = Bool(False)
     show_image_view = Bool(False)
     show_cell_view = Bool(False)
     show_score_view = Bool(False)
     show_factor_view = Bool(False)
-    title = String("")
+    title = Unicode("")
 
     image_controller = Instance(MappableImageController)
     cell_controller = Instance(CellController)
     mda_controller = Instance(MDAViewController)
+    chest = Instance(tb.File)
     
     def __init__(self, *args, **kw):
         super(HighSeasAdventure, self).__init__(*args, **kw)

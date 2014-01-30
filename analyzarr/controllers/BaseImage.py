@@ -9,10 +9,13 @@ from save_plot import SaveFileController
 import enaml
 with enaml.imports():
     from analyzarr.ui.save_plot import SavePlotDialog
+
 from enaml.application import Application
-from enaml.stdlib.sessions import simple_session
+from matplotlib.figure import Figure, Axes
 
 class BaseImageController(ControllerBase):
+    figure = Instance(Figure)
+    ax = Instance (Axes)
     plot = Instance(BasePlotContainer)
     plotdata = Instance(ArrayPlotData)
     
@@ -20,10 +23,13 @@ class BaseImageController(ControllerBase):
         super(BaseImageController, self).__init__(parent, treasure_chest, data_path,
                                               *args, **kw)
         self.plotdata = ArrayPlotData()
+        self.figure=Figure()
         self._can_save = True
         self._can_change_idx = True
 
     def init_plot(self):
+        self.ax=self.figure.add_subplot(1,1,1)
+        self.ax.imshow(self.get_active_image())
         self.plotdata.set_data('imagedata', self.get_active_image())
         self.plot = self.get_simple_image_plot(array_plot_data = self.plotdata,
                 title = self.get_active_name()
@@ -33,7 +39,7 @@ class BaseImageController(ControllerBase):
         # reinitialize data
         self.__init__(parent = self.parent, treasure_chest=self.chest,
                       data_path=self.data_path)
-
+    
     # this is a 2D image for plotting purposes
     def get_active_image(self):
         nodes = self.chest.listNodes('/rawdata')
@@ -63,6 +69,8 @@ class BaseImageController(ControllerBase):
     def update_image(self):
         if self.chest is None or self.numfiles<1:
             return
+        
+        self.ax.imshow(self.get_active_image())
         # get the old image for the sake of comparing image sizes
         old_data = self.plotdata.get_data('imagedata')
         active_image = self.get_active_image()

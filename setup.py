@@ -29,7 +29,7 @@ import analyzarr.Release as Release
 if os.path.exists('build'):
     distutils.dir_util.remove_tree('build')
 
-install_req = ['scipy', 'numpy', 'traits', 'chaco>=4.3', 'enaml==0.6.8',
+install_req = ['scipy', 'numpy', 'traits', 'chaco>=4.3', 'enaml>=0.8',
                'cython', 'scikit_learn', 'tables>=3.0']
 
 numpy_include_dir = np.get_include()

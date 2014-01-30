@@ -1,6 +1,6 @@
 from enaml.layout.api import vbox, hbox, vertical, horizontal
 from enaml.widgets.api import (
-    Container, PushButton, EnableCanvas, CheckBox, FileDialog,
+    Container, PushButton, CheckBox, FileDialog,
     Label, ComboBox, Field, GroupBox, Window
 )
 
