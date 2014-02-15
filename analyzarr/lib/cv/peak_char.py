@@ -20,8 +20,6 @@ from gaussfitter import gaussfit
 import numpy.ma as ma
 #from fit_gaussian import fitgaussian
 
-from pyface.api import ProgressDialog
-
 def get_characteristics(moments):
     try:
         import cv
@@ -40,6 +38,9 @@ def get_characteristics(moments):
     mu20 = cv.GetCentralMoment(moments,2,0)
     mu03 = cv.GetCentralMoment(moments,0,3)
     mu30 = cv.GetCentralMoment(moments,3,0) 
+    
+    if mu00 == 0:
+        return np.array([0, 0, 0, 0, 0, 0, 0, 0, 0])
     
     xxVar = mu20/mu00
     yyVar = mu02/mu00
@@ -64,6 +65,13 @@ def get_characteristics(moments):
     ySkew = mu03 / (mu00 * (yyVar**(3.0/2)))
     # 0 is a placeholder for the height.
     return np.array([xCenter, yCenter, 0, long_axis, short_axis, orientation, eccentricity, xSkew, ySkew])
+
+def gaussian(height, center_x, center_y, width_x, width_y):
+    """Returns a gaussian function with the given parameters"""
+    width_x = float(width_x)
+    width_y = float(width_y)
+    return lambda x,y: height*np.exp(
+                -(((center_x-x)/width_x)**2+((center_y-y)/width_y)**2)/2)
 
 def estimate_peak_width(image, window_size=64, window_center=None, medfilt=5, max_peak_width=100):
     from scipy.ndimage import gaussian_filter
@@ -157,7 +165,7 @@ def estimate_peak_width(image, window_size=64, window_center=None, medfilt=5, ma
 # code from
 # http://stackoverflow.com/questions/8647024/how-to-apply-a-disc-shaped-mask-to-a-numpy-array
 def draw_mask(array_size, radius, target_locations):
-    array = np.zeros(array_size)
+    array = np.zeros((int(array_size[0]),int(array_size[1])))
     for loc in target_locations:
         ay, ax = array_size[0], array_size[1]
         ty, tx = loc[0], loc[1]
@@ -167,84 +175,75 @@ def draw_mask(array_size, radius, target_locations):
     return array
 
 
-# Code tweaked from the example by Alejandro at:
-# http://stackoverflow.com/questions/16842823/peak-detection-in-a-noisy-2d-array
-# main tweak is the pre-allocation of the results, which should speed 
-#    things up quite a lot for large numbers of peaks.
-def two_dim_findpeaks(image, peak_width=None, sigma=None, alpha=2, 
-                      medfilt_radius=3, max_peak_number=50000, coords_list=[],
-                      recursion_level=0, max_peak_width=100):
-    """
+def two_dim_findpeaks(image, peak_width=None, medfilt_radius=3, max_peak_width=100):
+        """
+        Takes an image and detect the peaks using the local maximum filter.
+        Returns a boolean mask of the peaks (i.e. 1 when
+        the pixel's value is the neighborhood maximum, 0 otherwise)
+        
+        Code by Ivan:
+        http://stackoverflow.com/questions/3684484/peak-detection-in-a-2d-array
+        
+        Returns a 2D numpy array with one row per peak, two columns (X index first)
+        """
+        
+        from scipy.ndimage.filters import maximum_filter
+        from scipy.ndimage.morphology import generate_binary_structure, binary_erosion, \
+             iterate_structure
+        
+        from analyzarr.lib.cv.cv_funcs import xcorr
+
+        if medfilt_radius is not None:
+            image = medfilt(image, medfilt_radius)
+
+        if peak_width is None:
+            peak_width=estimate_peak_width(image,medfilt=medfilt_radius, 
+                                           max_peak_width=max_peak_width)
+            
+        # the normal gaussian
+        xg, yg = np.mgrid[0:peak_width, 0:peak_width]
+        templateImage = gaussian(255, (peak_width/2)+1, (peak_width/2)+1, (peak_width/4)+1, 
+                        peak_width/4+1)(xg, yg)
+            
+        cleaned_image = xcorr(templateImage, image)
+        #medfilt(image, medfilt_radius)
+        #peak_width=estimate_peak_width(cleaned_image,medfilt=None, 
+        #                               max_peak_width=max_peak_width)        
+            
+        # define an 8-connected neighborhood
+        neighborhood = generate_binary_structure(2,1)
+        neighborhood = iterate_structure(neighborhood, int(peak_width/4))
     
-    """
-    from copy import deepcopy    
-    # do a 2D median filter
-    if medfilt_radius > 0:
-        image = medfilt(image,medfilt_radius)    
-    if peak_width is None:
-        peak_width = estimate_peak_width(image,max_peak_width=max_peak_width)
-        # break recursion if peak width estimation fails
-        if peak_width == 0:
-            print "peak width estimated as 0.  Skipping iteration."
-            return
-        print "Estimated peak width as %d pixels"%peak_width
-    # draw a circular mask to be used around peaks
-    coords = np.zeros((max_peak_number,2))
-    image_temp = deepcopy(image)
-    peak_ct=0
-    # plus 3 is to black out a slightly larger area than the measured 
-    #   size of the peak so that we don't get edges of peaks turning into 
-    #   false peaks.
-    #size=peak_width/2+3
-    size=peak_width/2
-    mask = draw_mask((size*2,size*2), size, [(size,size)])
-    # invert the mask to chuck the peak, not the surrounding area.
-    mask = mask==0
-    if sigma is None:
-        # peaks are some number of standard deviations from mean
-        sigma=np.std(image_temp)
-        # peaks are some set fraction of the max peak height
-        #sigma = np.min(image)+0.2*(np.max(image)-np.min(image))
-    while True:
-        k = np.argmax(image_temp)
-        j,i = np.unravel_index(k, image_temp.shape)
-        if(image_temp[j,i] >= alpha*sigma):
-            # store the coordinate
-            coords[peak_ct]=[i,j]
-            # set the neighborhood of the peak to zero so we go look elsewhere
-            #  for other peaks
-            x = np.arange(i-size, i+size)
-            y = np.arange(j-size, j+size)
-            xv,yv = np.meshgrid(x,y)
-            image_temp[yv.clip(0,image_temp.shape[0]-1),
-                                   xv.clip(0,image_temp.shape[1]-1) ] *= mask
-            peak_ct+=1
-        else:
-            break
+        #apply the local maximum filter; all pixel of maximal value 
+        #in their neighborhood are set to 1
+        local_max = maximum_filter(cleaned_image, footprint=neighborhood)==cleaned_image
+        #local_max = maximum_filter(image, size=(peak_width,peak_width))==image
+        #local_max is a mask that contains the peaks we are 
+        #looking for, but also the background.
+        #In order to isolate the peaks we must remove the background from the mask.
     
-    coords = coords[:peak_ct]
-    # add in the heights and peak width
-    heights=np.array([[image[coords[i,1],coords[i,0]],peak_width] for i in xrange(coords.shape[0])]).reshape((-1,2))
-    sigma = np.std(heights[:,0])
-    mean = np.mean(heights[:,0])
-    # filter out junk peaks - anything beyond 5 sigma.
-    heights[:,0] = ma.masked_outside(heights[:,0], mean-(5*sigma), mean+(5*sigma))
-    coords=np.hstack((coords,heights))
-    coords=ma.compress_rows(coords)
-    sigma=np.std(image_temp)
-    # smaller fudge factor makes it more sensitive to junk.
-    fudge_factor=1.5
-    coords_list.append(coords)
-    print "Iteration %d done.  %d peaks found." %(recursion_level,coords.shape[0])
-    if image_temp.max()>sigma*alpha*fudge_factor:
-        print "Recursing..."
-        # we'll determine another peak width in this recursion, because less bright peaks might also be smaller.
-        two_dim_findpeaks(image_temp,alpha=alpha*fudge_factor, 
-                          recursion_level=recursion_level+1, 
-                          max_peak_width=peak_width,
-                          coords_list=coords_list)
-    return coords_list
+        #we create the mask of the background
+        background = (cleaned_image==0)
     
+        #a little technicality: we must erode the background in order to 
+        #successfully subtract it form local_max, otherwise a line will 
+        #appear along the background border (artifact of the local maximum filter)
+        eroded_background = binary_erosion(background, structure=neighborhood, border_value=1)
+    
+        #we obtain the final mask, containing only peaks, 
+        #by removing the background from the local_max mask
+        detected_peaks = local_max - eroded_background
+        
+        # convert the mask to indices:
+        detected_peaks = detected_peaks.nonzero()
+        
+        # format the two arrays into one
+        detected_peaks = np.vstack((detected_peaks[1],detected_peaks[0])).T
+        
+        detected_peaks=kill_duplicates(detected_peaks)
+        detected_peaks=kill_edges(image, detected_peaks, peak_width/2)
+    
+        return detected_peaks+peak_width/2
 
 def kill_duplicates(arr, minimum_distance=10):
     """
@@ -266,17 +265,27 @@ def kill_duplicates(arr, minimum_distance=10):
     
     for match in match_list:
         # compile the heights from the table
-        heights=arr[match][:,2]
-        best=np.argmax(heights)
-        match.remove(match[best])
+        #heights=arr[match][:,2]
+        #best=np.argmax(heights)
+        match.remove(match[0])
         chuck_list += match
         
     keepers = range(arr.shape[0])
     [keepers.remove(chuck) for chuck in chuck_list if chuck in keepers]
     return arr[keepers]
     
+def kill_edges(image, peaks, peak_width):
+    upper_bound_width=image.shape[0]-peak_width
+    upper_bound_height=image.shape[1]-peak_width
+    lower_bound=peak_width
+    mask = np.ma.greater(peaks,lower_bound)
+    masked_peaks=np.ma.masked_where(peaks<lower_bound,peaks)
+    masked_peaks[:,0]=np.ma.masked_where(masked_peaks[:,0]>upper_bound_width,masked_peaks[:,0])
+    masked_peaks[:,1]=np.ma.masked_where(masked_peaks[:,1]>upper_bound_height,masked_peaks[:,1])
+    return np.ma.compress_rows(masked_peaks)
 
-def peak_attribs_image(image, peak_width=None, target_locations=None, medfilt_radius=5):
+def peak_attribs_image(image, peak_width=None, target_locations=None, medfilt_radius=3,
+                       progress_object=None):
     """
     Characterizes the peaks in an image.
 
@@ -323,111 +332,105 @@ def peak_attribs_image(image, peak_width=None, target_locations=None, medfilt_ra
             print 'Module %s:' % sys.modules[__name__]
             print 'OpenCV is not available, the peak characterization functions will not work.'
             return None
-    if medfilt_radius:
-        image=medfilt(image,medfilt_radius)
     if target_locations is None:
         # target locations should be a list of arrays.  Each element in the 
         #    list corresponds to a recursion level in peak finding.  The peak 
         #    width can change with each recursion.
-        target_locations=two_dim_findpeaks(image, peak_width=peak_width, medfilt_radius=5,coords_list=[])
+        target_locations=two_dim_findpeaks(image, peak_width=peak_width, medfilt_radius=medfilt_radius)
     imsize=image.shape[0]
     
-    total_peaks = np.array([arr.shape[0] for arr in target_locations]).sum()
+    total_peaks = target_locations.shape[0]
     rlt=np.zeros((total_peaks,9))
     
-    # TODO: this should be abstracted to use whatever graphical 
-    #       or command-line environment we're in.
-    progress = ProgressDialog(title="Peak characterization progress", 
-                              message="Characterizing %d peaks on current image"%total_peaks, 
-                              max=int(total_peaks), show_time=True, can_cancel=False)
-    progress.open()
+    if progress_object is not None:
+        progress_object.initialize("Characterizing peaks", total_peaks)
     
     rlt_offset=0
-    progress_ctr=0
+    
+    if peak_width is None:
+        peak_width=estimate_peak_width(image)
 
-    for recursed_peak_array in target_locations:
-        peak_width = recursed_peak_array[0][3]
-        r=np.ceil(peak_width/2)
-        roi=np.zeros((r*2,r*2))
-        mask = draw_mask((r*2,r*2), r, [(r,r)])
-        for loc in xrange(recursed_peak_array.shape[0]):
-            c=recursed_peak_array[loc]
-            peak_left=c[0]-r
-            peak_top=c[1]-r
-            peak_right=c[0]+r
-            peak_bottom=c[1]+r
-            #if bxmin<0: bxmin=0; bxmax=peak_width
-            #if bymin<0: bymin=0; bymax=peak_width
-            #if bxmax>imsize: bxmax=imsize; bxmin=imsize-peak_width
-            #if bymax>imsize: bymax=imsize; bymin=imsize-peak_width            
-            # skip peaks that are too close to edges.
-            if (peak_right)>image.shape[1]+r/4 or (peak_bottom)>image.shape[0]+r/4:
-                progress_ctr+=1
-                continue
-            # set the neighborhood of the peak to zero so we go look elsewhere
-                        #  for other peaks            
-            x = np.array(np.arange(peak_left, peak_right),dtype=np.integer)
-            y = np.array(np.arange(peak_top, peak_bottom),dtype=np.integer)
-            xv,yv = np.meshgrid(x,y)
-            roi[:,:] = image[yv.clip(0,image.shape[0]-1),
-                             xv.clip(0,image.shape[1]-1)] * mask
-            #roi[0:,:]=image[bymin:bymax,bxmin:bxmax]
-            # skip frames with significant dead pixels (corners of
-            #    rotated images, perhaps
-            #if np.average(roi)< 0.5*np.average(image):
-            #rlt[loc,:2] = (c[1], c[0])
-            #continue
-            ms=cv.Moments(cv.fromarray(roi))
-            # output from get_characteristics is:
-            # x, y, height, long_axis, short_axis, orientation, eccentricity, skew_x, skew_y
-            rlt[rlt_offset] = get_characteristics(ms)
+    r=int(np.ceil(peak_width/2))
+    roi=np.zeros((r*2,r*2))
+    mask = draw_mask((r*2,r*2), r, [(r,r)])
+    for c in target_locations:
+        peak_left=int(c[0]-r)
+        peak_top=int(c[1]-r)
+        peak_right=int(c[0]+r)
+        peak_bottom=int(c[1]+r)
+        #if bxmin<0: bxmin=0; bxmax=peak_width
+        #if bymin<0: bymin=0; bymax=peak_width
+        #if bxmax>imsize: bxmax=imsize; bxmin=imsize-peak_width
+        #if bymax>imsize: bymax=imsize; bymin=imsize-peak_width            
+        # skip peaks that are too close to edges.
+        if (peak_right)>image.shape[1]+r/4 or (peak_bottom)>image.shape[0]+r/4:
+            if progress_object is not None:
+                progress_object.increment()
+            continue
+        # set the neighborhood of the peak to zero so we go look elsewhere
+                    #  for other peaks            
+        x = np.array(np.arange(peak_left, peak_right),dtype=np.integer)
+        y = np.array(np.arange(peak_top, peak_bottom),dtype=np.integer)
+        xv,yv = np.meshgrid(x,y)
+        roi[:,:] = image[yv.clip(0,image.shape[0]-1),
+                         xv.clip(0,image.shape[1]-1)] * mask
+        #roi[0:,:]=image[bymin:bymax,bxmin:bxmax]
+        # skip frames with significant dead pixels (corners of
+        #    rotated images, perhaps
+        #if np.average(roi)< 0.5*np.average(image):
+        #rlt[loc,:2] = (c[1], c[0])
+        #continue
+        ms=cv.Moments(cv.fromarray(roi))
+        # output from get_characteristics is:
+        # x, y, height, long_axis, short_axis, orientation, eccentricity, skew_x, skew_y
+        rlt[rlt_offset] = get_characteristics(ms)
         
-            # order for these is:
-            # amp, xShift, yShift, xWidth, height, yWidth, Rotation
-            #  WTF???  Why is this different from return order!?
-            # I'm a control freak...
-            limit_min = [True, True, True, True, True, True, True]
-            limit_max = [True, True, True, True, True, True, True]
-            
-            # 30 pixels seems like a hell of a lot for a peak...
-            max_width=30
-            max_height = 1.2*np.max(roi)
-            ctr = np.array(roi.shape)/2
-            min_height = np.mean(image)/1.5
-            
-            x = rlt[rlt_offset][0]
-            y = rlt[rlt_offset][1]
-            amp = image[peak_top+y,peak_left+x]
-            long_axis = rlt[rlt_offset][3]
-            short_axis = rlt[rlt_offset][4] 
-            orientation = rlt[rlt_offset][5]
-            height = 0
-            params = [amp, x, y, long_axis, height, short_axis, orientation]
-            
-            minpars = [min_height, x-2, y-2, 0, 0, 0, 0]
-            maxpars = [max_height, x+2, y+2, max_width, 0, max_width, 360]
-            
-            # TODO: could use existing moments or parameters to speed up...
-            
-            amp, fit_x, fit_y, width_x, height, width_y, rot = gaussfit(roi,
-                                        limitedmin=limit_min, 
-                                        limitedmax=limit_max,
-                                        maxpars=maxpars,
-                                        minpars=minpars,
-                                        params=params
-                                        )
-            # x and y are the locations within the ROI.  Add the coordinates of 
-            #    the top-left corner of our ROI on the global image.
-            rlt[rlt_offset,:2] = (np.array([peak_top,peak_left]) + np.array([fit_y,fit_x]))
-            #rlt[loc,:2] = np.array([y,x])
-            # insert the height
-            rlt[rlt_offset,2]=amp+height
-            # TODO: compare this with OpenCV moment calculation above:
-            #  (this is using the gaussfitter value)
-            rlt[rlt_offset,5]=rot
-            rlt_offset+=1
-            progress_ctr+=1
-            progress.update(int(progress_ctr))
+        # order for these is:
+        # amp, xShift, yShift, xWidth, height, yWidth, Rotation
+        #  WTF???  Why is this different from return order!?
+        # I'm a control freak...
+        limit_min = [True, True, True, True, True, True, True]
+        limit_max = [True, True, True, True, True, True, True]
+        
+        # 30 pixels seems like a hell of a lot for a peak...
+        max_width=30
+        max_height = 1.2*np.max(roi)
+        ctr = np.array(roi.shape)/2
+        min_height = np.mean(image)/1.5
+        
+        x = rlt[rlt_offset][0]
+        y = rlt[rlt_offset][1]
+        amp = image[int(peak_top+y),int(peak_left+x)]
+        long_axis = rlt[rlt_offset][3]
+        short_axis = rlt[rlt_offset][4] 
+        orientation = rlt[rlt_offset][5]
+        height = 0
+        params = [amp, x, y, long_axis, height, short_axis, orientation]
+        
+        minpars = [min_height, x-2, y-2, 0, 0, 0, 0]
+        maxpars = [max_height, x+2, y+2, max_width, 0, max_width, 360]
+        
+        # TODO: could use existing moments or parameters to speed up...
+        
+        amp, fit_x, fit_y, width_x, height, width_y, rot = gaussfit(roi,
+                                    limitedmin=limit_min, 
+                                    limitedmax=limit_max,
+                                    maxpars=maxpars,
+                                    minpars=minpars,
+                                    params=params
+                                    )
+        # x and y are the locations within the ROI.  Add the coordinates of 
+        #    the top-left corner of our ROI on the global image.
+        rlt[rlt_offset,:2] = (np.array([peak_top,peak_left]) + np.array([fit_y,fit_x]))
+        #rlt[loc,:2] = np.array([y,x])
+        # insert the height
+        rlt[rlt_offset,2]=amp+height
+        # TODO: compare this with OpenCV moment calculation above:
+        #  (this is using the gaussfitter value)
+        rlt[rlt_offset,5]=rot
+        rlt_offset+=1
+        if progress_object is not None:
+            progress_object.increment()
     # chuck outliers based on median of height
     d = np.abs(rlt[:,2] - np.median(rlt[:,2]))
     mdev = np.median(d)
@@ -436,7 +439,7 @@ def peak_attribs_image(image, peak_width=None, target_locations=None, medfilt_ra
     rlt=rlt[np.logical_and(s<10, rlt[:,2]<image.max()*1.3)]
     # kill peaks that are too close to other peaks
     # the minimum width is 1.5 times the smallest peak width.
-    min_width = 1.5*target_locations[-1][0][3]
+    #min_width = 1.5*target_locations[-1][0][3]
     #rlt = kill_duplicates(rlt,min_width)
     return rlt
 
