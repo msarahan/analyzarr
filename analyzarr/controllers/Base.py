@@ -16,7 +16,7 @@ class ControllerBase(HasRenderer):
         self.parent = parent
         if treasure_chest is not None:
             self.chest = treasure_chest
-            self.nodes = self.chest.listNodes(data_path)
+            self.nodes = self.chest.list_nodes(data_path)
 
     def get_plot(self, plot_id):
         if hasattr(self, plot_id):

@@ -36,7 +36,7 @@ class BaseImageController(ControllerBase):
 
     # this is a 2D image for plotting purposes
     def get_active_image(self):
-        nodes = self.chest.listNodes('/rawdata')
+        nodes = self.chest.list_nodes('/rawdata')
         if len(nodes) > 0:
             return nodes[self.selected_index][:]
 
@@ -45,7 +45,7 @@ class BaseImageController(ControllerBase):
         # TODO: this isn't rational for non-3D data yet.
         if names is None:
             # query the raw data table for filenames
-            nodes = self.chest.listNodes('/' + self.active_data_source)
+            nodes = self.chest.list_nodes('/' + self.active_data_source)
             data = nodes[0][:]
             # collect all the cells
             for node in nodes[1:]:
@@ -56,7 +56,7 @@ class BaseImageController(ControllerBase):
         return data
 
     def get_active_name(self):
-        nodes = self.chest.listNodes('/rawdata')
+        nodes = self.chest.list_nodes('/rawdata')
         return nodes[self.selected_index].name
     
     @on_trait_change("selected_index")

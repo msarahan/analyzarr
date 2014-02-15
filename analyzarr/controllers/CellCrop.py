@@ -222,10 +222,7 @@ class CellCropController(BaseImageController):
             CC = cv_funcs.xcorr(self.template_data.get_data("imagedata"),
                                     self.get_active_image())
             # 
-            pks=pc.two_dim_findpeaks((CC-CC.min())*255, medfilt_radius=None, alpha=1,
-                                     coords_list=[],
-                                     )
-            pks=pc.flatten_peak_list(pks)
+            pks=pc.two_dim_findpeaks((CC-CC.min())*255, medfilt_radius=None)
             pks[:,2]=pks[:,2]/255+CC.min()
             peaks[self.get_active_name()]=pks
         self.peaks=peaks
@@ -239,17 +236,17 @@ class CellCropController(BaseImageController):
         rows = self.chest.root.cell_description.nrows
         if rows > 0:
             # remove the table
-            self.chest.removeNode('/cell_description')
+            self.chest.remove_node('/cell_description')
             try:
                 # remove the table of peak characteristics - they are not valid.
-                self.chest.removeNode('/cell_peaks')
+                self.chest.remove_node('/cell_peaks')
             except:
                 pass
             # recreate it
-            self.chest.createTable('/', 'cell_description', CellsTable)
+            self.chest.create_table('/', 'cell_description', CellsTable)
             # remove all existing entries in the data group
-            for node in self.chest.listNodes('/cells'):
-                self.chest.removeNode('/cells/' + node.name)
+            for node in self.chest.list_nodes('/cells'):
+                self.chest.remove_node('/cells/' + node.name)
         # store the template
         template_data = self.template_data.get_data('imagedata')
         self.parent.add_cell_data(template_data, name="template")

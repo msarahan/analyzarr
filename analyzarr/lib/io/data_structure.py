@@ -93,18 +93,18 @@ class SpectrumDataTable(tables.IsDescription):
 
 def get_image_h5file(filename):
     # split off any extension in the filename - we add our own.
-    h5file = tables.openFile('%s.chest' % filename, 'w')
+    h5file = tables.open_file('%s.chest' % filename, 'w')
 
     # data outline keeps records of what data are available - the linkage
     # between which cells came from which images, locations, etc.
-    h5file.createTable('/', 'image_description', ImageDataTable)
+    h5file.create_table('/', 'image_description', ImageDataTable)
     
-    h5file.createTable('/', 'image_peaks', ImagePeakTable)
+    h5file.create_table('/', 'image_peaks', ImagePeakTable)
 
-    h5file.createTable('/', 'cell_description', CellsTable)
+    h5file.create_table('/', 'cell_description', CellsTable)
 
-    h5file.createTable('/', 'mda_description', MdaResultsTable)
-    #cell_peak_table = h5file.createTable('/', 'cell_peaks',
+    h5file.create_table('/', 'mda_description', MdaResultsTable)
+    #cell_peak_table = h5file.create_table('/', 'cell_peaks',
     #                                     CellsTable)
     # image group has data files as CArrays.  There is one array for each file,
     # accessed by the filename.
@@ -142,7 +142,7 @@ def get_image_h5file(filename):
     #  1. time, as a time64col - which is seconds from the epoch.
     #  2. action - a very brief text description
     #  3. parameters - a variable length string.  Ideally, this should be parsable?
-    data_outline = h5file.createTable('/', 'log', LogTable)
+    data_outline = h5file.create_table('/', 'log', LogTable)
 
     h5file.flush()
 
@@ -151,8 +151,8 @@ def get_image_h5file(filename):
 
 def get_spectrum_h5file(filename):
     # split off any extension in the filename - we add our own.
-    h5file = tables.openFile('%s.chest'%filename,'w')
-    data_outline = h5file.createTable('/', 'image_description', 
+    h5file = tables.open_file('%s.chest'%filename,'w')
+    data_outline = h5file.create_table('/', 'image_description', 
                                      SpectrumDataTable)
     imgGroup = h5file.createGroup('/', 'rawdata')
     # image MDA results group

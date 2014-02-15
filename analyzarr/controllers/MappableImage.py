@@ -52,7 +52,7 @@ class MappableImageController(BaseImageController):
     
     def get_peak_id_list(self):
         try:
-            numpeaks = self.chest.getNodeAttr('/cell_peaks','number_of_peaks')
+            numpeaks = self.chest.get_node_attr('/cell_peaks','number_of_peaks')
             peak_ids = ['all']+[str(idx) for idx in range(numpeaks)]
             return peak_ids
         except (ValueError, t.NoSuchNodeError):
@@ -69,13 +69,13 @@ class MappableImageController(BaseImageController):
         #    peaks as necessary for new images, or if peak_width changes.
         try:
             # wipe out old results
-            self.chest.removeNode('/image_peaks')
+            self.chest.remove_node('/image_peaks')
         except:
             # any errors will be because the table doesn't exist. That's OK.
             pass
-        self.chest.createTable('/', 'image_peaks', ImagePeakTable)
+        self.chest.create_table('/', 'image_peaks', ImagePeakTable)
         table = self.chest.root.image_peaks
-        nodes = self.chest.listNodes('/rawdata')
+        nodes = self.chest.list_nodes('/rawdata')
         progress = ProgressDialog(title="Image characterization progress", 
                                                   message="Characterizing peaks on %d images..."%len(nodes),
                                                   max=int(len(nodes)), show_time=True, can_cancel=False)
@@ -133,7 +133,7 @@ class MappableImageController(BaseImageController):
         try:
             # if the cell_peaks table exists, then we have mapped the global 
             #    peak descriptors to local cells and can use peak IDs.
-            self.chest.getNode('/','cell_peaks')
+            self.chest.get_node('/','cell_peaks')
             has_cell_peaks=True
         except (ValueError, t.NoSuchNodeError):
             pass
@@ -212,7 +212,7 @@ class MappableImageController(BaseImageController):
         return expression
 
     def get_expression_data(self, expression, table_loc):
-        target_table = self.chest.getNode(table_loc)
+        target_table = self.chest.get_node(table_loc)
         uv = target_table.colinstances
         # apply any shortcuts/macros
         expression = self.remap_distance_expressions(expression)

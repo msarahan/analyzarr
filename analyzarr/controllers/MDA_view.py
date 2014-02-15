@@ -35,14 +35,14 @@ class MDAViewController(BaseImageController):
         self.factor_plotdata = ArrayPlotData()
         self.score_plotdata = ArrayPlotData()
         if treasure_chest is not None:
-            self.numfiles = len(treasure_chest.listNodes(data_path))
+            self.numfiles = len(treasure_chest.list_nodes(data_path))
             self.chest = treasure_chest
             self.data_path = data_path
             # populate the list of available contexts (if any)
             if self.chest.root.mda_description.nrows>0:
                 self._contexts = self.chest.root.mda_description.col('context').tolist()
                 context = self.get_context_name()
-                self.dimensionality = self.chest.getNodeAttr('/mda_results/'+context, 
+                self.dimensionality = self.chest.get_node_attr('/mda_results/'+context, 
                                                              'dimensionality')
                 self.update_factor_image()
                 self.update_score_image()
@@ -50,7 +50,7 @@ class MDAViewController(BaseImageController):
     @on_trait_change('_context')
     def context_changed(self):
         context = self.get_context_name()
-        self.dimensionality = self.chest.getNodeAttr('/mda_results/'+context, 
+        self.dimensionality = self.chest.get_node_attr('/mda_results/'+context, 
                                                      'dimensionality')
         self.render_active_factor_image(context)
         self.render_active_score_image(context)
@@ -79,8 +79,8 @@ class MDAViewController(BaseImageController):
         return self._vectors[self._vector]
 
     def render_active_factor_image(self, context):
-        if self.chest.getNodeAttr('/mda_results/'+context, 'on_peaks'):
-            factors = self.chest.getNode('/mda_results/'+context+'/peak_factors')
+        if self.chest.get_node_attr('/mda_results/'+context, 'on_peaks'):
+            factors = self.chest.get_node('/mda_results/'+context+'/peak_factors')
             # return average cell image (will be overlaid with peak info)
             self.factor_plotdata.set_data('imagedata', 
                                           self.chest.root.cells.average[:])
@@ -132,7 +132,7 @@ class MDAViewController(BaseImageController):
                                                           tools=['colorbar'])
             self._can_map_peaks=True
         else:
-            factors = self.chest.getNode('/mda_results/'+context+'/image_factors')
+            factors = self.chest.get_node('/mda_results/'+context+'/image_factors')
             # return current factor image (MDA on images themselves)
             self.factor_plotdata.set_data('imagedata', 
                                           factors[self.component_index,:,:])
@@ -148,10 +148,10 @@ class MDAViewController(BaseImageController):
         indices = self.chest.root.cell_description.read_where(
                 'filename == "%s"' % self.get_active_name(),
                 field='x_coordinate',)
-        if self.chest.getNodeAttr('/mda_results/'+context, 'on_peaks'):
-            scores = self.chest.getNode('/mda_results/'+context+'/peak_scores')          
+        if self.chest.get_node_attr('/mda_results/'+context, 'on_peaks'):
+            scores = self.chest.get_node('/mda_results/'+context+'/peak_scores')          
         else:
-            scores = self.chest.getNode('/mda_results/'+context+'/image_scores')
+            scores = self.chest.get_node('/mda_results/'+context+'/image_scores')
         color = scores.read_where(
             'filename == "%s"' % self.get_active_name(),
             field='c%i' % self.component_index,

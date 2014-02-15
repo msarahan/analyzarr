@@ -42,7 +42,7 @@ class MDAExecutionController(HasTraits):
             self.data_path = data_path
             # do we have any peaks?
             try:
-                self.chest.getNode('/','cell_peaks')
+                self.chest.get_node('/','cell_peaks')
                 self.has_peaks = bool(self.chest.root.cell_peaks.nrows > 0)
             except:
                 pass
@@ -56,11 +56,11 @@ class MDAExecutionController(HasTraits):
         if target == 'peaks':
             self.on_peaks = True
             # dimensionality is the number of columns in our peak table
-            self.dimensionality = int(7*self.chest.getNodeAttr('/cell_peaks','number_of_peaks'))          
+            self.dimensionality = int(7*self.chest.get_node_attr('/cell_peaks','number_of_peaks'))          
         else:
             self.on_peaks = False
             # dimensionality is the size of each cell, flattened
-            cell_size = self.chest.getNodeAttr('/cell_description','template_size')
+            cell_size = self.chest.get_node_attr('/cell_description','template_size')
             self.dimensionality = int(cell_size**2)
     
     def execute(self):
@@ -120,7 +120,7 @@ class MDAExecutionController(HasTraits):
         else:
             chars = ['dx', 'dy', 'h', 'o', 'e', 'sx', 'sy']
             if len(indices) is 0:
-                indices = range(self.chest.getNodeAttr('/cell_peaks','number_of_peaks'))
+                indices = range(self.chest.get_node_attr('/cell_peaks','number_of_peaks'))
             # the columns we get are the combination of the chars with the
             #   indices we want.
             cols = [['%s%i' % (c, i) for c in chars] for i in indices]
@@ -174,13 +174,13 @@ class MDAExecutionController(HasTraits):
             # but we remove the file index and filename fields, they're irrelevant.
             factor_dtype = self.chest.root.cell_peaks.dtype.descr[2:]
             table_description = np.zeros((0,), dtype=factor_dtype)
-            fs = self.chest.createTable('/mda_results/'+self.context, 'peak_factors',
+            fs = self.chest.create_table('/mda_results/'+self.context, 'peak_factors',
                          description=table_description)
             self.chest.setNodeAttr('/mda_results/'+self.context, 'on_peaks', True)
             data = np.zeros((self.number_to_derive), dtype=factor_dtype)
             row = fs.row
             # record the factors
-            indices = range(self.chest.getNodeAttr('/cell_peaks','number_of_peaks'))
+            indices = range(self.chest.get_node_attr('/cell_peaks','number_of_peaks'))
             chars = ['dx', 'dy', 'h', 'o', 'e', 'sx', 'sy']
             # the columns we get are the combination of the chars with the
             #   indices we want.
@@ -220,7 +220,7 @@ class MDAExecutionController(HasTraits):
         # prepend the index column
         dtypes = [('filename', '|S30'), ('file_idx', 'i4')] + dtypes
         desc = np.recarray((0,), dtype=dtypes)        
-        ss = self.chest.createTable('/mda_results/'+self.context, score_table_title, 
+        ss = self.chest.create_table('/mda_results/'+self.context, score_table_title, 
                                     description=desc)
         # arrange data to populate the table
         if self.on_peaks:

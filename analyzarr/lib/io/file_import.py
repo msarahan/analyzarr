@@ -21,7 +21,7 @@ def new_treasure_chest(filename):
     return h5file
 
 def open_treasure_chest(filename):
-    h5file = tb.openFile(filename, 'a')
+    h5file = tb.open_file(filename, 'a')
     return h5file
 
 def import_files(h5file, file_string):

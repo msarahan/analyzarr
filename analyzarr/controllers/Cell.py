@@ -26,7 +26,7 @@ class CellController(BaseImageController):
                 *args, **kw)
         if self.chest is not None:
             try:
-                self.chest.getNode('/','cell_description')
+                self.chest.get_node('/','cell_description')
             except:
                 return            
             self.numfiles = int(self.chest.root.cell_description.nrows)
@@ -37,8 +37,8 @@ class CellController(BaseImageController):
                 self._can_change_idx = True
                 self.parent.show_cell_view=True
                 try:
-                    self.chest.getNode('/', 'cell_peaks')
-                    self.numpeaks = self.chest.getNodeAttr('/cell_peaks','number_of_peaks')
+                    self.chest.get_node('/', 'cell_peaks')
+                    self.numpeaks = self.chest.get_node_attr('/cell_peaks','number_of_peaks')
                     self._can_show_peak_ids = True
                 except:
                     # we haven't got any peaks to identify
@@ -51,7 +51,7 @@ class CellController(BaseImageController):
     @on_trait_change("selected_index, _show_peak_ids")
     def update_data_labels(self):
         try:
-            self.chest.getNode('/','cell_peaks')
+            self.chest.get_node('/','cell_peaks')
         except:
             print "No peak information to plot"
             return
@@ -105,7 +105,7 @@ class CellController(BaseImageController):
         # up the parent image and subsequently the local cell index (the
         # index among only the cells from that image)
         try:
-            self.chest.getNode('/','cell_description')
+            self.chest.get_node('/','cell_description')
         except:
             return       
         cell_record = self.chest.root.cell_description.read(
@@ -129,7 +129,7 @@ class CellController(BaseImageController):
         # up the parent image and subsequently the local cell index (the
         # index among only the cells from that image)
         try:
-            self.chest.getNode('/','cell_description')
+            self.chest.get_node('/','cell_description')
         except:
             return        
         cell_record = self.chest.root.cell_description.read(
@@ -175,7 +175,7 @@ class CellController(BaseImageController):
                              ),
                             dtype = self.chest.root.cells.template.dtype,
                             )
-            nodes = self.chest.listNodes('/cells')
+            nodes = self.chest.list_nodes('/cells')
             start_idx = 0
             end_idx=0
             tmp_size = self.chest.root.cells.template.shape[0]
@@ -250,7 +250,7 @@ class CellController(BaseImageController):
         #print 
         try:
             # wipe out old results
-            self.chest.removeNode('/cell_peaks')        
+            self.chest.remove_node('/cell_peaks')        
         except:
             # any errors will be because the table doesn't exist. That's OK.
             pass        
@@ -272,10 +272,10 @@ class CellController(BaseImageController):
         # create an empty recarray with our data type
         desc = np.recarray((0,), dtype=dtypes)
         # create the table using the empty description recarray
-        self.chest.createTable(self.chest.root,
+        self.chest.create_table(self.chest.root,
                                'cell_peaks', description=desc)        
         # for each file in the cell_data group, run analysis.
-        nodes = self.chest.listNodes('/cells')
+        nodes = self.chest.list_nodes('/cells')
         node_names = [node.name for node in nodes]
         progress = ProgressDialog(title="Peak characterization progress", 
                                   message="Characterizing peaks on %d images"%(len(node_names)-2),
@@ -304,7 +304,7 @@ class CellController(BaseImageController):
             self.chest.root.cell_peaks.append(data)
             self.chest.root.cell_peaks.flush()
             file_progress+=1
-            progress.update(file_progress)            
+            progress.update(file_progress)
         # add an attribute for the total number of peaks recorded
         self.chest.setNodeAttr('/cell_peaks','number_of_peaks', self.numpeaks)
         self.chest.root.cell_peaks.flush()
@@ -451,7 +451,7 @@ class CellController(BaseImageController):
         if len(chars) > 0:
             if len(indices) is 0:
                 # we want data for all the peaks in each cell
-                indices = range(self.chest.getNodeAttr('/cell_peaks','number_of_peaks'))
+                indices = range(self.chest.get_node_attr('/cell_peaks','number_of_peaks'))
             # the columns we get are the combination of the chars with the
             #   indices we want.
             cols = [['%s%i' % (c, i) for i in indices] for c in chars]
@@ -465,7 +465,7 @@ class CellController(BaseImageController):
         # make the cols a simple list, rather than a list of lists
         cols = [item for sublist in cols for item in sublist]
         # get the data from the table, omitting any excluded data
-        indices = self.chest.getNode('/cell_peaks').get_where_list(
+        indices = self.chest.get_node('/cell_peaks').get_where_list(
             '(omit==False)')
         peak_data = self.chest.root.cell_peaks[indices]
         # return an ndarray with only the selected columns
@@ -477,7 +477,7 @@ class CellController(BaseImageController):
         we add data back into the results table, we need to indicate in that
         table that we don't have data on those cells.
         """
-        indices = self.chest.getNode('/cell_peaks').get_where_list(
+        indices = self.chest.get_node('/cell_peaks').get_where_list(
                     '(omit==False)')        
         if len(indices)==0:
             return data
