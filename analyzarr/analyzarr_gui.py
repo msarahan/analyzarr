@@ -13,6 +13,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 def main():
     import enaml
+    from enaml.stdlib.sessions import simple_session
     from enaml.qt.qt_application import QtApplication
     with enaml.imports():
         from analyzarr.ui.main_view import Main
@@ -20,17 +21,14 @@ def main():
     
     controller = HighSeasAdventure()
     # For enaml 0.7
-    qtapp = QtApplication()
-    view=Main(controller=HighSeasAdventure())
-    view.show()
+    #qtapp = QtApplication()
+    #view=Main("Ahoy!")
     
     # for enaml 0.6
-    #from enaml.stdlib.sessions import simple_session
-    #qtapp = QtApplication([])
-    #main_ui = simple_session('main', 'The main UI window', Main, controller=controller)
-    #qtapp.add_factories([main_ui])
-    #qtapp.start_session('main')
-    
+    qtapp = QtApplication([])
+    main_ui = simple_session('main', 'The main UI window', Main, controller=controller)
+    qtapp.add_factories([main_ui])
+    qtapp.start_session('main')
     # version agnostic
     qtapp.start()
 

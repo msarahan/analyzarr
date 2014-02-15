@@ -23,11 +23,9 @@ Implementation Notes:
 from enaml.layout.api import vbox, hbox, vertical, horizontal
 from enaml.widgets.api import (
     MainWindow, ToolBar, DockPane, MenuBar, Menu, Action, ActionGroup,
-    Container, Html, PushButton, CheckBox, FileDialog,
-    Label, ComboBox, Field, GroupBox, ProgressBar, FlowArea, FlowItem,
+    Container, Html, PushButton, EnableCanvas, CheckBox, FileDialog,
+    Label, ComboBox, Field, GroupBox, ProgressBar, FlowArea, FlowItem
 )
-from enaml.widgets.api import MPLCanvas as Canvas
-#from enaml.widgets.api import EnableCanvas as Canvas
 
 from enaml.stdlib.fields import FloatField, IntField
 
@@ -420,9 +418,8 @@ enamldef CellViewDockPane(DockPane): celldockpane:
     attr controller
     Container:
         hug_width = 'medium'
-        Canvas: canvas:
-            figure << celldockpane.controller.figure
-            #component << celldockpane.controller.plot
+        EnableCanvas: canvas:
+            component << celldockpane.controller.plot
         CellPlotButtons: buttons:
             #:movable = False
             controller << celldockpane.controller
@@ -431,9 +428,8 @@ enamldef FactorViewDockPane(DockPane): factordockpane:
     attr controller
     Container:
         hug_width = 'medium'
-        Canvas: canvas:
-            figure << factordockpane.controller.figure            
-            #component << factordockpane.controller.factor_plot
+        EnableCanvas: canvas:
+            component << factordockpane.controller.factor_plot
         FactorPlotButtons: buttons:
             controller << factordockpane.controller
 
@@ -441,9 +437,8 @@ enamldef ScoreViewDockPane(DockPane): scoredockpane:
     attr controller
     Container:
         hug_width = 'medium'
-        Canvas: canvas:
-            figure << scoredockpane.controller.figure
-            #component << scoredockpane.controller.score_plot
+        EnableCanvas: canvas:
+            component << scoredockpane.controller.score_plot
         ScorePlotButtons: buttons:
             controller << scoredockpane.controller
 
@@ -451,9 +446,8 @@ enamldef ImageViewDockPane(DockPane): imagedockpane:
     attr controller
     Container:
         hug_width = 'medium'
-        Canvas: canvas:
-            figure << imagedockpane.controller.figure
-            #component << imagedockpane.controller.plot
+        EnableCanvas: canvas:
+            component << imagedockpane.controller.plot
             
         ImagePlotButtons: buttons:
             controller << imagedockpane.controller

@@ -1,12 +1,9 @@
 from enaml.layout.api import vbox, hbox
 from enaml.widgets.api import (
     Window, ToolBar, DockPane, MenuBar, Menu, Action, ActionGroup,
-    Container, Html, PushButton, CheckBox, FileDialog,
+    Container, Html, PushButton, EnableCanvas, CheckBox, FileDialog,
     SpinBox, Label
 )
-from enaml.widgets.api import MPLCanvas as Canvas
-#from enaml.widgets.api import EnableCanvas as Canvas
-
 from enaml.stdlib.fields import FloatField, IntField
 
 # TODO: need to import controller
@@ -23,9 +20,8 @@ enamldef CellCropperInterface(Window):
             constraints = [ vbox(imageCanvas, hbox(prev_img, next_img, showCC)),
                 next_img.width == prev_img.width,]
             #: the image (Chaco/Enable canvas)
-            Canvas: imageCanvas:
-                #component << controller.plot
-                figure << controller.figure
+            EnableCanvas: imageCanvas:
+                component << controller.plot
             #: the checkbox to show cross correlation view
             CheckBox: showCC:
                 text = "Show cross-correlation"
@@ -57,9 +53,8 @@ enamldef CellCropperInterface(Window):
                     crop.width == find_peaks.width,
                     ]
             hug_width = 'strong'
-            Canvas: templateCanvas:
-                #component << controller.template_plot
-                figure << controller.template_figure
+            EnableCanvas: templateCanvas:
+                component << controller.template_plot
             Label: l_left_coord:
                 text = "Left coordinate"
             SpinBox: left_coord:
