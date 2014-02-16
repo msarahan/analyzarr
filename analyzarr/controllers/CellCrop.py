@@ -197,8 +197,8 @@ class CellCropController(BaseImageController):
         aspect_ratio = (float(data.shape[1])/ 
                                   data.shape[0])        
         if self.get_active_name() in self.peaks:
-            self.plotdata.set_data("index",self.peaks[self.get_active_name()][:,0])
-            self.plotdata.set_data("value",self.peaks[self.get_active_name()][:,1])
+            self.plotdata.set_data("index",self.peaks[self.get_active_name()][:,1])
+            self.plotdata.set_data("value",self.peaks[self.get_active_name()][:,0])
             self.plotdata.set_data("color",self.peaks[self.get_active_name()][:,2])
             self.plot = self.get_scatter_overlay_plot(array_plot_data=self.plotdata,
                                                       tools=['zoom','pan','colorbar'])
@@ -268,19 +268,19 @@ class CellCropController(BaseImageController):
                     row['file_idx'] = i
                     row['input_data'] = self.data_path
                     row['filename'] = self.get_active_name()
-                    row['x_coordinate'] = peaks[i, 1]
-                    row['y_coordinate'] = peaks[i, 0]
+                    row['x_coordinate'] = peaks[i, 0]
+                    row['y_coordinate'] = peaks[i, 1]
                     row.append()
                     # crop the cells from the given locations
-                    data[i,:,:]=active_image[peaks[i, 1]:peaks[i, 1] + tmp_sz,
-                                      peaks[i, 0]:peaks[i, 0] + tmp_sz]
+                    data[i,:,:]=active_image[int(peaks[i, 0]):int(peaks[i, 0] + tmp_sz),
+                                      int(peaks[i, 1]):int(peaks[i, 1] + tmp_sz)]
                 self.chest.root.cell_description.flush()
                 self.parent.add_cell_data(data, name=self.get_active_name())
                 # insert the data (one 3d array per file)
-                self.chest.setNodeAttr('/cell_description', 'threshold', (self.thresh_lower, self.thresh_upper))
-                self.chest.setNodeAttr('/cell_description', 'template_position', (self.template_left, self.template_top))
-                self.chest.setNodeAttr('/cell_description', 'template_filename', self.template_filename)
-                self.chest.setNodeAttr('/cell_description', 'template_size', (self.template_size))
+                self.chest.set_node_attr('/cell_description', 'threshold', (self.thresh_lower, self.thresh_upper))
+                self.chest.set_node_attr('/cell_description', 'template_position', (self.template_left, self.template_top))
+                self.chest.set_node_attr('/cell_description', 'template_filename', self.template_filename)
+                self.chest.set_node_attr('/cell_description', 'template_size', (self.template_size))
                                        
                 self.chest.root.cell_description.flush()
                 self.chest.flush()

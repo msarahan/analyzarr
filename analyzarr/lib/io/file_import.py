@@ -55,7 +55,7 @@ def import_image(h5file, flist, output_filename=None):
             # get data as numpy array
             d = imread(f)
             # add a CArray for this data in the h5file
-            ds = h5file.createCArray(h5file.root.rawdata, 
+            ds = h5file.create_carray(h5file.root.rawdata, 
                             filename,
                             tb.Atom.from_dtype(d.dtype),
                             d.shape,
@@ -81,7 +81,7 @@ def import_tiff(h5file, flist):
             # get data as numpy array
             d = imread(f)
             # add a CArray for this data in the h5file
-            ds = h5file.createCArray(h5file.root.rawdata, 
+            ds = h5file.create_carray(h5file.root.rawdata, 
                             filename,
                             tb.Atom.from_dtype(d.dtype),
                             d.shape,
@@ -111,7 +111,7 @@ def import_dm(h5file, flist):
             # but I'm vain and want to save a line or two of code.
             tmp_dm3, tmp_tags = file_reader(f)
             # add a CArray for this data in the h5file
-            ds = h5file.createCArray(h5file.root.rawdata, 
+            ds = h5file.create_carray(h5file.root.rawdata, 
                             filename, 
                             tb.Atom.from_dtype(tmp_dm3.data.dtype),
                             tmp_dm3.data.shape,

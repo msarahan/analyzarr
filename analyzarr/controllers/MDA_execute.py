@@ -70,7 +70,7 @@ class MDAExecutionController(HasTraits):
                 self.PCA(n_components=self.number_to_derive)
             elif method == 'ICA':
                 self.ICA(n_components=self.number_to_derive)
-            self.chest.setNodeAttr('/mda_results/'+self.context, 
+            self.chest.set_node_attr('/mda_results/'+self.context, 
                                'dimensionality', self.number_to_derive)
             # close the dialog window
             Application.instance().end_session(self._session_id)
@@ -176,7 +176,7 @@ class MDAExecutionController(HasTraits):
             table_description = np.zeros((0,), dtype=factor_dtype)
             fs = self.chest.create_table('/mda_results/'+self.context, 'peak_factors',
                          description=table_description)
-            self.chest.setNodeAttr('/mda_results/'+self.context, 'on_peaks', True)
+            self.chest.set_node_attr('/mda_results/'+self.context, 'on_peaks', True)
             data = np.zeros((self.number_to_derive), dtype=factor_dtype)
             row = fs.row
             # record the factors
@@ -205,13 +205,13 @@ class MDAExecutionController(HasTraits):
             fs.flush()
         else:
             score_table_title='image_scores'
-            fs = self.chest.createCArray('/mda_results/'+self.context, 'image_factors',
+            fs = self.chest.create_carray('/mda_results/'+self.context, 'image_factors',
                                      tb.Atom.from_dtype(factors.dtype),
                                      factors.shape,
                                      filters=filters
                                      )
             fs[:] = factors
-            self.chest.setNodeAttr('/mda_results/'+self.context, 'on_peaks', False)
+            self.chest.set_node_attr('/mda_results/'+self.context, 'on_peaks', False)
         # scores go into a table, with one row per input image (or cell), and 
         # one column per component
         names = ['c%i' %x for x in xrange(self.number_to_derive)]
@@ -237,7 +237,7 @@ class MDAExecutionController(HasTraits):
         ss.append(data)
         ss.flush()
         if eigenvalues is not None:
-            ev = self.chest.createCArray('/mda_results/'+self.context, 'Eigenvalues',
+            ev = self.chest.create_carray('/mda_results/'+self.context, 'Eigenvalues',
                                      tb.Atom.from_dtype(eigenvalues.dtype),
                                      eigenvalues.shape,
                                      filters=filters

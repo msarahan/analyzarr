@@ -175,7 +175,7 @@ def draw_mask(array_size, radius, target_locations):
     return array
 
 
-def two_dim_findpeaks(image, peak_width=None, medfilt_radius=3, max_peak_width=100):
+def two_dim_findpeaks(image, peak_width=None, medfilt_radius=None, max_peak_width=100):
         """
         Takes an image and detect the peaks using the local maximum filter.
         Returns a boolean mask of the peaks (i.e. 1 when
@@ -217,7 +217,6 @@ def two_dim_findpeaks(image, peak_width=None, medfilt_radius=3, max_peak_width=1
         #apply the local maximum filter; all pixel of maximal value 
         #in their neighborhood are set to 1
         local_max = maximum_filter(cleaned_image, footprint=neighborhood)==cleaned_image
-        #local_max = maximum_filter(image, size=(peak_width,peak_width))==image
         #local_max is a mask that contains the peaks we are 
         #looking for, but also the background.
         #In order to isolate the peaks we must remove the background from the mask.
@@ -238,12 +237,19 @@ def two_dim_findpeaks(image, peak_width=None, medfilt_radius=3, max_peak_width=1
         detected_peaks = detected_peaks.nonzero()
         
         # format the two arrays into one
-        detected_peaks = np.vstack((detected_peaks[1],detected_peaks[0])).T
+        detected_peaks = np.vstack((detected_peaks[0],detected_peaks[1])).T
         
         detected_peaks=kill_duplicates(detected_peaks)
         detected_peaks=kill_edges(image, detected_peaks, peak_width/2)
+        
+        # translate to actual image peak, instead of cross correlation peak
+        detected_peaks=detected_peaks+peak_width/2
+        
+        # get peak heights as third column
+        heights = np.array([image[pk[0],pk[1]] for pk in detected_peaks])
+        peaks = np.hstack((detected_peaks, heights.reshape((-1,1))))
     
-        return detected_peaks+peak_width/2
+        return peaks
 
 def kill_duplicates(arr, minimum_distance=10):
     """
@@ -372,8 +378,8 @@ def peak_attribs_image(image, peak_width=None, target_locations=None, medfilt_ra
         x = np.array(np.arange(peak_left, peak_right),dtype=np.integer)
         y = np.array(np.arange(peak_top, peak_bottom),dtype=np.integer)
         xv,yv = np.meshgrid(x,y)
-        roi[:,:] = image[yv.clip(0,image.shape[0]-1),
-                         xv.clip(0,image.shape[1]-1)] * mask
+        roi[:,:] = image[xv.clip(0,image.shape[0]-1),
+                         yv.clip(0,image.shape[1]-1)] * mask
         #roi[0:,:]=image[bymin:bymax,bxmin:bxmax]
         # skip frames with significant dead pixels (corners of
         #    rotated images, perhaps
@@ -400,7 +406,7 @@ def peak_attribs_image(image, peak_width=None, target_locations=None, medfilt_ra
         
         x = rlt[rlt_offset][0]
         y = rlt[rlt_offset][1]
-        amp = image[int(peak_top+y),int(peak_left+x)]
+        amp = image[int(peak_left+x),int(peak_top+y)]
         long_axis = rlt[rlt_offset][3]
         short_axis = rlt[rlt_offset][4] 
         orientation = rlt[rlt_offset][5]
@@ -421,7 +427,7 @@ def peak_attribs_image(image, peak_width=None, target_locations=None, medfilt_ra
                                     )
         # x and y are the locations within the ROI.  Add the coordinates of 
         #    the top-left corner of our ROI on the global image.
-        rlt[rlt_offset,:2] = (np.array([peak_top,peak_left]) + np.array([fit_y,fit_x]))
+        rlt[rlt_offset,:2] = (np.array([peak_left,peak_top]) + np.array([fit_x,fit_y]))
         #rlt[loc,:2] = np.array([y,x])
         # insert the height
         rlt[rlt_offset,2]=amp+height
@@ -490,11 +496,12 @@ def best_match(arr, target, neighborhood=None):
     match=np.argmin(np.sqrt(np.sum(
         np.power(arr_sub,2),
         axis=1)))
-    rlt=arr[match]
+    return match
+    #rlt=arr[match]
     # TODO: this neighborhood warning doesn't work well.
     #if neighborhood and np.sum(rlt)>2*neighborhood:
     #    print "Warning! Didn't find a peak within your neighborhood! Watch for fishy peaks."
-    return rlt
+    #return rlt
 
 def normalize(arr,lower=0.0,upper=1.0):
     if lower>upper: lower,upper=upper,lower

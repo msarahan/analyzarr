@@ -83,7 +83,7 @@ class CellController(BaseImageController):
         self.omitted=bool(omitted)
         
     def get_average_cell(self):
-        pass
+        return self._get_average_image()
     
     def map_peaks_to_cells(self):
         """
@@ -139,7 +139,7 @@ class CellController(BaseImageController):
         return cell_record['filename']
         
     def add_cell_data(self, data, name):
-        cell_array = self.chest.createCArray(self.chest.root.cells,
+        cell_array = self.chest.create_carray(self.chest.root.cells,
                                              name,
                                              tb.Atom.from_dtype(data.dtype),
                                              data.shape,
@@ -273,7 +273,7 @@ class CellController(BaseImageController):
         desc = np.recarray((0,), dtype=dtypes)
         # create the table using the empty description recarray
         self.chest.create_table(self.chest.root,
-                               'cell_peaks', description=desc)        
+                               'cell_peaks', description=desc)
         # for each file in the cell_data group, run analysis.
         nodes = self.chest.list_nodes('/cells')
         node_names = [node.name for node in nodes]
@@ -306,7 +306,7 @@ class CellController(BaseImageController):
             file_progress+=1
             progress.update(file_progress)
         # add an attribute for the total number of peaks recorded
-        self.chest.setNodeAttr('/cell_peaks','number_of_peaks', self.numpeaks)
+        self.chest.set_node_attr('/cell_peaks','number_of_peaks', self.numpeaks)
         self.chest.root.cell_peaks.flush()
         self.chest.flush()
         self._can_show_peak_ids = True

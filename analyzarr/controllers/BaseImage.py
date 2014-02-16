@@ -40,21 +40,6 @@ class BaseImageController(ControllerBase):
         if len(nodes) > 0:
             return nodes[self.selected_index][:]
 
-    # this is a potentially 3D image stack for feeding into analyses
-    def get_active_image_set(self, names=None):
-        # TODO: this isn't rational for non-3D data yet.
-        if names is None:
-            # query the raw data table for filenames
-            nodes = self.chest.list_nodes('/' + self.active_data_source)
-            data = nodes[0][:]
-            # collect all the cells
-            for node in nodes[1:]:
-                data = np.append(data, node[:], axis=0)
-        else:
-            # TODO: need to implement image selection
-            data = None
-        return data
-
     def get_active_name(self):
         nodes = self.chest.list_nodes('/rawdata')
         return nodes[self.selected_index].name

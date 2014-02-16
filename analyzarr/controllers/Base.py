@@ -40,5 +40,53 @@ class ControllerBase(HasRenderer):
         else:
             self.selected_index -= 1
             
+    # this is a potentially 3D image stack for feeding into analyses
+    def get_active_image_set(self, names=None):
+        # TODO: this isn't rational for non-3D data yet.
+        if names is None:
+            # query the raw data table for filenames
+            nodes = self.chest.list_nodes(self.data_path)
+            data = nodes[0][:]
+            # collect all the cells
+            for node in nodes[1:]:
+                data = np.append(data, node[:], axis=0)
+        else:
+            # TODO: need to implement image selection
+            data = None
+        return data
+
+    def get_node_iterator(self):
+        nodes = self.chest.list_nodes(self.data_path)
+        for node in nodes:
+            yield node            
+            
     def log_action(self, action, **parameters):
         self.parent.log_action(action, **parameters)
+        
+    def get_expression_data(self, expression, table_loc=None, filename=None):
+        import tables
+        if table_loc is None:
+            table_loc=self.data_path
+        target_table = self.chest.get_node(table_loc)
+        uv = target_table.colinstances
+        # apply any shortcuts/macros
+        expression = self.remap_distance_expressions(expression)
+        # evaluate the math expression
+        data = tables.Expr(expression, uv).eval()
+        if filename is None:
+            filename=self.get_active_name()
+        elif filename == "all":
+            return data
+        # pick out the indices for only the active image
+        indices = target_table.get_where_list(
+            #'(omit==False) & (filename == "%s")' % self.get_active_name())
+            '(filename == "%s")' % filename)
+        # access the array data for those indices
+        data=data[indices]
+        return data
+            
+    def remap_distance_expressions(self, expression):
+        import re
+        pattern = re.compile("dist\((\s*\d+\s*),(\s*\d+\s*)\)")
+        expression = pattern.sub(r"((x\1-x\2)**2+(y\1-y\2)**2)**0.5", expression)
+        return expression    

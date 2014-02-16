@@ -19,11 +19,13 @@ from CellCrop import CellCropController
 from MDA_view import MDAViewController
 from MDA_execute import MDAExecutionController
 
+from analyzarr.lib.cv import peak_char as pc
 from analyzarr.lib.io import file_import
 from analyzarr.testing.test_pattern import get_test_pattern
 from analyzarr.Release import version
 
 from scipy.misc import imsave
+import numpy as np
 
 from time import time
 
@@ -131,10 +133,10 @@ class HighSeasAdventure(HasTraits):
         # TODO: need to make peak width a user-specified value, or some
         #   auto-detect algorithm...
         self.image_controller.characterize_peaks()
-        #if has_cells:
+        if has_cells:
             # TODO: cell_controller accesses the database for 
             #  the image controller here.  Need to clean up.
-            #self.cell_controller.map_peaks_to_cells()
+            self.map_global_peaks_to_cells()
 
     def open_crop_UI(self):
         crop_controller = CellCropController(parent=self,
@@ -171,3 +173,84 @@ class HighSeasAdventure(HasTraits):
         row['version'] = version
         row.append()
         self.chest.root.log.flush()
+
+    def get_peak_data(self, node_name):
+        indices = self.chest.get_node('/image_peaks').get_where_list(
+                    '(filename=="%s")'%node_name)
+        return self.chest.root.image_peaks[indices]
+
+    def find_best_matching_global_peaks(self, target_locations_x_y, node_name):
+        coords_x=self.image_controller.get_expression_data("x", "/image_peaks", node_name)
+        coords_y=self.image_controller.get_expression_data("y", "/image_peaks", node_name)
+        coords = np.vstack((coords_x, coords_y)).T
+        indices=[pc.best_match(coords, target) for target in target_locations_x_y]
+        return self.get_peak_data(node_name=node_name)[indices]
+
+    def map_global_peaks_to_cells(self):        
+        try:
+            # wipe out old results
+            self.chest.remove_node('/cell_peaks')        
+        except:
+            # any errors will be because the table doesn't exist. That's OK.
+            pass                
+        # get the average cell image and find peaks on it
+        peaks=pc.two_dim_findpeaks(self.cell_controller.get_average_cell())
+        # generate a list of column names
+        names = [('x%i, y%i, dx%i, dy%i, h%i, o%i, e%i, sx%i, sy%i' % ((x,)*9)).split(', ') 
+                 for x in xrange(peaks.shape[0])]
+        # flatten that from a list of lists to a simple list
+        names = [item for sublist in names for item in sublist]
+        # make tuples of each column name and 'f8' for the data type
+        dtypes = zip(names, ['f8', ] * peaks.shape[0]*9)
+        # prepend the filename and index columns
+        dtypes = [('filename', '|S250'), ('file_idx', 'i4'), ('omit', 'bool')] + dtypes
+        # create an empty recarray with our data type
+        desc = np.recarray((0,), dtype=dtypes)
+        # create the table using the empty description recarray
+        self.chest.create_table(self.chest.root,
+                               'cell_peaks', description=desc)
+        
+        self.chest.set_node_attr('/cell_peaks','number_of_peaks', peaks.shape[0])
+        self.chest.flush()
+        
+        global_peak_chars = np.zeros((self.cell_controller.get_num_files()),dtype=dtypes)
+        
+        # loop over each peak, finding the peak that best matches this cell's position
+        #     plus the offset for the peak.
+        for node in self.image_controller.get_node_iterator():
+            cell_data = self.cell_controller.get_cell_set(node.name)
+            data = np.zeros((cell_data.shape[0]),dtype=dtypes)
+            data["filename"] = node.name
+            data['file_idx'] = np.arange(cell_data.shape[0])
+            for idx, peak in enumerate(peaks):            
+                #TODO: need to rework this whole get_expression_data concept.  It is
+                #    a column accessor.
+                target_x = self.image_controller.get_expression_data("x_coordinate", 
+                                                    table_loc="/cell_description",
+                                                    filename=node.name)+peak[0]
+                target_y = self.image_controller.get_expression_data("y_coordinate", 
+                                                    table_loc="/cell_description",
+                                                    filename=node.name)+peak[1]
+                if target_x.shape[0]>0:
+                    chars = self.find_best_matching_global_peaks(np.array([target_x,target_y]).T, 
+                                                                 node.name)
+                    # add the peak ids (or data) to table representing cell peak characteristics
+                    
+                    
+                    data["x%i"%idx] = chars["x"]-target_x+peak[0]
+                    data["y%i"%idx] = chars["y"]-target_y+peak[1]
+                    data["dx%i"%idx] = chars["x"]-target_x
+                    data["dy%i"%idx] = chars["y"]-target_y
+                    data["h%i"%idx] = chars["h"]
+                    data["o%i"%idx] = chars["o"]
+                    data["e%i"%idx] = chars["e"]
+                    data["sx%i"%idx] = chars["sx"]
+                    data["sy%i"%idx] = chars["sy"]
+                
+            
+            # commit the data to the table
+            self.chest.root.cell_peaks.append(data)
+            self.chest.root.cell_peaks.flush()
+        self.chest.flush()
+            
+        

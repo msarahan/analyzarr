@@ -145,10 +145,12 @@ class MappableImageController(BaseImageController):
             if has_cell_peaks is True:
                 values = self.get_expression_data("x_coordinate", 
                                                   table_loc="/cell_description") + \
-                    self.get_expression_data("y%i"%self._peak_ids[self._selected_peak])
+                    self.get_expression_data("x%s"%self._peak_ids[self._selected_peak],
+                                             table_loc="/cell_peaks")
                 indices = self.get_expression_data("y_coordinate", 
                                                    table_loc="/cell_description") + \
-                    self.get_expression_data("x%i"%self._peak_ids[self._selected_peak])
+                    self.get_expression_data("y%s"%self._peak_ids[self._selected_peak],
+                                             table_loc="/cell_peaks")
             else:
                 raise StandardError("Error: you somehow managed to specify a selected peak, \
                 when there are no peak ids available.  If you're a beta tester,\
@@ -166,21 +168,43 @@ class MappableImageController(BaseImageController):
             elif self.get_vector_name() == 'Skew':
                 field = 's'
             if field != '':
-                x_comp = self.get_expression_data("%sx%i"%(field,self._selected_peak))
-                y_comp = self.get_expression_data("%sy%i"%(field,self._selected_peak))
+                if self.get_peak_id_list()[self._selected_peak] == "all":
+                    if field=="s":
+                        x_comp = self.get_expression_data("%sx"%(field),
+                                                          table_loc="/image_peaks")
+                        y_comp = self.get_expression_data("%sy"%(field),
+                                                          table_loc="/image_peaks")
+                    else:
+                        x_comp=None
+                        # clear vector data
+                        if 'vectors' in self.plotdata.arrays:
+                            try:
+                                self.plotdata.del_data('vectors')
+                            except:
+                                pass                        
+                else:
+                    x_comp = self.get_expression_data("%sx%i"%(field,self._selected_peak),
+                                                      table_loc="/cell_peaks")
+                    y_comp = self.get_expression_data("%sy%i"%(field,self._selected_peak),
+                                                      table_loc="/cell_peaks")
 
-                vectors = np.vstack((x_comp, y_comp)).T
-                vectors *= self.vector_scale
-                self.plotdata.set_data('vectors',vectors)
+                if x_comp is not None:
+                    vectors = np.vstack((x_comp, y_comp)).T
+                    vectors *= self.vector_scale
+                    self.plotdata.set_data('vectors',vectors)
             else:
                 print "%s field not recognized for vector plots."%field
                 if 'vectors' in self.plotdata.arrays:
                     self.plotdata.del_data('vectors')
                 
         else:
+            # clear vector data
             if 'vectors' in self.plotdata.arrays:
-                self.plotdata.del_data('vectors')
-                # clear vector data
+                try:
+                    self.plotdata.del_data('vectors')
+                except:
+                    pass
+                
         if self.get_expression_name() not in ["None",'']:
             if self.get_peak_id_list()[self._selected_peak] == "all":
                 data = self.get_expression_data(self.get_expression_name(),'/image_peaks')
@@ -189,7 +213,10 @@ class MappableImageController(BaseImageController):
             self.plotdata.set_data('color', data)
         else:
             if 'color' in self.plotdata.arrays:
-                self.plotdata.del_data('color')
+                try:
+                    self.plotdata.del_data('color')
+                except:
+                    pass
 
         #TODO: might want to implement the selection tool here.
         self.plot = self.get_scatter_quiver_plot(self.plotdata,
@@ -208,26 +235,10 @@ class MappableImageController(BaseImageController):
         elif self.get_characteristic_name != "None":
             expression = self._characteristics[self._characteristic][0].lower()
             if self.get_peak_id_list()[self._selected_peak] != "all":
-                expression = expression + str(self._selected_peak)
+                # -1 because "all" is first position
+                expression = expression + str(self._selected_peak-1)
         return expression
 
-    def get_expression_data(self, expression, table_loc):
-        target_table = self.chest.get_node(table_loc)
-        uv = target_table.colinstances
-        # apply any shortcuts/macros
-        expression = self.remap_distance_expressions(expression)
-        # evaluate the math expression
-        data = t.Expr(expression, uv).eval()
-        # pick out the indices for only the active image
-        indices = target_table.get_where_list(
-            #'(omit==False) & (filename == "%s")' % self.get_active_name())
-            '(filename == "%s")' % self.get_active_name())
-        # access the array data for those indices
-        data=data[indices]
-        return data
     
-    def remap_distance_expressions(self, expression):
-        import re
-        pattern = re.compile("dist\((\s*\d+\s*),(\s*\d+\s*)\)")
-        expression = pattern.sub(r"((x\1-x\2)**2+(y\1-y\2)**2)**0.5", expression)
-        return expression
+    
+    
