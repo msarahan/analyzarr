@@ -40,7 +40,6 @@ class CellCropController(BaseImageController):
             self.numfiles = len(self.nodes)
             if self.numfiles > 0:
                 self.init_plot()
-                print "initialized plot for data in %s" % data_path
     
     def data_updated(self):
         # reinitialize data
@@ -222,7 +221,7 @@ class CellCropController(BaseImageController):
             CC = cv_funcs.xcorr(self.template_data.get_data("imagedata"),
                                     self.get_active_image())
             # 
-            pks=pc.two_dim_findpeaks((CC-CC.min())*255, medfilt_radius=None)
+            pks=pc.two_dim_findpeaks((CC-CC.min())*255, xc_filter=False)
             pks[:,2]=pks[:,2]/255+CC.min()
             peaks[self.get_active_name()]=pks
         self.peaks=peaks
@@ -286,7 +285,16 @@ class CellCropController(BaseImageController):
                 self.chest.flush()
         average_data = np.average(data,axis=0).squeeze()
         self.parent.add_cell_data(average_data, name="average")
+        row = self.chest.root.cell_description.row
+        row['file_idx'] = 0
+        row['input_data'] = self.data_path
+        row['filename'] = "average"
+        row['x_coordinate'] = 0
+        row['y_coordinate'] = 0
+        row.append()
+        self.chest.root.cell_description.flush()
         self.parent.update_cell_data()
+        self.parent.add_image_data(average_data, "average")
         self.log_action(action="crop cells", files=files, thresh=self.thresh, 
                         template_position=(self.template_left, self.template_top), 
                         template_size=self.template_size, 

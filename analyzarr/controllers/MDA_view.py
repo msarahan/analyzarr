@@ -88,8 +88,8 @@ class MDAViewController(BaseImageController):
                              stop = self.component_index+1,
                              step = 1,)[:]
             numpeaks = self.chest.root.cell_peaks.getAttr('number_of_peaks')
-            index_keys = ['x%i' % i for i in xrange(numpeaks)]
-            value_keys = ['y%i' % i for i in xrange(numpeaks)]
+            index_keys = ['y%i' % i for i in xrange(numpeaks)]
+            value_keys = ['x%i' % i for i in xrange(numpeaks)]
 
             values = np.array(component[value_keys]).view(float)
             indices = np.array(component[index_keys]).view(float)

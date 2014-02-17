@@ -20,6 +20,8 @@ from gaussfitter import gaussfit
 import numpy.ma as ma
 #from fit_gaussian import fitgaussian
 
+from analyzarr.ui.progress import PyFaceProgress
+
 def get_characteristics(moments):
     try:
         import cv
@@ -65,13 +67,6 @@ def get_characteristics(moments):
     ySkew = mu03 / (mu00 * (yyVar**(3.0/2)))
     # 0 is a placeholder for the height.
     return np.array([xCenter, yCenter, 0, long_axis, short_axis, orientation, eccentricity, xSkew, ySkew])
-
-def gaussian(height, center_x, center_y, width_x, width_y):
-    """Returns a gaussian function with the given parameters"""
-    width_x = float(width_x)
-    width_y = float(width_y)
-    return lambda x,y: height*np.exp(
-                -(((center_x-x)/width_x)**2+((center_y-y)/width_y)**2)/2)
 
 def estimate_peak_width(image, window_size=64, window_center=None, medfilt=5, max_peak_width=100):
     from scipy.ndimage import gaussian_filter
@@ -145,7 +140,10 @@ def estimate_peak_width(image, window_size=64, window_center=None, medfilt=5, ma
     # First, chuck any values to the left of our peak.
     peak_right_crossings = zero_crossings[zero_crossings>cx+1]
     #  The leftmost value is the closest one.
-    right = peak_right_crossings[0]
+    if peak_right_crossings.size>0:
+        right = peak_right_crossings[0]
+    else:
+        right = tmp_row.size
     # tends to underestimate.  Tweak it.  7 is "empirically derived"
     #  fudge_factor = 7
     width = int(right-left)#+fudge_factor
@@ -175,7 +173,8 @@ def draw_mask(array_size, radius, target_locations):
     return array
 
 
-def two_dim_findpeaks(image, peak_width=None, medfilt_radius=None, max_peak_width=100):
+def two_dim_findpeaks(image, peak_width=None, medfilt_radius=5, xc_filter=True, 
+                      kill_edges=True, kill_duplicates=True):
         """
         Takes an image and detect the peaks using the local maximum filter.
         Returns a boolean mask of the peaks (i.e. 1 when
@@ -190,22 +189,33 @@ def two_dim_findpeaks(image, peak_width=None, medfilt_radius=None, max_peak_widt
         from scipy.ndimage.filters import maximum_filter
         from scipy.ndimage.morphology import generate_binary_structure, binary_erosion, \
              iterate_structure
+        from scipy.ndimage import gaussian_filter
         
         from analyzarr.lib.cv.cv_funcs import xcorr
 
         if medfilt_radius is not None:
             image = medfilt(image, medfilt_radius)
+            # blur it; sharp edges seem to mess up peak finding
+            image = gaussian_filter(image, medfilt_radius)
 
         if peak_width is None:
-            peak_width=estimate_peak_width(image,medfilt=medfilt_radius, 
-                                           max_peak_width=max_peak_width)
+            peak_width=estimate_peak_width(image,medfilt=medfilt_radius)
             
-        # the normal gaussian
-        xg, yg = np.mgrid[0:peak_width, 0:peak_width]
-        templateImage = gaussian(255, (peak_width/2)+1, (peak_width/2)+1, (peak_width/4)+1, 
-                        peak_width/4+1)(xg, yg)
+        if xc_filter:
+            # the normal gaussian
+            xg, yg = np.mgrid[0:peak_width, 0:peak_width]
+            def gaussian(height, center_x, center_y, width_x, width_y):
+                """Returns a gaussian function with the given parameters"""
+                width_x = float(width_x)
+                width_y = float(width_y)
+                return lambda x,y: height*np.exp(
+                            -(((center_x-x)/width_x)**2+((center_y-y)/width_y)**2)/2)
             
-        cleaned_image = xcorr(templateImage, image)
+            templateImage = gaussian(255, (peak_width/2)+1, (peak_width/2)+1, (peak_width/4)+1, 
+                                    peak_width/4+1)(xg, yg)            
+            cleaned_image = xcorr(templateImage, image)
+        else:
+            cleaned_image=image
         #medfilt(image, medfilt_radius)
         #peak_width=estimate_peak_width(cleaned_image,medfilt=None, 
         #                               max_peak_width=max_peak_width)        
@@ -239,11 +249,14 @@ def two_dim_findpeaks(image, peak_width=None, medfilt_radius=None, max_peak_widt
         # format the two arrays into one
         detected_peaks = np.vstack((detected_peaks[0],detected_peaks[1])).T
         
-        detected_peaks=kill_duplicates(detected_peaks)
-        detected_peaks=kill_edges(image, detected_peaks, peak_width/2)
+        if kill_duplicates:
+            detected_peaks=_kill_duplicates(detected_peaks)
+        if kill_edges:
+            detected_peaks=_kill_edges(image, detected_peaks, peak_width/8)
         
         # translate to actual image peak, instead of cross correlation peak
-        detected_peaks=detected_peaks+peak_width/2
+        if xc_filter:
+            detected_peaks=detected_peaks+peak_width/2
         
         # get peak heights as third column
         heights = np.array([image[pk[0],pk[1]] for pk in detected_peaks])
@@ -251,7 +264,7 @@ def two_dim_findpeaks(image, peak_width=None, medfilt_radius=None, max_peak_widt
     
         return peaks
 
-def kill_duplicates(arr, minimum_distance=10):
+def _kill_duplicates(arr, minimum_distance=10):
     """
     Attempts to eliminate garbage coordinates
     
@@ -280,18 +293,18 @@ def kill_duplicates(arr, minimum_distance=10):
     [keepers.remove(chuck) for chuck in chuck_list if chuck in keepers]
     return arr[keepers]
     
-def kill_edges(image, peaks, peak_width):
-    upper_bound_width=image.shape[0]-peak_width
-    upper_bound_height=image.shape[1]-peak_width
-    lower_bound=peak_width
+def _kill_edges(image, peaks, edge_width):
+    upper_bound_width=image.shape[0]-edge_width
+    upper_bound_height=image.shape[1]-edge_width
+    lower_bound=edge_width
     mask = np.ma.greater(peaks,lower_bound)
     masked_peaks=np.ma.masked_where(peaks<lower_bound,peaks)
     masked_peaks[:,0]=np.ma.masked_where(masked_peaks[:,0]>upper_bound_width,masked_peaks[:,0])
     masked_peaks[:,1]=np.ma.masked_where(masked_peaks[:,1]>upper_bound_height,masked_peaks[:,1])
     return np.ma.compress_rows(masked_peaks)
 
-def peak_attribs_image(image, peak_width=None, target_locations=None, medfilt_radius=3,
-                       progress_object=None):
+def peak_attribs_image(image, peak_width=None, target_locations=None, medfilt_radius=None, xc_filter=True,
+                       progress_object=PyFaceProgress(), kill_edges=True, kill_duplicates=True):
     """
     Characterizes the peaks in an image.
 
@@ -342,7 +355,9 @@ def peak_attribs_image(image, peak_width=None, target_locations=None, medfilt_ra
         # target locations should be a list of arrays.  Each element in the 
         #    list corresponds to a recursion level in peak finding.  The peak 
         #    width can change with each recursion.
-        target_locations=two_dim_findpeaks(image, peak_width=peak_width, medfilt_radius=medfilt_radius)
+        target_locations=two_dim_findpeaks(image, peak_width=peak_width, medfilt_radius=medfilt_radius,
+                                           xc_filter=xc_filter, kill_edges=kill_edges, 
+                                           kill_duplicates=kill_duplicates)
     imsize=image.shape[0]
     
     total_peaks = target_locations.shape[0]
@@ -459,20 +474,6 @@ def flatten_peak_list(peak_list):
         rlt[peak_offset:peak_offset+arr.shape[0]]=arr
         peak_offset+=arr.shape[0]
     return rlt
-
-def stack_coords(stack, peak_width, maxpeakn=5000):
-    """
-    A rough location of all peaks in the image stack.  This can be fed into the
-    best_match function with a list of specific peak locations to find the best
-    matching peak location in each image.
-    """
-    depth=stack.shape[0]
-    coords=np.ones((maxpeakn,2,depth))*10000
-    for i in xrange(depth):
-        ctmp=two_dim_findpeaks(stack[i,:,:], peak_width=peak_width)
-        for row in xrange(ctmp.shape[0]):
-            coords[row,:,i]=ctmp[row,:2]
-    return coords
     
 def best_match(arr, target, neighborhood=None):
     """

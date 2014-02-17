@@ -389,7 +389,7 @@ class CellCropper(StackViewer):
             self.data = self.controller.get_active_image()[:]
             self.CC = cv_funcs.xcorr(self.template, self.data)
             # peak finder needs peaks greater than 1.  Multiply by 255 to scale them.
-            pks=pc.two_dim_findpeaks(self.CC*255, peak_width=self.peak_width, medfilt_radius=None)
+            pks=pc.two_dim_findpeaks(self.CC*255, peak_width=self.peak_width)
             pks[:,2]=pks[:,2]/255.
             peaks.append(pks)
             progress.update(idx+1)

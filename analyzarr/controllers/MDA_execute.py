@@ -113,7 +113,7 @@ class MDAExecutionController(HasTraits):
         """
         if len(chars) > 0:
             if len(indices) is 0:
-                indices = range(self.chest.root.cell_peaks.number_of_peaks)
+                indices = range(int(self.chest.get_node_attr('/cell_peaks','number_of_peaks')))
             # the columns we get are the combination of the chars with the
             #   indices we want.
             cols = [['%s%i' % (c, i) for i in indices] for c in chars]
@@ -198,7 +198,7 @@ class MDAExecutionController(HasTraits):
             #   we use this for recording the X and Y coordinates of peaks,
             #   which we do not feed into MDA itself.
             peak_record = self.chest.root.cell_peaks.read_where(
-                'filename == "average"')[0]        
+                'filename == "average"')[0]
             for idx in coordinate_data_indices:
                 data[idx] = peak_record[idx]
             fs.append(data)
@@ -336,6 +336,6 @@ or remove some variables.  For images, you can subsample." % (data.shape[1], dat
         #data_record['treatments'] = self.data_controller.summarize
         data_record.append()
         self.chest.root.mda_description.flush()
-        self.chest.createGroup('/mda_results', datestr)
+        self.chest.create_group('/mda_results', datestr)
         self.context = datestr
         self.chest.flush()

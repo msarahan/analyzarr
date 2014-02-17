@@ -32,13 +32,12 @@ class CellController(BaseImageController):
             self.numfiles = int(self.chest.root.cell_description.nrows)
             if self.numfiles > 0:
                 self.init_plot()
-                print "initialized plot for data in %s" % data_path
                 self._toggle_UI(True)
                 self._can_change_idx = True
                 self.parent.show_cell_view=True
                 try:
                     self.chest.get_node('/', 'cell_peaks')
-                    self.numpeaks = self.chest.get_node_attr('/cell_peaks','number_of_peaks')
+                    self.numpeaks = int(self.chest.get_node_attr('/cell_peaks','number_of_peaks'))
                     self._can_show_peak_ids = True
                 except:
                     # we haven't got any peaks to identify
@@ -53,10 +52,7 @@ class CellController(BaseImageController):
         try:
             self.chest.get_node('/','cell_peaks')
         except:
-            print "No peak information to plot"
             return
-        if self._show_peak_ids:
-            print "showing labels"
         # labels is a dict consisting of data points as tuples
         labels = {}
         # this is the record in the cell_description table
@@ -72,7 +68,7 @@ class CellController(BaseImageController):
             x = peak_record['x%i'%peak]
             y = peak_record['y%i'%peak]
             label = '%i' %peak
-            labels[label]=(x,y)
+            labels[label]=(y,x)
         self.plot_labels(labels)
         self.show_labels(self._show_peak_ids)
 
@@ -137,16 +133,6 @@ class CellController(BaseImageController):
                             stop=self.selected_index + 1)[0]
         # find the parent that this cell comes from
         return cell_record['filename']
-        
-    def add_cell_data(self, data, name):
-        cell_array = self.chest.create_carray(self.chest.root.cells,
-                                             name,
-                                             tb.Atom.from_dtype(data.dtype),
-                                             data.shape,
-                                             filters = filters,
-                                             )
-        cell_array[:] = data
-        self.chest.flush()
 
     def get_omitted_indices(self, node_name):
         return self.chest.root.cell_description.read_where(
@@ -238,190 +224,6 @@ class CellController(BaseImageController):
                         image=cell_record["filename"],
                         state=cell_record["omit"])
     
-    # TODO: execute this in a separate thread/process for responsiveness.
-    # TODO: automatically determine the peak width from an average image
-    def characterize(self, target_locations=None, 
-                     target_neighborhood=20, 
-                     medfilt_radius=5):
-        #print "Main thread?" 
-        #print Application.instance().is_main_thread()
-        # disable the UI while we're running
-        self._toggle_UI(False)
-        #print 
-        try:
-            # wipe out old results
-            self.chest.remove_node('/cell_peaks')        
-        except:
-            # any errors will be because the table doesn't exist. That's OK.
-            pass        
-        # locate peaks on the average image to use as target locations.
-        #   also determines the number of peaks, which in turn determines
-        #   the table columns.
-        target_locations = pc.two_dim_findpeaks(self._get_average_image(),
-                                                )[:,:2]
-        self.numpeaks = int(target_locations.shape[0])
-        # generate a list of column names
-        names = [('x%i, y%i, dx%i, dy%i, h%i, o%i, e%i, sx%i, sy%i' % ((x,)*9)).split(', ') 
-                 for x in xrange(self.numpeaks)]
-        # flatten that from a list of lists to a simple list
-        names = [item for sublist in names for item in sublist]
-        # make tuples of each column name and 'f8' for the data type
-        dtypes = zip(names, ['f8', ] * self.numpeaks*9)
-        # prepend the filename and index columns
-        dtypes = [('filename', '|S250'), ('file_idx', 'i4'), ('omit', 'bool')] + dtypes
-        # create an empty recarray with our data type
-        desc = np.recarray((0,), dtype=dtypes)
-        # create the table using the empty description recarray
-        self.chest.create_table(self.chest.root,
-                               'cell_peaks', description=desc)
-        # for each file in the cell_data group, run analysis.
-        nodes = self.chest.list_nodes('/cells')
-        node_names = [node.name for node in nodes]
-        progress = ProgressDialog(title="Peak characterization progress", 
-                                  message="Characterizing peaks on %d images"%(len(node_names)-2),
-                                  max=len(node_names)-1, show_time=True, can_cancel=False)
-        progress.open()
-        file_progress=0
-        for node in node_names:
-            # exclude some nodes
-            if node == 'template':
-                continue
-            cell_data = self.get_cell_set(node)
-            data = np.zeros((cell_data.shape[0]),dtype=dtypes)
-            data['filename'] = node
-            data['file_idx'] = np.arange(cell_data.shape[0])
-            # might want to tweak this loop or cythonize for speed...
-            attribs = self._peak_attribs_stack(cell_data,
-                            peak_width=self.peak_width, 
-                            target_locations=target_locations,
-                            target_neighborhood=target_neighborhood,
-                            medfilt_radius=medfilt_radius)
-            attribs = attribs.T
-            # for each column name, copy in the data
-            for name_idx in xrange(len(names)):
-                data[names[name_idx]] = attribs[:, name_idx]
-            # add the data to the table
-            self.chest.root.cell_peaks.append(data)
-            self.chest.root.cell_peaks.flush()
-            file_progress+=1
-            progress.update(file_progress)
-        # add an attribute for the total number of peaks recorded
-        self.chest.set_node_attr('/cell_peaks','number_of_peaks', self.numpeaks)
-        self.chest.root.cell_peaks.flush()
-        self.chest.flush()
-        self._can_show_peak_ids = True
-        self.parent.image_controller.update_peak_map_choices()
-        self._progress_value = 0
-        self.log_action(action="Characterize peaks", 
-                        target_locations=target_locations, 
-                        target_neighborhood=target_neighborhood, 
-                        medfilt_radius=medfilt_radius)
-        self._toggle_UI(True)
-
-    def _peak_attribs_stack(self, stack, peak_width, target_locations=None,
-                           target_neighborhood=20, medfilt_radius=5,
-                           mask = True):
-        """
-        Characterizes the peaks in a stack of images.
-    
-            Parameters:
-            ----------
-    
-            peak_width : int (required)
-                    expected peak width.  Too big, and you'll include other peaks
-                    in measurements.
-    
-            target_locations : numpy array (n x 2)
-                    array of n target locations.  If left as None, will create 
-                    target locations by locating peaks on the average image of the stack.
-                    default is None (peaks detected from average image)
-    
-            img_size : tuple, 2 elements
-                    (width, height) of images in image stack.
-    
-            target_neighborhood : int
-                    pixel neighborhood to limit peak search to.  Peaks outside the
-                    square defined by 2x this value around the peak will be excluded
-                    from any fitting.  
-    
-            medfilt_radius : int (optional)
-                    median filter window to apply to smooth the data
-                    (see scipy.signal.medfilt)
-                    if 0, no filter will be applied.
-                    default is set to 5
-    
-           Returns:
-           -------
-           2D  numpy array:
-            - One column per image
-            - 9 rows per peak located
-                0,1 - location
-                2,3 - difference between location and target location
-                4 - height
-                5 - orientation
-                6 - eccentricity
-                7,8 - skew X, Y, respectively
-    
-        """
-        avgImage=np.average(stack,axis=0)
-        if target_locations is None:
-            # get peak locations from the average image
-            # an initial value for the peak width of 11 pixels works
-            #   OK to find initial peaks.  We determine a proper value
-            #   soon.
-            target_locations=pc.two_dim_findpeaks(avgImage, 10)
-        
-        peak_width = 0.75*pc.min_peak_distance(target_locations)
-        if peak_width < 10:
-            peak_width = 10        
-    
-        if mask:
-            mask = pc.draw_mask(avgImage.shape,
-                                peak_width/2.0,
-                                target_locations)            
-            stack *= mask
-        # get all peaks on all images
-        peaks=pc.stack_coords(stack, peak_width=peak_width)
-        # two loops here - outer loop loops over images (i index)
-        # inner loop loops over target peak locations (j index)
-        peak_locations=np.array([[pc.best_match(peaks[:,:,i], 
-                                             target_locations[j,:2], 
-                                             target_neighborhood) \
-                                  for i in xrange(peaks.shape[2])] \
-                                  for j in xrange(target_locations.shape[0])])
-    
-        # pre-allocate result array.  7 rows for each peak, 1 column for each image
-        rlt = np.zeros((9*peak_locations.shape[0],stack.shape[0]))
-        rlt_tmp = np.zeros((peak_locations.shape[0],7))
-        
-        progress = ProgressDialog(title="Peak characterization progress", 
-                                  message="Characterizing peaks on %d cells"%stack.shape[0], 
-                                  max=int(stack.shape[0]), show_time=True, can_cancel=False)
-        progress.open()
-        
-        for i in xrange(stack.shape[0]):
-            progress.update(int(i+1))
-            rlt_tmp=pc.peak_attribs_image(stack[i,:,:], 
-                                       target_locations=peak_locations[:,i,:], 
-                                       peak_width=peak_width, 
-                                       medfilt_radius=medfilt_radius, 
-                                       )
-            diff_coords=target_locations[:,:2]-rlt_tmp[:,:2]
-            for j in xrange(target_locations.shape[0]):
-                # peak position
-                rlt[ j*9   : j*9+2 ,i] = rlt_tmp[j,:2]
-                # difference in peak position relative to average
-                rlt[ j*9+2 : j*9+4 ,i] = diff_coords[j]
-                # height
-                rlt[ j*9+4         ,i]=rlt_tmp[j,2]
-                # orientation
-                rlt[ j*9+5         ,i]=rlt_tmp[j,3]
-                # eccentricity
-                rlt[ j*9+6         ,i]=rlt_tmp[j,4]
-                # skew (x and y)
-                rlt[ j*9+7 : j*9+9 ,i]=rlt_tmp[j,5:]
-        return rlt
-
     def get_peak_data(self, chars=[], indices=[]):
         """
         Get peak data from the table of peak data.

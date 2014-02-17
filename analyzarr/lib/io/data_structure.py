@@ -108,12 +108,12 @@ def get_image_h5file(filename):
     #                                     CellsTable)
     # image group has data files as CArrays.  There is one array for each file,
     # accessed by the filename.
-    h5file.createGroup('/', 'rawdata')
+    h5file.create_group('/', 'rawdata')
 
     # cell group has cell stacks as CArrays - one for each file from which
     #    cells came
     # cell group also has template used for cropping
-    h5file.createGroup('/', 'cells')
+    h5file.create_group('/', 'cells')
 
     # mda cell results has factors/score images for cell data.  These are
     #  nested:
@@ -135,7 +135,7 @@ def get_image_h5file(filename):
     #     - which image they (the cells) originated from
     #       - Factors
     #       - Scores
-    h5file.createGroup('/', 'mda_results')
+    h5file.create_group('/', 'mda_results')
     
     # Finally, a logging table.  Every GUI interaction will log here so that people *should* be
     #   able to reproduce any of their results.  Its columns are:
@@ -154,9 +154,9 @@ def get_spectrum_h5file(filename):
     h5file = tables.open_file('%s.chest'%filename,'w')
     data_outline = h5file.create_table('/', 'image_description', 
                                      SpectrumDataTable)
-    imgGroup = h5file.createGroup('/', 'rawdata')
+    imgGroup = h5file.create_group('/', 'rawdata')
     # image MDA results group
-    mdaGroup = h5file.createGroup('/', 'mda_results')
+    mdaGroup = h5file.create_group('/', 'mda_results')
 
     h5file.flush()
 

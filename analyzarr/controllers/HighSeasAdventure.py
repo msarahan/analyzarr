@@ -23,6 +23,7 @@ from analyzarr.lib.cv import peak_char as pc
 from analyzarr.lib.io import file_import
 from analyzarr.testing.test_pattern import get_test_pattern
 from analyzarr.Release import version
+from analyzarr.ui.progress import PyFaceProgress
 
 from scipy.misc import imsave
 import numpy as np
@@ -62,8 +63,11 @@ class HighSeasAdventure(HasTraits):
         self.cell_controller = CellController(parent=self, 
                                               treasure_chest=self.chest)
         
+    def add_image_data(self, data, name):
+        self.image_controller.add_data(data,name)
+        
     def add_cell_data(self, data, name):
-        self.cell_controller.add_cell_data(data,name)
+        self.cell_controller.add_data(data,name)
 
     def update_mda_data(self):
         self.mda_controller = MDAViewController(parent=self, 
@@ -129,7 +133,7 @@ class HighSeasAdventure(HasTraits):
         # delete the file for cleanliness?
 
     def characterize_peaks(self):
-        has_cells = self.cell_controller._can_change_idx
+        has_cells = self.cell_controller.get_num_files()>0
         # TODO: need to make peak width a user-specified value, or some
         #   auto-detect algorithm...
         self.image_controller.characterize_peaks()
@@ -194,7 +198,8 @@ class HighSeasAdventure(HasTraits):
             # any errors will be because the table doesn't exist. That's OK.
             pass                
         # get the average cell image and find peaks on it
-        peaks=pc.two_dim_findpeaks(self.cell_controller.get_average_cell())
+        peaks=pc.two_dim_findpeaks(self.cell_controller.get_average_cell(), 
+                                   xc_filter=False, kill_edges=False)
         # generate a list of column names
         names = [('x%i, y%i, dx%i, dy%i, h%i, o%i, e%i, sx%i, sy%i' % ((x,)*9)).split(', ') 
                  for x in xrange(peaks.shape[0])]
@@ -212,8 +217,6 @@ class HighSeasAdventure(HasTraits):
         
         self.chest.set_node_attr('/cell_peaks','number_of_peaks', peaks.shape[0])
         self.chest.flush()
-        
-        global_peak_chars = np.zeros((self.cell_controller.get_num_files()),dtype=dtypes)
         
         # loop over each peak, finding the peak that best matches this cell's position
         #     plus the offset for the peak.
@@ -252,5 +255,6 @@ class HighSeasAdventure(HasTraits):
             self.chest.root.cell_peaks.append(data)
             self.chest.root.cell_peaks.flush()
         self.chest.flush()
+        self.cell_controller._can_show_peak_ids=True
             
         

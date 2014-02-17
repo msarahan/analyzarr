@@ -1,5 +1,8 @@
 from traits.api import Int, Bool
 from analyzarr.ui.renderers import HasRenderer
+import tables as tb
+
+from analyzarr.lib.io.data_structure import filters
 
 class ControllerBase(HasRenderer):
     # current image index
@@ -62,6 +65,17 @@ class ControllerBase(HasRenderer):
             
     def log_action(self, action, **parameters):
         self.parent.log_action(action, **parameters)
+        
+    def add_data(self, data, name):
+        import tables as tb
+        array = self.chest.create_carray(self.data_path,
+                                         name,
+                                         tb.Atom.from_dtype(data.dtype),
+                                         data.shape,
+                                         filters = filters,
+                                         )
+        array[:] = data
+        self.chest.flush()        
         
     def get_expression_data(self, expression, table_loc=None, filename=None):
         import tables

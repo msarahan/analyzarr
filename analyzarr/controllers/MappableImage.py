@@ -3,7 +3,7 @@ from traits.api import Bool, List, Int, Float, Range, String, on_trait_change
 import numpy as np
 import tables as t
 
-from pyface.api import ProgressDialog
+from analyzarr.ui.progress import PyFaceProgress
 
 class MappableImageController(BaseImageController):
     _can_map_peaks = Bool(False)
@@ -26,10 +26,17 @@ class MappableImageController(BaseImageController):
             self.numfiles = len(self.nodes)
             if self.numfiles >0:
                 self.init_plot()
-                print "initialized plot for data in %s" % data_path
                 self._can_crop_cells = True
                 self.parent.show_image_view=True
                 self.update_peak_map_choices()
+    
+    def add_data(self, data, name):
+        super(MappableImageController, self).add_data(data, name)
+        row = self.chest.root.image_description.row
+        row["idx"]=self.chest.root.image_description.nrows
+        row["filename"]="average"
+        row.append()
+        self.chest.root.image_description.flush()
     
     def get_characteristic_name(self):
         return self._characteristics[self._characteristic]
@@ -61,7 +68,7 @@ class MappableImageController(BaseImageController):
     def get_numpeaks(self):
         return self.chest.root.image_peaks.nrows
     
-    def characterize_peaks(self, peak_width=None):
+    def characterize_peaks(self, peak_width=None, progress_object=PyFaceProgress()):
         from lib.io.data_structure import ImagePeakTable
         import lib.cv.peak_char as pc
         # clear out the existing peak data table
@@ -76,16 +83,15 @@ class MappableImageController(BaseImageController):
         self.chest.create_table('/', 'image_peaks', ImagePeakTable)
         table = self.chest.root.image_peaks
         nodes = self.chest.list_nodes('/rawdata')
-        progress = ProgressDialog(title="Image characterization progress", 
-                                                  message="Characterizing peaks on %d images..."%len(nodes),
-                                                  max=int(len(nodes)), show_time=True, can_cancel=False)
-        progress.open()
-        img_idx=0
+        progress_object.initialize("Characterizing peaks on images", int(len(
+                                                                    nodes)))
         for node in nodes:
-            # TODO: progress bar here for image progress
-            # TODO: progress bar for characterizing each peak (within this function call...)
             # uses default median filter radius of 5 pixels
-            peak_data = pc.peak_attribs_image(node[:],peak_width=peak_width)
+            if node.name=="average":
+                peak_data = pc.peak_attribs_image(node[:],xc_filter=False,
+                                                  kill_edges=False)
+            else:
+                peak_data = pc.peak_attribs_image(node[:],peak_width=peak_width)
             # prepend the filename and index columns
             dtypes = ['i8','|S250']+['f8']*9
             dtypes = zip(table.colnames, dtypes)
@@ -101,8 +107,7 @@ class MappableImageController(BaseImageController):
             self.chest.root.image_peaks.append(data)
             self.chest.root.image_peaks.flush()
             self.chest.flush()
-            img_idx += 1
-            progress.update(int(img_idx))
+            progress_object.increment()
             
         # update the menu since we now (probably) have peaks to map.
         self.update_peak_map_choices()
@@ -183,9 +188,9 @@ class MappableImageController(BaseImageController):
                             except:
                                 pass                        
                 else:
-                    x_comp = self.get_expression_data("%sx%i"%(field,self._selected_peak),
+                    x_comp = self.get_expression_data("%sx%s"%(field,self._peak_ids[self._selected_peak]),
                                                       table_loc="/cell_peaks")
-                    y_comp = self.get_expression_data("%sy%i"%(field,self._selected_peak),
+                    y_comp = self.get_expression_data("%sy%s"%(field,self._peak_ids[self._selected_peak]),
                                                       table_loc="/cell_peaks")
 
                 if x_comp is not None:
@@ -214,7 +219,9 @@ class MappableImageController(BaseImageController):
         else:
             if 'color' in self.plotdata.arrays:
                 try:
+                    self.plot.datasources.clear()
                     self.plotdata.del_data('color')
+                    self.plot.request_redraw()
                 except:
                     pass
 
