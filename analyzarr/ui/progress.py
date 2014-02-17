@@ -13,19 +13,19 @@ class IProgress(HasTraits):
     """
     progress = Instance(ProgressDialog)
     current_idx = Int(0)
-    def initialize(title, max_index):
+    def initialize(self, title, max_index):
         raise NotImplementedError("initialize not implemented in interface!")
     
-    def increment():
+    def increment(self):
         raise NotImplementedError("increment not implemented in interface!")
 
 class PyFaceProgress(IProgress):
-    def initialize(title, max_index):
+    def initialize(self, title, max_index):
         self.progress = ProgressDialog(title="Characterizing %d peaks on current image"%max_index, 
                           max=int(max_index), show_time=True, can_cancel=False)
         self.progress.open()
         
-    def increment():
+    def increment(self):
         self.current_idx+=1
         self.progress.update(self.current_idx)
 
