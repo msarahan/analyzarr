@@ -19,7 +19,7 @@
 
 name = 'analyzarr'
 
-version = '0.1.1'
+version = '0.1.3'
 
 description = "Hyperdimensional data analysis for pirates, by pirates"
 
