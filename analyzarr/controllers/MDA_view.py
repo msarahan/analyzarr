@@ -99,15 +99,17 @@ class MDAViewController(BaseImageController):
 
             if self.get_vector_name() != "None":
                 field = ''
+                y_invert=1
                 if self.get_vector_name() == 'Shifts':
                     field = 'd'
+                    y_invert=-1
                 elif self.get_vector_name() == 'Skew':
                     field = 's'
                 if field != '':
                     vector_x_keys = ['%sx%i' % (field, i) for i in xrange(numpeaks)]
                     vector_y_keys = ['%sy%i' % (field, i) for i in xrange(numpeaks)]
                     vector_x = np.array(component[vector_x_keys]).view(float).reshape((-1,1))
-                    vector_y = np.array(component[vector_y_keys]).view(float).reshape((-1,1))
+                    vector_y = y_invert*np.array(component[vector_y_keys]).view(float).reshape((-1,1))
                     vectors = np.hstack((vector_x,vector_y))
                     vectors *= self.vector_scale
                     self.factor_plotdata.set_data('vectors',vectors)

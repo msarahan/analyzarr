@@ -69,8 +69,8 @@ class MappableImageController(BaseImageController):
         return self.chest.root.image_peaks.nrows
     
     def characterize_peaks(self, peak_width=None, progress_object=PyFaceProgress()):
-        from lib.io.data_structure import ImagePeakTable
-        import lib.cv.peak_char as pc
+        from analyzarr.lib.io.data_structure import ImagePeakTable
+        import analyzarr.lib.cv.peak_char as pc
         # clear out the existing peak data table
         # TODO: there's probably a better way to intelligently only recalculate
         #    peaks as necessary for new images, or if peak_width changes.
@@ -192,6 +192,8 @@ class MappableImageController(BaseImageController):
                                                       table_loc="/cell_peaks")
                     y_comp = self.get_expression_data("%sy%s"%(field,self._peak_ids[self._selected_peak]),
                                                       table_loc="/cell_peaks")
+                    if field=='d':
+                        y_comp*=-1
 
                 if x_comp is not None:
                     vectors = np.vstack((x_comp, y_comp)).T
